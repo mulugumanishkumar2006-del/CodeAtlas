@@ -38,6 +38,17 @@ class AuthService:
             return None
 
     async def login_with_github(self, db: Session, code: str) -> User:
+        # Stub bypass for local testing if GitHub secrets are stubbed
+        if code == "stub_code":
+            stub_user = User(
+                id="12345",
+                username="github_stub_user",
+                name="Stub User",
+                email="stub@codeatlas.com",
+                avatar_url="https://github.com/identicons/stub.png",
+            )
+            return user_repository.save(db, stub_user)
+
         async with httpx.AsyncClient() as client:
             token_response = await client.post(
                 "https://github.com/login/oauth/access_token",
@@ -58,16 +69,6 @@ class AuthService:
             token_data = token_response.json()
             access_token = token_data.get("access_token")
             if not access_token:
-                # Stub bypass for local testing if GitHub secrets are stubbed
-                if code == "stub_code":
-                    stub_user = User(
-                        id="12345",
-                        username="github_stub_user",
-                        name="Stub User",
-                        email="stub@codeatlas.com",
-                        avatar_url="https://github.com/identicons/stub.png",
-                    )
-                    return user_repository.save(db, stub_user)
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=(
