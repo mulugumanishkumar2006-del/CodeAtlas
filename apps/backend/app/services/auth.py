@@ -4,6 +4,7 @@ from typing import Optional
 import httpx
 import jwt
 from fastapi import HTTPException, status
+from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models.user import User
@@ -24,7 +25,7 @@ class AuthService:
             payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM
         )
 
-    def verify_token(self, token: str) -> Optional[User]:
+    def verify_token(self, db: Session, token: str) -> Optional[User]:
         try:
             payload = jwt.decode(
                 token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM]
@@ -32,11 +33,11 @@ class AuthService:
             user_id: Optional[str] = payload.get("sub")
             if not user_id:
                 return None
-            return user_repository.get_by_id(user_id)
+            return user_repository.get_by_id(db, user_id)
         except (jwt.PyJWTError, ValueError):
             return None
 
-    async def login_with_github(self, code: str) -> User:
+    async def login_with_github(self, db: Session, code: str) -> User:
         async with httpx.AsyncClient() as client:
             token_response = await client.post(
                 "https://github.com/login/oauth/access_token",
@@ -66,7 +67,7 @@ class AuthService:
                         email="stub@codeatlas.com",
                         avatar_url="https://github.com/identicons/stub.png",
                     )
-                    return user_repository.save(stub_user)
+                    return user_repository.save(db, stub_user)
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=(
@@ -95,4 +96,4 @@ class AuthService:
                 email=github_user.get("email"),
                 avatar_url=github_user.get("avatar_url"),
             )
-            return user_repository.save(user)
+            return user_repository.save(db, user)

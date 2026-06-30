@@ -17,6 +17,16 @@ class Settings(BaseSettings):
     GITHUB_CLIENT_SECRET: str = "stub_client_secret"
     GITHUB_REDIRECT_URI: str = "http://localhost:3000/login/callback"
 
+    # Database Settings
+    DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/codeatlas"
+
+    # Celery & Redis Settings
+    CELERY_BROKER_URL: str = "redis://localhost:6379/0"
+    CELERY_RESULT_BACKEND: str = "redis://localhost:6379/0"
+
+    # Repository Storage Settings
+    CLONED_REPOS_DIR: str = "cloned_repos"
+
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", case_sensitive=True
     )

@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordBearer
+from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.database import get_db
 from app.models.user import User
 from app.schemas.token import Token
 from app.schemas.user import UserResponse
@@ -20,6 +22,7 @@ def get_auth_service() -> AuthService:
 
 def get_current_user(
     token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
     auth_service: AuthService = Depends(get_auth_service),
 ) -> User:
     if not token:
@@ -28,7 +31,7 @@ def get_current_user(
             detail="Not authenticated",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    user = auth_service.verify_token(token)
+    user = auth_service.verify_token(db, token)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -52,13 +55,14 @@ def github_login_redirect():
 @router.post("/auth/github/callback", response_model=Token)
 async def github_callback(
     payload: dict,
+    db: Session = Depends(get_db),
     auth_service: AuthService = Depends(get_auth_service),
 ):
     code = payload.get("code")
     if not code:
         raise HTTPException(status_code=400, detail="Authorization code is missing")
 
-    user = await auth_service.login_with_github(code)
+    user = await auth_service.login_with_github(db, code)
     token_str = auth_service.generate_token(user)
     return Token(access_token=token_str, token_type="bearer")
 
