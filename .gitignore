@@ -4,3 +4,5 @@ dist/
 build/
 .pnpm-store/
 *.log
+__pycache__/
+*.pyc
