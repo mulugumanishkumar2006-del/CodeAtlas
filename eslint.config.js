@@ -5,6 +5,6 @@ export default [
   eslint.configs.recommended,
   prettier,
   {
-    ignores: ['**/node_modules/**', '**/.venv/**', 'dist/**', 'build/**'],
+    ignores: ['**/node_modules/**', '**/.venv/**', '**/dist/**', '**/build/**', '**/.next/**'],
   },
 ];
