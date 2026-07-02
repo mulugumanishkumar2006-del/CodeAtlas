@@ -8,7 +8,7 @@ from app.models import base_models
 from app.core.config import settings
 # pyrefly: ignore [missing-import]
 from app.core.logging import setup_logging
-# pyrefly: ignore [missing-import]
+from app.core.neo4j_client import neo4j_client
 
 
 setup_logging()
@@ -17,6 +17,16 @@ app = FastAPI(
     title=settings.PROJECT_NAME,
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
 )
+
+
+@app.on_event("startup")
+def startup_event():
+    neo4j_client.connect()
+
+
+@app.on_event("shutdown")
+def shutdown_event():
+    neo4j_client.close()
 
 # CORS configuration
 app.add_middleware(

@@ -502,3 +502,94 @@ def orphan_function():
     orphans_data = res.json()
     orphan_ids = {o["id"] for o in orphans_data["orphans"]}
     assert file_z_node["id"] in orphan_ids
+
+
+def test_neo4j_and_knowledge_graph_builder(client):
+    import shutil
+    from app.services.parse_service import ParseService
+    from app.core.config import settings
+    from app.core.neo4j_client import neo4j_client
+
+    # 1. Setup mock repository files on disk matching services, tables, routers, libs, envs
+    repo_id = "test_graph_repo"
+    cloned_dir = os.path.join(settings.CLONED_REPOS_DIR, repo_id)
+    shutil.rmtree(cloned_dir, ignore_errors=True)
+    os.makedirs(os.path.join(cloned_dir, "app"), exist_ok=True)
+
+    # API Endpoint node check: router/endpoint context
+    api_content = """\
+def execute_endpoint():
+    pass
+"""
+    with open(os.path.join(cloned_dir, "app", "api_router.py"), "w", encoding="utf-8") as f:
+        f.write(api_content)
+
+    # Service layer node check: service/Service context
+    service_content = """\
+def run_auth_service():
+    pass
+"""
+    with open(os.path.join(cloned_dir, "app", "auth_service.py"), "w", encoding="utf-8") as f:
+        f.write(service_content)
+
+    # Database Table class check
+    db_content = """\
+class UserDBModel:
+    pass
+"""
+    with open(os.path.join(cloned_dir, "app", "db_model.py"), "w", encoding="utf-8") as f:
+        f.write(db_content)
+
+    # requirements.txt mapping External Library entities
+    with open(os.path.join(cloned_dir, "requirements.txt"), "w", encoding="utf-8") as f:
+        f.write("fastapi>=0.110.0\npytest>=9.1.1\n")
+
+    # .env mapping Environment Variables
+    with open(os.path.join(cloned_dir, ".env"), "w", encoding="utf-8") as f:
+        f.write("API_KEY=secret_key_123\n")
+
+    # 2. Parse repository
+    db = SessionLocal()
+    try:
+        parse_service = ParseService()
+        parse_service.parse_repository(db, repo_id)
+    finally:
+        db.close()
+
+    # 3. Query Neo4j to verify nodes and relationships exist
+    session = neo4j_client.get_session()
+    assert session is not None
+    try:
+        # Check Repository node
+        res_repo = session.run("MATCH (r:Repository {id: $repo_id}) RETURN r", repo_id=repo_id)
+        assert res_repo.single() is not None
+
+        # Check Service node
+        res_srv = session.run("MATCH (s:Service {repository_id: $repo_id}) RETURN s", repo_id=repo_id)
+        records_srv = list(res_srv)
+        assert len(records_srv) > 0
+
+        # Check API Endpoint node
+        res_api = session.run("MATCH (a:API_Endpoint {repository_id: $repo_id}) RETURN a", repo_id=repo_id)
+        records_api = list(res_api)
+        assert len(records_api) > 0
+
+        # Check Database Table node
+        res_tbl = session.run("MATCH (d:Database_Table {repository_id: $repo_id}) RETURN d", repo_id=repo_id)
+        records_tbl = list(res_tbl)
+        assert len(records_tbl) > 0
+
+        # Check External Library node
+        res_lib = session.run("MATCH (l:External_Library {id: 'lib::fastapi'}) RETURN l")
+        assert res_lib.single() is not None
+
+        # Check Environment Variable node
+        res_env = session.run("MATCH (e:Environment_Variable {name: 'API_KEY', repository_id: $repo_id}) RETURN e", repo_id=repo_id)
+        assert res_env.single() is not None
+
+        # Check semantic connections HAS_MODULE
+        res_has_mod = session.run("MATCH (r:Repository {id: $repo_id})-[h:HAS_MODULE]->() RETURN h", repo_id=repo_id)
+        assert len(list(res_has_mod)) > 0
+
+    finally:
+        session.close()

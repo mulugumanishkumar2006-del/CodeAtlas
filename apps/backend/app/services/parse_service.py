@@ -16,6 +16,7 @@ from app.models.repository_statistics import RepositoryStatistics
 from app.models.graph_node import GraphNode
 from app.models.graph_relationship import GraphRelationship
 from app.models.graph_enums import GraphNodeType, GraphRelationshipType
+from app.core.neo4j_client import neo4j_client
 
 from app.services.scanner import RepositoryScanner
 from app.services.language_detector import LanguageDetector, Language
@@ -347,6 +348,196 @@ class ParseService:
                     line=edge.line,
                 )
                 db.add(db_rel)
+
+            # === Neo4j Knowledge Graph Integration ===
+            try:
+                session = neo4j_client.get_session()
+                if session:
+                    # 1. Clear old data for repo
+                    session.run("MATCH (n {repository_id: $repo_id}) DETACH DELETE n", repo_id=repo_id)
+                    session.run("MATCH (n:Repository {id: $repo_id}) DETACH DELETE n", repo_id=repo_id)
+
+                    # 2. Create Repository Node
+                    session.run(
+                        "MERGE (n:Repository {id: $id}) SET n.name = $name, n.type = 'Repository'",
+                        id=repo_id, name=repo_id
+                    )
+
+                    # 3. Create Folder Nodes
+                    for folder in folder_paths:
+                        folder_id = f"folder::{folder}"
+                        folder_name = folder.split("/")[-1]
+                        session.run(
+                            "MERGE (n:Folder {id: $id, repository_id: $repo_id}) "
+                            "SET n.name = $name, n.type = 'Folder' "
+                            "SET n += $props",
+                            id=folder_id, repo_id=repo_id, name=folder_name, props={"path": folder}
+                        )
+
+                    # 4. Create GraphNodes from ast extraction
+                    for node_id, node in graph.nodes.items():
+                        # Map type to label
+                        label = "File"
+                        kind_lower = node.kind.lower()
+                        if kind_lower == "file":
+                            label = "File"
+                        elif kind_lower == "module":
+                            label = "Module"
+                        elif kind_lower == "class":
+                            label = "Class"
+                        elif kind_lower == "interface":
+                            label = "Interface"
+                        elif kind_lower in ("function", "method"):
+                            label = "Function" if kind_lower == "function" else "Method"
+                        elif kind_lower == "variable":
+                            label = "Variable"
+
+                        # Additional check for Service layer naming pattern
+                        is_service = "service" in node.name.lower() or "service" in node_id.lower()
+                        labels = [label]
+                        if is_service:
+                            labels.append("Service")
+
+                        # Database connection or table checks
+                        is_db = "db" in node.name.lower() or "database" in node_id.lower() or "model" in node.name.lower()
+                        if is_db and label == "Class":
+                            labels.append("Database_Table")
+
+                        # API check
+                        is_api = "api" in node.name.lower() or "router" in node_id.lower() or "endpoint" in node.name.lower()
+                        if is_api:
+                            labels.append("API_Endpoint")
+
+                        # Build Cypher labels string e.g. "File:Service"
+                        labels_str = ":".join(labels)
+
+                        # Flatten properties for Neo4j primitive support
+                        raw_props = node.metadata or {}
+                        flat_props = {}
+                        for k, v in raw_props.items():
+                            if isinstance(v, (dict, list)):
+                                flat_props[k] = str(v)
+                            else:
+                                flat_props[k] = v
+                        
+                        session.run(
+                            f"MERGE (n:{labels_str} {{id: $id, repository_id: $repo_id}}) "
+                            "SET n.name = $name, n.type = $type "
+                            "SET n += $props",
+                            id=node.id, repo_id=repo_id, name=node.name, type=node.kind, props=flat_props
+                        )
+
+                    # 5. Create Relationships
+                    for edge in graph.edges:
+                        rel_type = "DEPENDS_ON"
+                        kind = edge.kind.value
+                        if kind == "imports":
+                            rel_type = "IMPORTS"
+                        elif kind == "calls":
+                            rel_type = "CALLS"
+                        elif kind == "inherits":
+                            rel_type = "INHERITS"
+                        elif kind == "composition":
+                            rel_type = "USES"
+
+                        session.run(
+                            f"MATCH (a {{id: $src, repository_id: $repo_id}}), (b {{id: $tgt}}) "
+                            f"MERGE (a)-[r:{rel_type}]->(b)",
+                            src=edge.source_id, tgt=edge.target_id, repo_id=repo_id
+                        )
+
+                    # 6. Parse external dependencies/libs (requirements.txt or package.json)
+                    cloned_dir = os.path.join(settings.CLONED_REPOS_DIR, repo_id)
+                    req_path = os.path.join(cloned_dir, "requirements.txt")
+                    if os.path.exists(req_path):
+                        with open(req_path, "r") as f:
+                            for line in f:
+                                lib = line.strip().split(">=")[0].split("==")[0].strip()
+                                if lib and not lib.startswith("#"):
+                                    session.run(
+                                        "MERGE (l:External_Library {id: $id}) "
+                                        "SET l.name = $name, l.type = 'External Library'",
+                                        id=f"lib::{lib}", name=lib
+                                    )
+                                    session.run(
+                                        "MATCH (r:Repository {id: $repo_id}), (l:External_Library {id: $lib_id}) "
+                                        "MERGE (r)-[:DEPENDS_ON_LIB]->(l)",
+                                        repo_id=repo_id, lib_id=f"lib::{lib}"
+                                    )
+
+                    # 7. Parse env vars (.env)
+                    env_path = os.path.join(cloned_dir, ".env")
+                    if os.path.exists(env_path):
+                        with open(env_path, "r") as f:
+                            for line in f:
+                                if "=" in line and not line.strip().startswith("#"):
+                                    parts = line.split("=")
+                                    var_name = parts[0].strip()
+                                    var_val = parts[1].strip() if len(parts) > 1 else ""
+                                    if var_name:
+                                        session.run(
+                                            "MERGE (e:Environment_Variable {id: $id, repository_id: $repo_id}) "
+                                            "SET e.name = $name, e.type = 'Environment Variable', e.value = $val",
+                                            id=f"env::{repo_id}::{var_name}", repo_id=repo_id, name=var_name, val=var_val
+                                        )
+
+                    # 8. Create Cache, Queue, Configuration placeholders if settings suggest them
+                    has_redis = False
+                    has_celery = False
+                    for n in graph.nodes.values():
+                        n_lower = n.name.lower()
+                        if "redis" in n_lower or "cache" in n_lower:
+                            has_redis = True
+                        if "celery" in n_lower or "queue" in n_lower:
+                            has_celery = True
+
+                    if has_redis:
+                        session.run(
+                            "MERGE (c:Cache {id: $id, repository_id: $repo_id}) SET c.name = 'RedisCache', c.type = 'Cache'",
+                            id=f"cache::{repo_id}::redis", repo_id=repo_id
+                        )
+                    if has_celery:
+                        session.run(
+                            "MERGE (q:Queue {id: $id, repository_id: $repo_id}) SET q.name = 'CeleryQueue', q.type = 'Queue'",
+                            id=f"queue::{repo_id}::celery", repo_id=repo_id
+                        )
+
+                    # 9. Build semantic Knowledge Graph hierarchy connections (Feature 2)
+                    # Repository -> Module -> Service -> API -> Database
+                    
+                    # Link Repository containing Modules/Folders
+                    session.run(
+                        "MATCH (r:Repository {id: $repo_id}), (m {repository_id: $repo_id}) "
+                        "WHERE m:Folder OR m:Module OR m:File "
+                        "MERGE (r)-[:HAS_MODULE]->(m)",
+                        repo_id=repo_id
+                    )
+
+                    # Link Modules/Folders containing Services
+                    session.run(
+                        "MATCH (m {repository_id: $repo_id}), (s:Service {repository_id: $repo_id}) "
+                        "WHERE (m:Folder OR m:Module) AND m.id <> s.id "
+                        "MERGE (m)-[:HAS_SERVICE]->(s)",
+                        repo_id=repo_id
+                    )
+
+                    # Link Services exposing API Endpoints
+                    session.run(
+                        "MATCH (s:Service {repository_id: $repo_id}), (a:API_Endpoint {repository_id: $repo_id}) "
+                        "MERGE (s)-[:EXPOSES_API]->(a)",
+                        repo_id=repo_id
+                    )
+
+                    # Link Services writing/reading Database Tables
+                    session.run(
+                        "MATCH (s {repository_id: $repo_id}), (d:Database_Table {repository_id: $repo_id}) "
+                        "WHERE s:Service OR s.type = 'Repository' "
+                        "MERGE (s)-[:WRITES_TO]->(d)",
+                        repo_id=repo_id
+                    )
+
+            except Exception as neo_err:
+                print(f"Error populating Neo4j knowledge graph: {neo_err}")
         except Exception as e:
             print(f"Error populating universal graph: {e}")
             pass

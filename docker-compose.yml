@@ -34,6 +34,9 @@ services:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/codeatlas
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - NEO4J_URL=bolt://neo4j:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=codeatlaspass
     depends_on:
       db:
         condition: service_healthy
@@ -53,6 +56,9 @@ services:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/codeatlas
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - NEO4J_URL=bolt://neo4j:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=codeatlaspass
     depends_on:
       db:
         condition: service_healthy
@@ -79,6 +85,19 @@ services:
     depends_on:
       - frontend
       - backend
+
+  neo4j:
+    image: neo4j:5.12.0-community
+    ports:
+      - '7474:7474'
+      - '7687:7687'
+    environment:
+      - NEO4J_AUTH=neo4j/codeatlaspass
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p codeatlaspass 'RETURN 1'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
 volumes:
   postgres_data:
