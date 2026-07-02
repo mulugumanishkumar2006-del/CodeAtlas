@@ -32,4 +32,10 @@ class Repository(Base):
     statistics = relationship(
         "RepositoryStatistics", back_populates="repository", uselist=False, cascade="all, delete-orphan"
     )
+    graph_nodes = relationship(
+        "GraphNode", back_populates="repository", cascade="all, delete-orphan"
+    )
+    graph_relationships = relationship(
+        "GraphRelationship", back_populates="repository", cascade="all, delete-orphan"
+    )
 

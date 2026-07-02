@@ -10,3 +10,5 @@ from app.models.import_model import Import
 from app.models.relationship import Relationship
 from app.models.metric import Metric
 from app.models.repository_statistics import RepositoryStatistics
+from app.models.graph_node import GraphNode
+from app.models.graph_relationship import GraphRelationship
