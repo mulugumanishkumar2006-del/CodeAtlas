@@ -174,3 +174,67 @@ def get_impact_analysis(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repository not found")
 
     return analysis_service.run_impact_analysis(db, repo_id, request.symbol_name)
+
+
+@router.get("/repositories/{repo_id}/query/dependencies")
+def get_dependencies(
+    repo_id: str,
+    node_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    repo = db.query(Repository).filter(Repository.id == repo_id).first()
+    if not repo or repo.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repository not found")
+    return analysis_service.get_module_dependencies(db, repo_id, node_id)
+
+
+@router.get("/repositories/{repo_id}/query/callers")
+def get_callers(
+    repo_id: str,
+    symbol_name: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    repo = db.query(Repository).filter(Repository.id == repo_id).first()
+    if not repo or repo.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repository not found")
+    return analysis_service.get_function_callers(db, repo_id, symbol_name)
+
+
+@router.get("/repositories/{repo_id}/query/imports")
+def get_imports(
+    repo_id: str,
+    node_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    repo = db.query(Repository).filter(Repository.id == repo_id).first()
+    if not repo or repo.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repository not found")
+    return analysis_service.get_import_tree(db, repo_id, node_id)
+
+
+@router.get("/repositories/{repo_id}/query/downstream")
+def get_downstream(
+    repo_id: str,
+    node_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    repo = db.query(Repository).filter(Repository.id == repo_id).first()
+    if not repo or repo.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repository not found")
+    return analysis_service.get_downstream_impact(db, repo_id, node_id)
+
+
+@router.get("/repositories/{repo_id}/query/orphans")
+def get_orphans(
+    repo_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    repo = db.query(Repository).filter(Repository.id == repo_id).first()
+    if not repo or repo.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repository not found")
+    return analysis_service.find_orphan_modules(db, repo_id)

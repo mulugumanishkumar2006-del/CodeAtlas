@@ -259,3 +259,205 @@ class AnalysisService:
                 for n in affected_nodes
             ]
         }
+
+    def get_module_dependencies(self, db: Session, repo_id: str, node_id: str) -> Dict[str, Any]:
+        """
+        Show direct dependencies of a module (outgoing edges).
+        """
+        node = db.query(GraphNode).filter(GraphNode.id == node_id, GraphNode.repository_id == repo_id).first()
+        if not node:
+            return {"error": "Node not found", "dependencies": []}
+
+        relationships = db.query(GraphRelationship).filter(
+            GraphRelationship.repository_id == repo_id,
+            GraphRelationship.source_id == node_id
+        ).all()
+
+        target_ids = [r.target_id for r in relationships]
+        targets = db.query(GraphNode).filter(
+            GraphNode.repository_id == repo_id,
+            GraphNode.id.in_(target_ids)
+        ).all() if target_ids else []
+
+        return {
+            "node": {"id": node.id, "name": node.name, "type": node.type},
+            "dependencies": [
+                {
+                    "relationship_id": r.id,
+                    "type": r.type,
+                    "properties": r.properties,
+                    "target": {"id": t.id, "name": t.name, "type": t.type}
+                }
+                for r in relationships
+                for t in targets if t.id == r.target_id
+            ]
+        }
+
+    def get_function_callers(self, db: Session, repo_id: str, symbol_name: str) -> Dict[str, Any]:
+        """
+        Show all callers of a function (incoming CALLS edges).
+        """
+        function_nodes = db.query(GraphNode).filter(
+            GraphNode.repository_id == repo_id,
+            GraphNode.name == symbol_name,
+            GraphNode.type.in_([GraphNodeType.FUNCTION.value, GraphNodeType.METHOD.value])
+        ).all()
+
+        if not function_nodes:
+            return {"symbol_name": symbol_name, "callers": []}
+
+        func_ids = [f.id for f in function_nodes]
+        relationships = db.query(GraphRelationship).filter(
+            GraphRelationship.repository_id == repo_id,
+            GraphRelationship.target_id.in_(func_ids),
+            GraphRelationship.type == "CALLS"
+        ).all()
+
+        source_ids = [r.source_id for r in relationships]
+        sources = db.query(GraphNode).filter(
+            GraphNode.repository_id == repo_id,
+            GraphNode.id.in_(source_ids)
+        ).all() if source_ids else []
+
+        return {
+            "symbol_name": symbol_name,
+            "callers": [
+                {
+                    "relationship_id": r.id,
+                    "properties": r.properties,
+                    "caller": {"id": s.id, "name": s.name, "type": s.type}
+                }
+                for r in relationships
+                for s in sources if s.id == r.source_id
+            ]
+        }
+
+    def get_import_tree(self, db: Session, repo_id: str, start_node_id: str) -> Dict[str, Any]:
+        """
+        Show import tree (transitive IMPORTS edges downwards).
+        """
+        relationships = db.query(GraphRelationship).filter(
+            GraphRelationship.repository_id == repo_id,
+            GraphRelationship.type == "IMPORTS"
+        ).all()
+
+        adj = collections.defaultdict(list)
+        for r in relationships:
+            adj[r.source_id].append(r)
+
+        visited_nodes: Set[str] = set()
+        tree_edges = []
+
+        def traverse(curr_id: str, depth: int):
+            if curr_id in visited_nodes or depth > 10:
+                return
+            visited_nodes.add(curr_id)
+            for edge in adj.get(curr_id, []):
+                tree_edges.append(edge)
+                traverse(edge.target_id, depth + 1)
+
+        traverse(start_node_id, 0)
+
+        all_node_ids = list(visited_nodes) + [e.target_id for e in tree_edges]
+        nodes = db.query(GraphNode).filter(
+            GraphNode.repository_id == repo_id,
+            GraphNode.id.in_(all_node_ids)
+        ).all() if all_node_ids else []
+
+        nodes_map = {n.id: {"id": n.id, "name": n.name, "type": n.type} for n in nodes}
+
+        return {
+            "start_node_id": start_node_id,
+            "nodes": list(nodes_map.values()),
+            "edges": [
+                {
+                    "id": e.id,
+                    "source_id": e.source_id,
+                    "target_id": e.target_id,
+                    "properties": e.properties
+                }
+                for e in tree_edges
+            ]
+        }
+
+    def get_downstream_impact(self, db: Session, repo_id: str, start_node_id: str) -> Dict[str, Any]:
+        """
+        Show downstream impact (transitive CALLS/IMPORTS/INHERITS edges downwards).
+        """
+        relationships = db.query(GraphRelationship).filter(GraphRelationship.repository_id == repo_id).all()
+
+        adj = collections.defaultdict(list)
+        for r in relationships:
+            adj[r.source_id].append(r)
+
+        visited_nodes: Set[str] = set()
+        impact_edges = []
+
+        queue = collections.deque([start_node_id])
+        while queue:
+            curr = queue.popleft()
+            if curr in visited_nodes:
+                continue
+            visited_nodes.add(curr)
+            for edge in adj.get(curr, []):
+                impact_edges.append(edge)
+                if edge.target_id not in visited_nodes:
+                    queue.append(edge.target_id)
+
+        all_node_ids = list(visited_nodes) + [e.target_id for e in impact_edges]
+        nodes = db.query(GraphNode).filter(
+            GraphNode.repository_id == repo_id,
+            GraphNode.id.in_(all_node_ids)
+        ).all() if all_node_ids else []
+
+        nodes_map = {n.id: {"id": n.id, "name": n.name, "type": n.type} for n in nodes}
+
+        return {
+            "start_node_id": start_node_id,
+            "nodes": list(nodes_map.values()),
+            "edges": [
+                {
+                    "id": e.id,
+                    "source_id": e.source_id,
+                    "target_id": e.target_id,
+                    "type": e.type,
+                    "properties": e.properties
+                }
+                for e in impact_edges
+            ]
+        }
+
+    def find_orphan_modules(self, db: Session, repo_id: str) -> Dict[str, Any]:
+        """
+        Find orphan modules (nodes of type File/Folder/Module with Fan-in = 0 and Fan-out = 0).
+        """
+        nodes = db.query(GraphNode).filter(
+            GraphNode.repository_id == repo_id,
+            GraphNode.type.in_([
+                GraphNodeType.FILE.value,
+                GraphNodeType.FOLDER.value,
+                GraphNodeType.MODULE.value
+            ])
+        ).all()
+
+        relationships = db.query(GraphRelationship).filter(GraphRelationship.repository_id == repo_id).all()
+
+        active_node_ids = {n.id for n in nodes}
+        connected_ids = set()
+
+        for r in relationships:
+            if r.source_id in active_node_ids:
+                connected_ids.add(r.source_id)
+            if r.target_id in active_node_ids:
+                connected_ids.add(r.target_id)
+
+        orphans = [
+            {"id": n.id, "name": n.name, "type": n.type}
+            for n in nodes
+            if n.id not in connected_ids
+        ]
+
+        return {
+            "total_orphans": len(orphans),
+            "orphans": orphans
+        }

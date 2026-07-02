@@ -21,7 +21,10 @@ import {
   ShieldCheck,
   Zap,
   HelpCircle,
-  FileText
+  FileText,
+  Network,
+  Eye,
+  Layers,
 } from 'lucide-react';
 import { useAuth } from '@/context/auth-context';
 import { Button } from '@/components/ui/button';
@@ -102,6 +105,152 @@ export default function Home() {
   // Active states
   const [activeFile, setActiveFile] = React.useState<FileData | null>(null);
   const [activeTab, setActiveTab] = React.useState<'metrics' | 'classes' | 'functions' | 'imports' | 'ast'>('metrics');
+
+  // Graph visualizer state
+  const [workspaceView, setWorkspaceView] = React.useState<'explorer' | 'graph'>('explorer');
+  const [graphNodes, setGraphNodes] = React.useState<any[]>([]);
+  const [graphEdges, setGraphEdges] = React.useState<any[]>([]);
+  const [layoutNodes, setLayoutNodes] = React.useState<any[]>([]);
+  const [selectedGraphNode, setSelectedGraphNode] = React.useState<any | null>(null);
+  const [graphSearchQuery, setGraphSearchQuery] = React.useState<string>('');
+  const [graphTypeFilter, setGraphTypeFilter] = React.useState<string>('all');
+  const [graphViewMode, setGraphViewMode] = React.useState<'all' | 'layers' | 'circular' | 'orphans'>('all');
+  const [highlightedNodes, setHighlightedNodes] = React.useState<Set<string>>(new Set());
+  const [highlightedEdges, setHighlightedEdges] = React.useState<Set<string>>(new Set());
+  const [graphLoading, setGraphLoading] = React.useState<boolean>(false);
+  const [graphErrorMessage, setGraphErrorMessage] = React.useState<string | null>(null);
+
+  // Zoom / Pan
+  const [zoom, setZoom] = React.useState<number>(1);
+  const [pan, setPan] = React.useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = React.useState<boolean>(false);
+  const [panStart, setPanStart] = React.useState<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  const fetchGraphData = React.useCallback(async () => {
+    if (!token || !selectedRepoId) return;
+    setGraphLoading(true);
+    setGraphErrorMessage(null);
+    try {
+      const res = await fetch(`/api/v1/repositories/${selectedRepoId}/graph`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setGraphNodes(data.nodes);
+        setGraphEdges(data.relationships);
+        
+        // Compute force layout positions
+        const nodes = data.nodes.map((n: any, idx: number) => {
+          const angle = (idx / (data.nodes.length || 1)) * 2 * Math.PI;
+          const radius = 180 + Math.random() * 60;
+          return {
+            ...n,
+            x: 400 + Math.cos(angle) * radius,
+            y: 300 + Math.sin(angle) * radius,
+            vx: 0,
+            vy: 0
+          };
+        });
+
+        const edges = data.relationships;
+        const width = 800;
+        const height = 600;
+        const repulsion = 12000;
+        const attraction = 0.04;
+
+        // Run force simulation ticks
+        for (let tick = 0; tick < 90; tick++) {
+          for (let i = 0; i < nodes.length; i++) {
+            for (let j = i + 1; j < nodes.length; j++) {
+              const dx = nodes[i].x - nodes[j].x;
+              const dy = nodes[i].y - nodes[j].y;
+              const dist = Math.sqrt(dx * dx + dy * dy) || 1.0;
+              if (dist < 350) {
+                const force = repulsion / (dist * dist);
+                const fx = (dx / dist) * force;
+                const fy = (dy / dist) * force;
+                nodes[i].vx += fx;
+                nodes[i].vy += fy;
+                nodes[j].vx -= fx;
+                nodes[j].vy -= fy;
+              }
+            }
+          }
+
+          for (const edge of edges) {
+            const source = nodes.find((n: any) => n.id === edge.source_id);
+            const target = nodes.find((n: any) => n.id === edge.target_id);
+            if (source && target) {
+              const dx = target.x - source.x;
+              const dy = target.y - source.y;
+              const dist = Math.sqrt(dx * dx + dy * dy) || 1.0;
+              const force = attraction * dist;
+              const fx = (dx / dist) * force;
+              const fy = (dy / dist) * force;
+              source.vx += fx;
+              source.vy += fy;
+              target.vx -= fx;
+              target.vy -= fy;
+            }
+          }
+
+          for (const node of nodes) {
+            // gravity force to center
+            const gc_x = 400 - node.x;
+            const gc_y = 300 - node.y;
+            node.vx += gc_x * 0.005;
+            node.vy += gc_y * 0.005;
+
+            node.x += node.vx;
+            node.y += node.vy;
+            node.vx *= 0.65;
+            node.vy *= 0.65;
+
+            node.x = Math.max(40, Math.min(width - 40, node.x));
+            node.y = Math.max(40, Math.min(height - 40, node.y));
+          }
+        }
+        setLayoutNodes(nodes);
+      } else {
+        setGraphErrorMessage("Failed to retrieve universal graph payload.");
+      }
+    } catch (e) {
+      console.error(e);
+      setGraphErrorMessage("Failed to fetch graph payload.");
+    } finally {
+      setGraphLoading(false);
+    }
+  }, [token, selectedRepoId]);
+
+  React.useEffect(() => {
+    if (workspaceView === 'graph' && selectedRepoId) {
+      fetchGraphData();
+    }
+    // Clear selections and highlights on change
+    setSelectedGraphNode(null);
+    setHighlightedNodes(new Set());
+    setHighlightedEdges(new Set());
+    setGraphViewMode('all');
+  }, [workspaceView, selectedRepoId, fetchGraphData]);
+
+  const handleMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
+    setIsPanning(true);
+    setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (!isPanning) return;
+    setPan({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
+  };
+
+  const handleMouseUp = () => {
+    setIsPanning(false);
+  };
+
+  const handleWheel = (e: React.WheelEvent<SVGSVGElement>) => {
+    const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+    setZoom((z) => Math.max(0.2, Math.min(4, z * zoomFactor)));
+  };
   
   // Folder expansion state in tree explorer
   const [expandedFolders, setExpandedFolders] = React.useState<Set<string>>(new Set());
@@ -376,6 +525,32 @@ export default function Home() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {selectedRepo?.status === 'cloned' && files.length > 0 && (
+            <div className="flex items-center rounded-lg border bg-muted/30 p-1 mr-2 shadow-inner">
+              <button
+                onClick={() => setWorkspaceView('explorer')}
+                className={cn(
+                  "px-3.5 py-1.5 rounded-md text-xs font-semibold tracking-tight transition-all",
+                  workspaceView === 'explorer' 
+                    ? "bg-background text-foreground shadow border" 
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                Workspace Explorer
+              </button>
+              <button
+                onClick={() => setWorkspaceView('graph')}
+                className={cn(
+                  "px-3.5 py-1.5 rounded-md text-xs font-semibold tracking-tight transition-all",
+                  workspaceView === 'graph' 
+                    ? "bg-background text-foreground shadow border" 
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                Interactive Dependency Graph
+              </button>
+            </div>
+          )}
           {repos.length > 0 ? (
             <div className="flex items-center gap-2">
               <select
@@ -494,6 +669,465 @@ export default function Home() {
           <Button onClick={handleParse} disabled={isParseLoading} className="mt-2 shadow-md">
             {isParseLoading ? 'Parsing...' : 'Trigger Parsing Engine'}
           </Button>
+        </div>
+      ) : workspaceView === 'graph' ? (
+        <div className="grid gap-6 grid-cols-1 lg:grid-cols-12 items-start h-[calc(100vh-230px)] overflow-hidden border rounded-2xl bg-card shadow-sm">
+          {/* Main Visualizer Canvas Area (8 cols) */}
+          <div className="lg:col-span-8 flex flex-col h-full overflow-hidden border-r relative select-none">
+            {/* Visualizer header & control options */}
+            <div className="p-4 border-b flex flex-wrap items-center justify-between bg-muted/20 gap-3">
+              <span className="font-semibold text-sm tracking-tight flex items-center gap-2">
+                <Network className="h-4.5 w-4.5 text-primary animate-pulse" />
+                Interactive Workspace Dependency Graph
+              </span>
+
+              {/* View options */}
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Search */}
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+                  <input
+                    type="text"
+                    placeholder="Search node..."
+                    value={graphSearchQuery}
+                    onChange={(e) => setGraphSearchQuery(e.target.value)}
+                    className="pl-8 pr-3 py-1 rounded-md border bg-background text-xs focus:outline-none focus:ring-1 focus:ring-primary w-32"
+                  />
+                </div>
+
+                {/* Filter Type */}
+                <select
+                  value={graphTypeFilter}
+                  onChange={(e) => setGraphTypeFilter(e.target.value)}
+                  className="rounded-md border bg-background px-2.5 py-1 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-primary shadow-sm"
+                >
+                  <option value="all">All Types</option>
+                  <option value="Folder">Folders</option>
+                  <option value="File">Files</option>
+                  <option value="Module">Modules</option>
+                  <option value="Class">Classes</option>
+                  <option value="Function">Functions</option>
+                </select>
+
+                {/* View Mode / Quick Query selectors */}
+                <select
+                  value={graphViewMode}
+                  onChange={async (e) => {
+                    const val = e.target.value as any;
+                    setGraphViewMode(val);
+                    setSelectedGraphNode(null);
+                    setHighlightedNodes(new Set());
+                    setHighlightedEdges(new Set());
+                    
+                    if (val === 'circular') {
+                      try {
+                        const res = await fetch(`/api/v1/repositories/${selectedRepoId}/analysis/circular`, {
+                          headers: { Authorization: `Bearer ${token}` }
+                        });
+                        if (res.ok) {
+                          const data = await res.json();
+                          const nodesSet = new Set<string>();
+                          const edgesSet = new Set<string>();
+                          data.cycles.forEach((cycleReport: any) => {
+                            cycleReport.cycle.forEach((nid: string) => nodesSet.add(nid));
+                          });
+                          graphEdges.forEach((e: any) => {
+                            if (nodesSet.has(e.source_id) && nodesSet.has(e.target_id)) {
+                              edgesSet.add(e.id);
+                            }
+                          });
+                          setHighlightedNodes(nodesSet);
+                          setHighlightedEdges(edgesSet);
+                        }
+                      } catch (err) { console.error(err); }
+                    } else if (val === 'orphans') {
+                      try {
+                        const res = await fetch(`/api/v1/repositories/${selectedRepoId}/query/orphans`, {
+                          headers: { Authorization: `Bearer ${token}` }
+                        });
+                        if (res.ok) {
+                          const data = await res.json();
+                          const nodesSet = new Set<string>(data.orphans.map((o: any) => o.id));
+                          setHighlightedNodes(nodesSet);
+                          setHighlightedEdges(new Set());
+                        }
+                      } catch (err) { console.error(err); }
+                    }
+                  }}
+                  className="rounded-md border bg-background px-2.5 py-1 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-primary shadow-sm text-primary"
+                >
+                  <option value="all">View Mode: Default</option>
+                  <option value="circular">Highlight Cycles</option>
+                  <option value="orphans">Highlight Orphans</option>
+                </select>
+
+                {/* Reset button */}
+                <Button
+                  variant="outline"
+                  size="xs"
+                  onClick={() => {
+                    setZoom(1);
+                    setPan({ x: 0, y: 0 });
+                    setSelectedGraphNode(null);
+                    setHighlightedNodes(new Set());
+                    setHighlightedEdges(new Set());
+                    setGraphSearchQuery('');
+                    setGraphTypeFilter('all');
+                    setGraphViewMode('all');
+                  }}
+                  className="text-xs h-7 px-2.5 rounded-md"
+                >
+                  Reset
+                </Button>
+              </div>
+            </div>
+
+            {/* Canvas Area */}
+            {graphLoading ? (
+              <div className="flex-1 flex flex-col items-center justify-center space-y-2">
+                <RefreshCw className="h-8 w-8 text-primary animate-spin" />
+                <span className="text-xs text-muted-foreground">Running force simulation layout...</span>
+              </div>
+            ) : graphErrorMessage ? (
+              <div className="flex-1 flex flex-col items-center justify-center p-6 text-center space-y-2">
+                <AlertCircle className="h-8 w-8 text-destructive" />
+                <p className="text-sm font-semibold">{graphErrorMessage}</p>
+                <Button size="sm" onClick={fetchGraphData}>Retry</Button>
+              </div>
+            ) : (
+              <div className="flex-1 relative bg-muted/5 overflow-hidden">
+                <svg
+                  className="w-full h-full cursor-grab active:cursor-grabbing"
+                  onMouseDown={handleMouseDown}
+                  onMouseMove={handleMouseMove}
+                  onMouseUp={handleMouseUp}
+                  onMouseLeave={handleMouseUp}
+                  onWheel={handleWheel}
+                >
+                  <defs>
+                    <pattern id="graph-grid" width="40" height="40" patternUnits="userSpaceOnUse">
+                      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="currentColor" strokeWidth="0.5" className="text-muted/10" />
+                    </pattern>
+                    <marker id="arrow" viewBox="0 0 10 10" refX="18" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                      <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor" className="text-muted-foreground/30" />
+                    </marker>
+                    <marker id="arrow-highlight" viewBox="0 0 10 10" refX="18" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+                      <path d="M 0 0 L 10 5 L 0 10 z" fill="#f43f5e" />
+                    </marker>
+                  </defs>
+                  
+                  <rect width="100%" height="100%" fill="url(#graph-grid)" />
+
+                  <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
+                    {/* Render Relationships (Edges) */}
+                    {graphEdges
+                      .filter((e: any) => {
+                        const srcNode = layoutNodes.find(n => n.id === e.source_id);
+                        const tgtNode = layoutNodes.find(n => n.id === e.target_id);
+                        if (!srcNode || !tgtNode) return false;
+                        if (graphTypeFilter !== 'all') {
+                          if (srcNode.type !== graphTypeFilter && tgtNode.type !== graphTypeFilter) return false;
+                        }
+                        return true;
+                      })
+                      .map((edge: any) => {
+                        const source = layoutNodes.find(n => n.id === edge.source_id);
+                        const target = layoutNodes.find(n => n.id === edge.target_id);
+                        if (!source || !target) return null;
+
+                        const isHighlighted = highlightedEdges.has(edge.id);
+                        const isNodeHighlighted = highlightedNodes.size > 0 && highlightedNodes.has(edge.source_id) && highlightedNodes.has(edge.target_id);
+                        const isFaded = highlightedNodes.size > 0 && (!highlightedNodes.has(edge.source_id) || !highlightedNodes.has(edge.target_id));
+                        
+                        let strokeColor = "stroke-muted-foreground/30";
+                        if (isHighlighted || isNodeHighlighted) {
+                          strokeColor = "stroke-rose-500 stroke-[2.5px]";
+                        } else if (edge.type === "IMPORTS") {
+                          strokeColor = "stroke-blue-500/50";
+                        } else if (edge.type === "CALLS") {
+                          strokeColor = "stroke-purple-500/50";
+                        } else if (edge.type === "INHERITS") {
+                          strokeColor = "stroke-amber-500/50";
+                        } else if (edge.type === "DEPENDS_ON") {
+                          strokeColor = "stroke-emerald-500/50";
+                        }
+
+                        return (
+                          <g key={edge.id}>
+                            <line
+                              x1={source.x}
+                              y1={source.y}
+                              x2={target.x}
+                              y2={target.y}
+                              className={cn(
+                                "transition-all duration-300",
+                                strokeColor,
+                                isFaded ? "opacity-5" : "opacity-80"
+                              )}
+                              markerEnd={isHighlighted || isNodeHighlighted ? "url(#arrow-highlight)" : "url(#arrow)"}
+                            />
+                            {(isHighlighted || isNodeHighlighted) && (
+                              <text
+                                x={(source.x + target.x) / 2}
+                                y={(source.y + target.y) / 2 - 5}
+                                className="fill-rose-400 text-[8px] font-bold font-mono text-center select-none"
+                              >
+                                {edge.type}
+                              </text>
+                            )}
+                          </g>
+                        );
+                      })}
+
+                    {/* Render Nodes */}
+                    {layoutNodes
+                      .filter((n: any) => {
+                        if (graphTypeFilter !== 'all' && n.type !== graphTypeFilter) return false;
+                        if (graphSearchQuery && !n.name.toLowerCase().includes(graphSearchQuery.toLowerCase())) return false;
+                        return true;
+                      })
+                      .map((node: any) => {
+                        const isSelected = selectedGraphNode?.id === node.id;
+                        const isHighlighted = highlightedNodes.has(node.id);
+                        const isFaded = highlightedNodes.size > 0 && !highlightedNodes.has(node.id);
+
+                        let colorClass = "fill-muted border bg-muted/10";
+                        let borderStroke = "stroke-muted-foreground/40";
+                        
+                        if (node.type === "Folder") {
+                          colorClass = "fill-yellow-500/10";
+                          borderStroke = "stroke-yellow-500";
+                        } else if (node.type === "File") {
+                          colorClass = "fill-blue-500/10";
+                          borderStroke = "stroke-blue-500";
+                        } else if (node.type === "Module") {
+                          colorClass = "fill-indigo-500/10";
+                          borderStroke = "stroke-indigo-500";
+                        } else if (node.type === "Class") {
+                          colorClass = "fill-amber-500/10";
+                          borderStroke = "stroke-amber-500";
+                        } else if (node.type === "Function" || node.type === "Method") {
+                          colorClass = "fill-purple-500/10";
+                          borderStroke = "stroke-purple-500";
+                        }
+
+                        return (
+                          <g
+                            key={node.id}
+                            transform={`translate(${node.x}, ${node.y})`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedGraphNode(node);
+                              const relatedNodes = new Set<string>([node.id]);
+                              const relatedEdges = new Set<string>();
+                              graphEdges.forEach((edge: any) => {
+                                if (edge.source_id === node.id) {
+                                  relatedNodes.add(edge.target_id);
+                                  relatedEdges.add(edge.id);
+                                } else if (edge.target_id === node.id) {
+                                  relatedNodes.add(edge.source_id);
+                                  relatedEdges.add(edge.id);
+                                }
+                              });
+                              setHighlightedNodes(relatedNodes);
+                              setHighlightedEdges(relatedEdges);
+                            }}
+                            className="cursor-pointer group"
+                          >
+                            {(isSelected || isHighlighted) && (
+                              <circle
+                                r="22"
+                                className="fill-rose-500/20 animate-ping opacity-75"
+                              />
+                            )}
+                            
+                            <circle
+                              r={isSelected ? "18" : "14"}
+                              className={cn(
+                                "transition-all duration-300 stroke-[1.5px]",
+                                colorClass,
+                                borderStroke,
+                                isSelected && "stroke-rose-500 stroke-2",
+                                isFaded ? "opacity-15" : "opacity-100 hover:scale-110"
+                              )}
+                            />
+
+                            <text
+                              textAnchor="middle"
+                              dy=".3em"
+                              className={cn(
+                                "font-mono font-black text-[9px]",
+                                isFaded ? "fill-muted-foreground/15" : "fill-foreground",
+                                isSelected ? "fill-rose-400" : ""
+                              )}
+                            >
+                              {node.type.substring(0, 2).toUpperCase()}
+                            </text>
+
+                            <text
+                              textAnchor="middle"
+                              y={isSelected ? "32" : "26"}
+                              className={cn(
+                                "text-[9px] font-bold select-none truncate max-w-[80px]",
+                                isFaded ? "fill-muted-foreground/10" : "fill-foreground",
+                                isSelected ? "fill-rose-400 text-[10px]" : "hidden group-hover:block"
+                              )}
+                            >
+                              {node.name}
+                            </text>
+                          </g>
+                        );
+                      })}
+                  </g>
+                </svg>
+
+                <div className="absolute bottom-4 left-4 p-3 border rounded-xl bg-background/80 backdrop-blur-md text-[10px] text-muted-foreground font-mono space-y-1 shadow">
+                  <p>🖱️ Drag canvas to PAN</p>
+                  <p>📜 Scroll wheel to ZOOM</p>
+                  <p>🎯 Click node to inspect details</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Right Panel: Selected node metadata details and analysis controllers */}
+          <div className="lg:col-span-4 flex flex-col h-full overflow-hidden">
+            <div className="p-4 border-b bg-muted/20">
+              <span className="font-semibold text-sm tracking-tight flex items-center gap-2">
+                <Layers className="h-4.5 w-4.5 text-muted-foreground" />
+                Query Inspector Panel
+              </span>
+            </div>
+
+            {selectedGraphNode ? (
+              <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                <div>
+                  <span className="text-[10px] px-2 py-0.5 border rounded-full font-bold uppercase tracking-wider text-primary bg-primary/5">
+                    {selectedGraphNode.type}
+                  </span>
+                  <h3 className="font-bold text-lg text-foreground font-mono mt-2 break-all">
+                    {selectedGraphNode.name}
+                  </h3>
+                  <p className="text-[10px] font-mono text-muted-foreground mt-1 break-all select-all">
+                    ID: {selectedGraphNode.id}
+                  </p>
+                </div>
+
+                <div className="border rounded-xl p-4 bg-muted/10 space-y-2 text-xs">
+                  <span className="font-bold text-muted-foreground uppercase tracking-wider text-[10px]">Properties</span>
+                  <div className="space-y-1 font-mono text-foreground break-all max-h-36 overflow-y-auto">
+                    {Object.entries(selectedGraphNode.properties || {}).map(([k, v]: any) => (
+                      <div key={k} className="flex justify-between border-b border-border/40 py-1">
+                        <span className="text-muted-foreground">{k}:</span>
+                        <span>{typeof v === 'object' ? JSON.stringify(v) : String(v)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <span className="font-bold text-muted-foreground uppercase tracking-wider text-[10px]">Dependency Queries</span>
+
+                  <Button
+                    onClick={async () => {
+                      try {
+                        const res = await fetch(`/api/v1/repositories/${selectedRepoId}/query/dependencies?node_id=${selectedGraphNode.id}`, {
+                          headers: { Authorization: `Bearer ${token}` }
+                        });
+                        if (res.ok) {
+                          const data = await res.json();
+                          const nodesSet = new Set<string>([selectedGraphNode.id]);
+                          const edgesSet = new Set<string>();
+                          data.dependencies.forEach((d: any) => {
+                            nodesSet.add(d.target.id);
+                            edgesSet.add(d.relationship_id);
+                          });
+                          setHighlightedNodes(nodesSet);
+                          setHighlightedEdges(edgesSet);
+                        }
+                      } catch (err) { console.error(err); }
+                    }}
+                    variant="outline"
+                    className="w-full justify-start text-xs font-semibold"
+                  >
+                    🔍 Show Direct Dependencies
+                  </Button>
+
+                  <Button
+                    onClick={async () => {
+                      try {
+                        const res = await fetch(`/api/v1/repositories/${selectedRepoId}/query/callers?symbol_name=${selectedGraphNode.name}`, {
+                          headers: { Authorization: `Bearer ${token}` }
+                        });
+                        if (res.ok) {
+                          const data = await res.json();
+                          const nodesSet = new Set<string>([selectedGraphNode.id]);
+                          const edgesSet = new Set<string>();
+                          data.callers.forEach((c: any) => {
+                            nodesSet.add(c.caller.id);
+                            edgesSet.add(c.relationship_id);
+                          });
+                          setHighlightedNodes(nodesSet);
+                          setHighlightedEdges(edgesSet);
+                        }
+                      } catch (err) { console.error(err); }
+                    }}
+                    variant="outline"
+                    className="w-full justify-start text-xs font-semibold"
+                  >
+                    📞 Show Callers of Function
+                  </Button>
+
+                  <Button
+                    onClick={async () => {
+                      try {
+                        const res = await fetch(`/api/v1/repositories/${selectedRepoId}/query/imports?node_id=${selectedGraphNode.id}`, {
+                          headers: { Authorization: `Bearer ${token}` }
+                        });
+                        if (res.ok) {
+                          const data = await res.json();
+                          const nodesSet = new Set<string>(data.nodes.map((n: any) => n.id));
+                          const edgesSet = new Set<string>(data.edges.map((e: any) => e.id));
+                          setHighlightedNodes(nodesSet);
+                          setHighlightedEdges(edgesSet);
+                        }
+                      } catch (err) { console.error(err); }
+                    }}
+                    variant="outline"
+                    className="w-full justify-start text-xs font-semibold"
+                  >
+                    🌳 Show Import Dependency Tree
+                  </Button>
+
+                  <Button
+                    onClick={async () => {
+                      try {
+                        const res = await fetch(`/api/v1/repositories/${selectedRepoId}/query/downstream?node_id=${selectedGraphNode.id}`, {
+                          headers: { Authorization: `Bearer ${token}` }
+                        });
+                        if (res.ok) {
+                          const data = await res.json();
+                          const nodesSet = new Set<string>(data.nodes.map((n: any) => n.id));
+                          const edgesSet = new Set<string>(data.edges.map((e: any) => e.id));
+                          setHighlightedNodes(nodesSet);
+                          setHighlightedEdges(edgesSet);
+                        }
+                      } catch (err) { console.error(err); }
+                    }}
+                    variant="outline"
+                    className="w-full justify-start text-xs font-semibold text-rose-500"
+                  >
+                    💥 Show Downstream Blast Radius
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-muted-foreground text-xs space-y-2">
+                <Network className="h-8 w-8 text-muted-foreground/30 animate-pulse" />
+                <p>Click on any node in the visualizer graph to inspect properties and execute dependency analysis query flows.</p>
+              </div>
+            )}
+          </div>
         </div>
       ) : (
         <div className="grid gap-6 grid-cols-1 lg:grid-cols-12 items-start h-[calc(100vh-230px)] overflow-hidden">

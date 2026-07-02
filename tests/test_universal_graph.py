@@ -408,3 +408,97 @@ class DatabaseConnection:
     # Assert Service depends on Database (services/auth.py calls db/connection.py)
     service_depends_db = [r for r in depends_edges if "layer::Service" in r["source_id"] and "layer::Database" in r["target_id"]]
     assert len(service_depends_db) > 0
+
+
+def test_dependency_query_engine(client):
+    import shutil
+    from app.services.parse_service import ParseService
+    from app.core.config import settings
+
+    # 1. Setup mock repository files on disk with queries context
+    repo_id = "test_graph_repo"
+    cloned_dir = os.path.join(settings.CLONED_REPOS_DIR, repo_id)
+    shutil.rmtree(cloned_dir, ignore_errors=True)
+    os.makedirs(os.path.join(cloned_dir, "app"), exist_ok=True)
+
+    # file_x: imports file_y
+    file_x_content = """\
+import app.file_y
+
+def run_process():
+    app.file_y.start_service()
+"""
+    with open(os.path.join(cloned_dir, "app", "file_x.py"), "w", encoding="utf-8") as f:
+        f.write(file_x_content)
+
+    # file_y: has start_service function
+    file_y_content = """\
+def start_service():
+    pass
+"""
+    with open(os.path.join(cloned_dir, "app", "file_y.py"), "w", encoding="utf-8") as f:
+        f.write(file_y_content)
+
+    # file_z: orphan file (no imports or calls!)
+    file_z_content = """\
+# Orphan module
+def orphan_function():
+    pass
+"""
+    with open(os.path.join(cloned_dir, "app", "file_z.py"), "w", encoding="utf-8") as f:
+        f.write(file_z_content)
+
+    # 2. Parse repository
+    db = SessionLocal()
+    try:
+        parse_service = ParseService()
+        parse_service.parse_repository(db, repo_id)
+    finally:
+        db.close()
+
+    # 3. Retrieve graph to get specific node IDs
+    res = client.get(f"/api/v1/repositories/{repo_id}/graph")
+    assert res.status_code == 200
+    graph_data = res.json()
+    
+    file_x_node = [n for n in graph_data["nodes"] if "file_x.py" in n["id"]][0]
+    file_y_node = [n for n in graph_data["nodes"] if "file_y.py" in n["id"]][0]
+    file_z_node = [n for n in graph_data["nodes"] if "file_z.py" in n["id"]][0]
+
+    # Query 1: Direct Dependencies of file_x.py
+    res = client.get(f"/api/v1/repositories/{repo_id}/query/dependencies?node_id={file_x_node['id']}")
+    assert res.status_code == 200
+    dep_data = res.json()
+    # file_x.py depends on file_y
+    dep_targets = {d["target"]["id"] for d in dep_data["dependencies"]}
+    assert "module::app.file_y" in dep_targets
+
+    # Query 2: Callers of start_service
+    res = client.get(f"/api/v1/repositories/{repo_id}/query/callers?symbol_name=start_service")
+    assert res.status_code == 200
+    callers_data = res.json()
+    assert len(callers_data["callers"]) > 0
+    # run_process should be a caller of start_service
+    caller_names = {c["caller"]["name"] for c in callers_data["callers"]}
+    assert "run_process" in caller_names
+
+    # Query 3: Import Tree starting from file_x.py
+    res = client.get(f"/api/v1/repositories/{repo_id}/query/imports?node_id={file_x_node['id']}")
+    assert res.status_code == 200
+    imports_data = res.json()
+    imports_targets = {e["target_id"] for e in imports_data["edges"]}
+    assert "module::app.file_y" in imports_targets
+
+    # Query 4: Downstream Impact starting from file_x.py
+    res = client.get(f"/api/v1/repositories/{repo_id}/query/downstream?node_id={file_x_node['id']}")
+    assert res.status_code == 200
+    downstream_data = res.json()
+    downstream_nodes = {n["id"] for n in downstream_data["nodes"]}
+    assert "module::app.file_y" in downstream_nodes
+
+    # Query 5: Find Orphan Modules
+    res = client.get(f"/api/v1/repositories/{repo_id}/query/orphans")
+    assert res.status_code == 200
+    orphans_data = res.json()
+    orphan_ids = {o["id"] for o in orphans_data["orphans"]}
+    assert file_z_node["id"] in orphan_ids
