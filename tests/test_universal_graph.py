@@ -158,3 +158,68 @@ def test_create_and_fetch_graph(client):
     retrieved_rel_types = {r["type"] for r in graph_data["relationships"]}
     expected_rel_types = {rt.value for rt in GraphRelationshipType}
     assert retrieved_rel_types == expected_rel_types
+
+
+def test_import_and_call_graph(client):
+    import shutil
+    from app.services.parse_service import ParseService
+    from app.core.config import settings
+
+    # 1. Setup mock repository files on disk simulating import and call flow
+    repo_id = "test_graph_repo"
+    cloned_dir = os.path.join(settings.CLONED_REPOS_DIR, repo_id)
+    shutil.rmtree(cloned_dir, ignore_errors=True)
+    os.makedirs(cloned_dir, exist_ok=True)
+
+    auth_py_content = """\
+import jwt
+
+def save_session():
+    pass
+
+def generate_token():
+    save_session()
+
+def authenticate():
+    generate_token()
+
+def login():
+    authenticate()
+"""
+    with open(os.path.join(cloned_dir, "auth.py"), "w", encoding="utf-8") as f:
+        f.write(auth_py_content)
+
+    # 2. Force ParseService to run and populate db graph tables
+    db = SessionLocal()
+    try:
+        parse_service = ParseService()
+        parse_service.parse_repository(db, repo_id)
+    finally:
+        db.close()
+
+    # 3. Retrieve graph from GET API
+    res = client.get(f"/api/v1/repositories/{repo_id}/graph")
+    assert res.status_code == 200
+    graph_data = res.json()
+
+    # Verify import node and edge exists
+    import_edges = [r for r in graph_data["relationships"] if r["type"] == "IMPORTS"]
+    assert len(import_edges) > 0
+    # One of the import edges should target the module 'jwt'
+    jwt_import = [r for r in import_edges if "jwt" in r["target_id"]]
+    assert len(jwt_import) > 0
+
+    # Verify function call edges exist and trace context
+    call_edges = [r for r in graph_data["relationships"] if r["type"] == "CALLS"]
+    assert len(call_edges) > 0
+
+    # Verify specific calling dependencies
+    # login() -> authenticate() -> generate_token() -> save_session()
+    login_calls_auth = [r for r in call_edges if "login" in r["source_id"] and "authenticate" in r["target_id"]]
+    assert len(login_calls_auth) > 0
+
+    auth_calls_token = [r for r in call_edges if "authenticate" in r["source_id"] and "generate_token" in r["target_id"]]
+    assert len(auth_calls_token) > 0
+
+    token_calls_save = [r for r in call_edges if "generate_token" in r["source_id"] and "save_session" in r["target_id"]]
+    assert len(token_calls_save) > 0

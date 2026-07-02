@@ -497,27 +497,47 @@ class RelationshipBuilder:
 
             # Find the enclosing function/method for this call
             caller_id = _file_id(path)  # default: file-level
+            if node.position:
+                call_line = node.position.start_row
+                best_enclosing_symbol = None
+                best_range_size = float('inf')
+                for sym in extraction.symbols:
+                    if sym.kind in (SymbolKind.FUNCTION, SymbolKind.METHOD):
+                        if sym.position and sym.position.start_row <= call_line <= sym.position.end_row:
+                            range_size = sym.position.end_row - sym.position.start_row
+                            if range_size < best_range_size:
+                                best_range_size = range_size
+                                best_enclosing_symbol = sym
+                if best_enclosing_symbol:
+                    caller_id = _symbol_id(path, best_enclosing_symbol.name, best_enclosing_symbol.parent_name)
 
             # Resolve target
             base_name = callee_name.split(".")[-1]
 
             # Function calls
             if base_name in function_index:
-                for def_path, def_sym in function_index[base_name]:
-                    if def_path != path or def_sym.name not in local_names:
-                        target_id = _symbol_id(def_path, def_sym.name, def_sym.parent_name)
-                        graph.add_edge(GraphEdge(
-                            source_id=caller_id,
-                            target_id=target_id,
-                            kind=EdgeKind.CALLS,
-                            label=f"calls {base_name}",
-                            file_path=path,
-                            line=node.position.start_row,
-                        ))
+                # Find if there are definitions in the same file to prioritize local call links
+                same_file_defs = [d for d in function_index[base_name] if d[0] == path]
+                defs_to_link = same_file_defs if same_file_defs else function_index[base_name]
+
+                for def_path, def_sym in defs_to_link:
+                    target_id = _symbol_id(def_path, def_sym.name, def_sym.parent_name)
+                    graph.add_edge(GraphEdge(
+                        source_id=caller_id,
+                        target_id=target_id,
+                        kind=EdgeKind.CALLS,
+                        label=f"calls {base_name}",
+                        file_path=path,
+                        line=node.position.start_row if node.position else None,
+                    ))
 
             # Class instantiation / usage
             if base_name in class_index:
-                for def_path, def_sym in class_index[base_name]:
+                # Prioritize same-file classes
+                same_file_classes = [c for c in class_index[base_name] if c[0] == path]
+                classes_to_link = same_file_classes if same_file_classes else class_index[base_name]
+
+                for def_path, def_sym in classes_to_link:
                     target_id = _symbol_id(def_path, def_sym.name)
                     graph.add_edge(GraphEdge(
                         source_id=caller_id,
@@ -525,7 +545,7 @@ class RelationshipBuilder:
                         kind=EdgeKind.CLASS_USAGE,
                         label=f"uses {base_name}",
                         file_path=path,
-                        line=node.position.start_row,
+                        line=node.position.start_row if node.position else None,
                     ))
 
         # Module-usage edges from import statements in the AST

@@ -13,6 +13,9 @@ from app.models.relationship import Relationship
 from app.models.metric import Metric
 from app.models.repository import Repository
 from app.models.repository_statistics import RepositoryStatistics
+from app.models.graph_node import GraphNode
+from app.models.graph_relationship import GraphRelationship
+from app.models.graph_enums import GraphNodeType, GraphRelationshipType
 
 from app.services.scanner import RepositoryScanner
 from app.services.language_detector import LanguageDetector, Language
@@ -57,6 +60,8 @@ class ParseService:
         # Clear existing parsed data to allow overwrite
         db.query(RepositoryStatistics).filter(RepositoryStatistics.repository_id == repo_id).delete()
         db.query(Relationship).filter(Relationship.repository_id == repo_id).delete()
+        db.query(GraphRelationship).filter(GraphRelationship.repository_id == repo_id).delete()
+        db.query(GraphNode).filter(GraphNode.repository_id == repo_id).delete()
         # Deleting files cascades to symbols, imports, and metrics
         db.query(File).filter(File.repository_id == repo_id).delete()
         db.commit()
@@ -197,10 +202,68 @@ class ParseService:
                 except Exception:
                     pass
 
-        # Build Relationships
+        # Build Relationships and Universal Graph Model
         try:
             graph = self.relationship_builder.build(extractions, asts)
+
+            # 1. Save GraphNodes
+            for node_id, node in graph.nodes.items():
+                node_type = GraphNodeType.FILE
+                kind_lower = node.kind.lower()
+                if kind_lower == "file":
+                    node_type = GraphNodeType.FILE
+                elif kind_lower == "module":
+                    node_type = GraphNodeType.MODULE
+                elif kind_lower == "class":
+                    node_type = GraphNodeType.CLASS
+                elif kind_lower == "interface":
+                    node_type = GraphNodeType.INTERFACE
+                elif kind_lower == "function":
+                    node_type = GraphNodeType.FUNCTION
+                elif kind_lower == "method":
+                    node_type = GraphNodeType.METHOD
+                elif kind_lower == "variable":
+                    node_type = GraphNodeType.VARIABLE
+                elif kind_lower == "constant":
+                    node_type = GraphNodeType.VARIABLE
+
+                db_graph_node = GraphNode(
+                    id=node.id,
+                    repository_id=repo_id,
+                    type=node_type.value,
+                    name=node.name,
+                    properties=node.metadata or {}
+                )
+                db.add(db_graph_node)
+
+            # 2. Save GraphRelationships
             for edge in graph.edges:
+                rel_type = GraphRelationshipType.DEPENDS_ON
+                kind = edge.kind.value
+                if kind == "imports":
+                    rel_type = GraphRelationshipType.IMPORTS
+                elif kind == "module_usage":
+                    rel_type = GraphRelationshipType.IMPORTS
+                elif kind == "calls":
+                    rel_type = GraphRelationshipType.CALLS
+                elif kind == "inherits":
+                    rel_type = GraphRelationshipType.INHERITS
+                elif kind == "composition":
+                    rel_type = GraphRelationshipType.USES
+                elif kind == "class_usage":
+                    rel_type = GraphRelationshipType.USES
+
+                db_graph_rel = GraphRelationship(
+                    id=str(uuid.uuid4()),
+                    repository_id=repo_id,
+                    source_id=edge.source_id,
+                    target_id=edge.target_id,
+                    type=rel_type.value,
+                    properties={"label": edge.label, "line": edge.line, "file_path": edge.file_path}
+                )
+                db.add(db_graph_rel)
+
+                # Also save old relationship model for backward compatibility
                 db_rel = Relationship(
                     id=str(uuid.uuid4()),
                     repository_id=repo_id,
@@ -212,7 +275,8 @@ class ParseService:
                     line=edge.line,
                 )
                 db.add(db_rel)
-        except Exception:
+        except Exception as e:
+            print(f"Error populating universal graph: {e}")
             pass
 
         # Aggregate repository statistics
