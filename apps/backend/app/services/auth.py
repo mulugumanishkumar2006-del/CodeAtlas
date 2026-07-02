@@ -40,6 +40,9 @@ class AuthService:
     async def login_with_github(self, db: Session, code: str) -> User:
         # Stub bypass for local testing if GitHub secrets are stubbed
         if code == "stub_code":
+            existing_user = user_repository.get_by_id(db, "12345")
+            if existing_user:
+                return existing_user
             stub_user = User(
                 id="12345",
                 username="github_stub_user",

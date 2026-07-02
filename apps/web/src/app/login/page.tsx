@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 
 export default function LoginPage() {
   const handleGithubLogin = () => {
-    window.location.href = 'http://localhost:8000/api/v1/auth/login/github';
+    window.location.href = '/api/v1/auth/login/github';
   };
 
   const handleStubLogin = () => {

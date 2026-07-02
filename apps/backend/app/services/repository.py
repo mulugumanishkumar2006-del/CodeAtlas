@@ -1,6 +1,7 @@
 import os
 import shutil
 import uuid
+from typing import List
 
 from sqlalchemy.orm import Session
 
@@ -57,3 +58,7 @@ class RepositoryService:
         target_dir = os.path.join(settings.CLONED_REPOS_DIR, repo_id)
         if os.path.exists(target_dir):
             shutil.rmtree(target_dir, ignore_errors=True)
+
+    def get_repositories_by_user(self, db: Session, user: User) -> List[Repository]:
+        return repository_repository.get_by_user_id(db, user.id)
+

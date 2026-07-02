@@ -1,172 +1,1032 @@
+'use client';
+
 import * as React from 'react';
-import { Activity, ShieldCheck, CheckCircle, Server, AlertTriangle } from 'lucide-react';
+import {
+  Folder,
+  FolderOpen,
+  FileCode,
+  ChevronRight,
+  ChevronDown,
+  Plus,
+  Trash2,
+  Play,
+  RefreshCw,
+  Search,
+  Database,
+  Code,
+  GitBranch,
+  File,
+  AlertCircle,
+  ExternalLink,
+  ShieldCheck,
+  Zap,
+  HelpCircle,
+  FileText
+} from 'lucide-react';
+import { useAuth } from '@/context/auth-context';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+
+// Interfaces mapping to backend types
+interface FileMetrics {
+  complexity_total: number;
+  complexity_average: number;
+  complexity_max: number;
+  complexity_max_function: string | null;
+  documentation_symbols: number;
+  total_documentable: number;
+  coverage_percent: number;
+}
+
+interface ImportItem {
+  module: string;
+  names: string[];
+  line: number;
+}
+
+interface FileData {
+  id: string;
+  file_path: string;
+  language: string;
+  size_bytes: number;
+  code_lines: number;
+  comment_lines: number;
+  blank_lines: number;
+  total_lines: number;
+  metrics: FileMetrics | null;
+  imports: ImportItem[] | null;
+}
+
+interface SymbolItem {
+  id: string;
+  name: string;
+  kind: string;
+  file_path: string;
+  start_line: number;
+  start_column: number;
+  end_line: number;
+  end_column: number;
+  parent_name: string | null;
+  docstring: string | null;
+  is_async: boolean;
+  is_exported: boolean;
+}
+
+interface Repository {
+  id: string;
+  name: string;
+  full_name: string;
+  clone_url: string;
+  status: string; // pending, cloning, cloned, failed
+}
+
+interface TreeNode {
+  name: string;
+  path: string;
+  isFolder: boolean;
+  children?: TreeNode[];
+  fileData?: FileData;
+}
 
 export default function Home() {
-  const stats = [
-    {
-      name: 'API Gateway',
-      value: 'Healthy',
-      description: 'Response time: 14ms',
-      icon: Activity,
-      color: 'text-emerald-500',
-      bg: 'bg-emerald-500/10',
-    },
-    {
-      name: 'Database Cluster',
-      value: 'Connected',
-      description: 'Active pool: 12 nodes',
-      icon: Server,
-      color: 'text-blue-500',
-      bg: 'bg-blue-500/10',
-    },
-    {
-      name: 'Security Checks',
-      value: 'Passing',
-      description: '0 vulnerable points detected',
-      icon: ShieldCheck,
-      color: 'text-indigo-500',
-      bg: 'bg-indigo-500/10',
-    },
-    {
-      name: 'System Uptime',
-      value: '99.98%',
-      description: 'No outages in 30 days',
-      icon: CheckCircle,
-      color: 'text-purple-500',
-      bg: 'bg-purple-500/10',
-    },
-  ];
+  const { token, user } = useAuth();
+  
+  // Repositories state
+  const [repos, setRepos] = React.useState<Repository[]>([]);
+  const [selectedRepoId, setSelectedRepoId] = React.useState<string>('');
+  
+  // Data for the active repository
+  const [files, setFiles] = React.useState<FileData[]>([]);
+  const [symbols, setSymbols] = React.useState<SymbolItem[]>([]);
+  
+  // Active states
+  const [activeFile, setActiveFile] = React.useState<FileData | null>(null);
+  const [activeTab, setActiveTab] = React.useState<'metrics' | 'classes' | 'functions' | 'imports' | 'ast'>('metrics');
+  
+  // Folder expansion state in tree explorer
+  const [expandedFolders, setExpandedFolders] = React.useState<Set<string>>(new Set());
+  
+  // Modal / Add Repo Form state
+  const [showAddModal, setShowAddModal] = React.useState(false);
+  const [newRepoName, setNewRepoName] = React.useState('');
+  const [newRepoFullName, setNewRepoFullName] = React.useState('');
+  const [newRepoCloneUrl, setNewRepoCloneUrl] = React.useState('');
+  
+  // UI states
+  const [isSubmitLoading, setIsSubmitLoading] = React.useState(false);
+  const [isParseLoading, setIsParseLoading] = React.useState(false);
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
-  const recentIncidents = [
-    {
-      id: 'INC-9382',
-      title: 'API Rate limiting trigger',
-      status: 'Resolved',
-      severity: 'Low',
-      time: '2 hours ago',
-    },
-    {
-      id: 'INC-9379',
-      title: 'Database index maintenance',
-      status: 'Completed',
-      severity: 'Info',
-      time: '5 hours ago',
-    },
-    {
-      id: 'INC-9372',
-      title: 'SSL Certificate auto-renewal',
-      status: 'Completed',
-      severity: 'Info',
-      time: 'Yesterday',
-    },
-  ];
+  const selectedRepo = repos.find((r) => r.id === selectedRepoId);
+
+  // 1. Fetch repositories on load or when token changes
+  const fetchRepositories = React.useCallback(async (selectFirst = false) => {
+    if (!token) return;
+    try {
+      const res = await fetch('/api/v1/repositories', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setRepos(data);
+        if (data.length > 0 && (selectFirst || !selectedRepoId)) {
+          setSelectedRepoId(data[0].id);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load repositories', e);
+    }
+  }, [token, selectedRepoId]);
+
+  React.useEffect(() => {
+    fetchRepositories(true);
+  }, [token]);
+
+  // 2. Fetch structural details for the selected repository
+  const fetchRepoData = React.useCallback(async () => {
+    if (!token || !selectedRepoId) return;
+    setIsRefreshing(true);
+    setErrorMessage(null);
+    try {
+      // Fetch files
+      const filesRes = await fetch(`/api/v1/repositories/${selectedRepoId}/files`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      // Fetch symbols
+      const symbolsRes = await fetch(`/api/v1/repositories/${selectedRepoId}/symbols`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (filesRes.ok && symbolsRes.ok) {
+        const filesData = await filesRes.json();
+        const symbolsData = await symbolsRes.json();
+        
+        setFiles(filesData);
+        setSymbols(symbolsData);
+        
+        // Auto-select first file if no file is currently selected
+        if (filesData.length > 0) {
+          setActiveFile(filesData[0]);
+          
+          // Expand all folders by default on initial parse/load
+          const folders = new Set<string>();
+          filesData.forEach((f: FileData) => {
+            const parts = f.file_path.split('/');
+            for (let i = 0; i < parts.length - 1; i++) {
+              folders.add(parts.slice(0, i + 1).join('/'));
+            }
+          });
+          setExpandedFolders(folders);
+        } else {
+          setActiveFile(null);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to fetch repository structural details', e);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [token, selectedRepoId]);
+
+  React.useEffect(() => {
+    if (selectedRepoId) {
+      fetchRepoData();
+    } else {
+      setFiles([]);
+      setSymbols([]);
+      setActiveFile(null);
+    }
+  }, [selectedRepoId]);
+
+  // 3. Folder expand / collapse toggler
+  const toggleFolder = (folderPath: string) => {
+    const next = new Set(expandedFolders);
+    if (next.has(folderPath)) {
+      next.delete(folderPath);
+    } else {
+      next.add(folderPath);
+    }
+    setExpandedFolders(next);
+  };
+
+  // 4. Trigger parsing workflow
+  const handleParse = async () => {
+    if (!token || !selectedRepoId) return;
+    setIsParseLoading(true);
+    setErrorMessage(null);
+    try {
+      const res = await fetch(`/api/v1/repositories/${selectedRepoId}/parse`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        await fetchRepoData();
+      } else {
+        const detail = await res.json();
+        setErrorMessage(detail.detail || 'Failed to parse repository');
+      }
+    } catch (e) {
+      setErrorMessage('Failed to trigger repository parsing engine');
+    } finally {
+      setIsParseLoading(false);
+    }
+  };
+
+  // 5. Add new repository
+  const handleAddRepository = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token || !newRepoName || !newRepoCloneUrl || !newRepoFullName) return;
+    setIsSubmitLoading(true);
+    setErrorMessage(null);
+    try {
+      const res = await fetch('/api/v1/repositories', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: newRepoName,
+          full_name: newRepoFullName,
+          clone_url: newRepoCloneUrl,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setRepos((prev) => [...prev, data]);
+        setSelectedRepoId(data.id);
+        setShowAddModal(false);
+        setNewRepoName('');
+        setNewRepoFullName('');
+        setNewRepoCloneUrl('');
+      } else {
+        setErrorMessage('Failed to register repository');
+      }
+    } catch (err) {
+      setErrorMessage('Network error occurred while adding repository');
+    } finally {
+      setIsSubmitLoading(false);
+    }
+  };
+
+  // 6. Delete repository
+  const handleDeleteRepository = async () => {
+    if (!token || !selectedRepoId) return;
+    if (!confirm('Are you sure you want to delete this repository and purge all cloned files?')) return;
+    try {
+      const res = await fetch(`/api/v1/repositories/${selectedRepoId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const nextRepos = repos.filter((r) => r.id !== selectedRepoId);
+        setRepos(nextRepos);
+        setSelectedRepoId(nextRepos.length > 0 ? nextRepos[0].id : '');
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Build the directory tree structure
+  const fileTreeRoot = React.useMemo(() => {
+    const root: TreeNode = { name: 'root', path: '', isFolder: true, children: [] };
+    for (const file of files) {
+      const parts = file.file_path.split('/');
+      let current = root;
+      for (let i = 0; i < parts.length; i++) {
+        const part = parts[i];
+        const isLast = i === parts.length - 1;
+        const currentPath = parts.slice(0, i + 1).join('/');
+
+        let child = current.children?.find((c) => c.name === part);
+        if (!child) {
+          child = {
+            name: part,
+            path: currentPath,
+            isFolder: !isLast,
+            children: isLast ? undefined : [],
+            fileData: isLast ? file : undefined,
+          };
+          current.children?.push(child);
+        }
+        current = child;
+      }
+    }
+
+    function sortTree(node: TreeNode) {
+      if (node.children) {
+        node.children.sort((a, b) => {
+          if (a.isFolder && !b.isFolder) return -1;
+          if (!a.isFolder && b.isFolder) return 1;
+          return a.name.localeCompare(b.name);
+        });
+        node.children.forEach(sortTree);
+      }
+    }
+    sortTree(root);
+    return root;
+  }, [files]);
+
+  // Recursively render directory items
+  function renderTreeNodes(node: TreeNode, level = 0) {
+    if (!node.children) return null;
+    return node.children.map((child) => (
+      <FileTreeItem
+        key={child.path}
+        node={child}
+        level={level}
+        onSelectFile={setActiveFile}
+        activeFilePath={activeFile?.file_path || null}
+        expandedFolders={expandedFolders}
+        toggleFolder={toggleFolder}
+      />
+    ));
+  }
+
+  // Filter symbols based on active file
+  const activeFileSymbols = React.useMemo(() => {
+    if (!activeFile) return [];
+    return symbols.filter((s) => s.file_path === activeFile.file_path);
+  }, [activeFile, symbols]);
+
+  // Derived symbols lists
+  const activeFileClasses = React.useMemo(() => {
+    return activeFileSymbols.filter((s) => s.kind === 'class');
+  }, [activeFileSymbols]);
+
+  const activeFileFunctions = React.useMemo(() => {
+    return activeFileSymbols.filter((s) => s.kind === 'function' || s.kind === 'method');
+  }, [activeFileSymbols]);
 
   return (
-    <div className="space-y-8">
-      {/* Title Header */}
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight text-foreground">Overview</h2>
-        <p className="text-muted-foreground mt-1">
-          Monitor your microservices, database clusters, and system integrity in real-time.
-        </p>
-      </div>
-
-      {/* Grid Stats */}
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat) => (
-          <div
-            key={stat.name}
-            className="group relative overflow-hidden rounded-xl border bg-card p-6 shadow-sm transition-all hover:scale-[1.02] hover:shadow-md"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-muted-foreground">{stat.name}</span>
-              <div className={`rounded-lg p-2 ${stat.bg} ${stat.color}`}>
-                <stat.icon className="h-5 w-5" />
-              </div>
-            </div>
-            <div className="mt-4">
-              <span className="text-2xl font-bold tracking-tight text-foreground">
-                {stat.value}
-              </span>
-              <p className="mt-1 text-xs text-muted-foreground">{stat.description}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Main Grid: Details Panel */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Operations Logs */}
-        <div className="rounded-xl border bg-card p-6 shadow-sm lg:col-span-2">
-          <h3 className="text-lg font-semibold text-foreground">Recent Maintenance & Events</h3>
+    <div className="space-y-6">
+      {/* Top Header bar with selector */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b pb-4">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
+            <Database className="h-6 w-6 text-primary" />
+            Repository Explorer
+          </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Historical log of recent automated tasks and incidents.
+            Browse directory structures, inspect trees, analyze AST details and calculate cyclomatic complexity.
           </p>
-
-          <div className="mt-6 divide-y">
-            {recentIncidents.map((incident) => (
-              <div
-                key={incident.id}
-                className="flex items-center justify-between py-4 first:pt-0 last:pb-0"
-              >
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs font-semibold text-muted-foreground bg-accent px-2 py-0.5 rounded">
-                      {incident.id}
-                    </span>
-                    <span className="text-sm font-medium text-foreground">{incident.title}</span>
-                  </div>
-                  <span className="text-xs text-muted-foreground">{incident.time}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span
-                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                      incident.severity === 'Low'
-                        ? 'bg-amber-500/10 text-amber-500'
-                        : 'bg-blue-500/10 text-blue-500'
-                    }`}
-                  >
-                    {incident.severity}
-                  </span>
-                  <span className="text-sm font-semibold text-emerald-500">{incident.status}</span>
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
 
-        {/* System Health Card */}
-        <div className="rounded-xl border bg-card p-6 shadow-sm flex flex-col justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-foreground">Operational Status</h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              Current workspace environment details.
-            </p>
+        <div className="flex flex-wrap items-center gap-2">
+          {repos.length > 0 ? (
+            <div className="flex items-center gap-2">
+              <select
+                value={selectedRepoId}
+                onChange={(e) => setSelectedRepoId(e.target.value)}
+                className="rounded-lg border bg-background px-3 py-2 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-sm"
+              >
+                {repos.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.full_name} ({r.status})
+                  </option>
+                ))}
+              </select>
+              
+              {selectedRepo?.status === 'cloned' && (
+                <Button
+                  onClick={handleParse}
+                  disabled={isParseLoading}
+                  className="flex items-center gap-1.5 shadow-sm"
+                  variant="default"
+                  size="sm"
+                >
+                  <Play className={cn("h-4 w-4 fill-current", isParseLoading && "animate-spin")} />
+                  {files.length > 0 ? 'Reparse' : 'Parse Repository'}
+                </Button>
+              )}
 
-            <div className="mt-6 space-y-4">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Active Environment:</span>
-                <span className="font-medium text-foreground font-mono">local</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Region:</span>
-                <span className="font-medium text-foreground font-mono">localhost</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Core Services:</span>
-                <span className="font-semibold text-emerald-500">Online</span>
-              </div>
-            </div>
-          </div>
+              {selectedRepo?.status !== 'cloned' && (
+                <Button
+                  onClick={() => fetchRepositories(false)}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-1.5 shadow-sm"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Refresh Status
+                </Button>
+              )}
 
-          <div className="mt-6 border-t pt-6">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <AlertTriangle className="h-4 w-4 text-amber-500" />
-              <span>All backend instances running on local ports.</span>
+              <Button
+                onClick={handleDeleteRepository}
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg"
+                title="Delete Repository"
+              >
+                <Trash2 className="h-4.5 w-4.5" />
+              </Button>
             </div>
-          </div>
+          ) : (
+            <span className="text-sm text-muted-foreground mr-2 font-mono">No repositories registered yet.</span>
+          )}
+
+          <Button
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-1 shadow-sm"
+            variant="outline"
+            size="sm"
+          >
+            <Plus className="h-4 w-4" />
+            Add Repo
+          </Button>
         </div>
       </div>
+
+      {/* Error Banner */}
+      {errorMessage && (
+        <div className="flex items-center gap-3 p-4 rounded-xl border border-destructive/20 bg-destructive/5 text-destructive text-sm">
+          <AlertCircle className="h-5 w-5 shrink-0" />
+          <span>{errorMessage}</span>
+        </div>
+      )}
+
+      {/* Main Content Workspace Layout */}
+      {repos.length === 0 ? (
+        <div className="flex flex-col items-center justify-center border border-dashed rounded-2xl p-16 text-center bg-card shadow-sm space-y-4">
+          <div className="rounded-2xl p-4 bg-primary/5 text-primary">
+            <GitBranch className="h-10 w-10" />
+          </div>
+          <div className="max-w-md space-y-2">
+            <h3 className="text-xl font-bold tracking-tight">No Repository Registered</h3>
+            <p className="text-muted-foreground text-sm">
+              Connect a GitHub repository to fetch source code structure, run structural analyses, extract AST symbols, and track codebase complexity.
+            </p>
+          </div>
+          <Button onClick={() => setShowAddModal(true)} size="lg" className="mt-4 shadow-md">
+            Register First Repository
+          </Button>
+        </div>
+      ) : selectedRepo?.status === 'pending' || selectedRepo?.status === 'cloning' ? (
+        <div className="flex flex-col items-center justify-center border rounded-2xl p-16 bg-card shadow-sm space-y-4">
+          <div className="rounded-full p-4 bg-amber-500/10 text-amber-500 animate-pulse">
+            <RefreshCw className="h-8 w-8 animate-spin" />
+          </div>
+          <div className="text-center space-y-1">
+            <h3 className="text-lg font-semibold">Cloning Repository...</h3>
+            <p className="text-muted-foreground text-sm">
+              Git clone operations are running in the background. Please wait.
+            </p>
+          </div>
+          <Button onClick={() => fetchRepositories(false)} variant="outline" size="sm" className="mt-2">
+            Refresh Status
+          </Button>
+        </div>
+      ) : files.length === 0 ? (
+        <div className="flex flex-col items-center justify-center border rounded-2xl p-16 bg-card shadow-sm space-y-4">
+          <div className="rounded-full p-4 bg-primary/10 text-primary">
+            <Code className="h-8 w-8" />
+          </div>
+          <div className="text-center space-y-1 max-w-sm">
+            <h3 className="text-lg font-semibold">Repository Cloned Successfully</h3>
+            <p className="text-muted-foreground text-sm">
+              The git clone operation completed successfully, but the codebase has not been analyzed yet.
+            </p>
+          </div>
+          <Button onClick={handleParse} disabled={isParseLoading} className="mt-2 shadow-md">
+            {isParseLoading ? 'Parsing...' : 'Trigger Parsing Engine'}
+          </Button>
+        </div>
+      ) : (
+        <div className="grid gap-6 grid-cols-1 lg:grid-cols-12 items-start h-[calc(100vh-230px)] overflow-hidden">
+          
+          {/* 1. Left Panel: Collapsible Directory Tree Explorer (4 cols) */}
+          <div className="lg:col-span-4 border rounded-2xl bg-card shadow-sm flex flex-col h-full overflow-hidden">
+            <div className="p-4 border-b flex items-center justify-between bg-muted/20">
+              <span className="font-semibold text-sm tracking-tight flex items-center gap-2">
+                <Folder className="h-4.5 w-4.5 text-muted-foreground" />
+                Repository Tree
+              </span>
+              <span className="text-[10px] bg-accent px-2 py-0.5 rounded font-mono font-bold text-muted-foreground uppercase">
+                {selectedRepo?.name}
+              </span>
+            </div>
+
+            <div className="p-3 border-b">
+              <div className="relative">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <input
+                  type="text"
+                  placeholder="Search files..."
+                  className="w-full pl-9 pr-4 py-1.5 rounded-lg border bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                  onChange={(e) => {
+                    const query = e.target.value.toLowerCase();
+                    const filtered = files.filter(f => f.file_path.toLowerCase().includes(query));
+                    // Simple search implementation
+                    if (query) {
+                      setFiles(filtered);
+                    } else {
+                      fetchRepoData();
+                    }
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-0.5">
+              {renderTreeNodes(fileTreeRoot)}
+            </div>
+          </div>
+
+          {/* 2. Middle Panel: Source Code & Line Breakdown (4 cols) */}
+          <div className="lg:col-span-4 border rounded-2xl bg-card shadow-sm flex flex-col h-full overflow-hidden">
+            <div className="p-4 border-b flex items-center justify-between bg-muted/20">
+              <span className="font-semibold text-sm tracking-tight flex items-center gap-2">
+                <FileCode className="h-4.5 w-4.5 text-muted-foreground" />
+                File Metadata
+              </span>
+              <span className="text-xs text-muted-foreground font-mono">{activeFile?.language}</span>
+            </div>
+
+            {activeFile ? (
+              <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                <div>
+                  <h3 className="font-bold text-lg text-foreground font-mono truncate">{activeFile.file_path.split('/').pop()}</h3>
+                  <p className="text-xs text-muted-foreground font-mono mt-1 truncate">{activeFile.file_path}</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="border rounded-xl p-4 bg-muted/10 space-y-1">
+                    <span className="text-xs text-muted-foreground font-medium">Lines of Code</span>
+                    <p className="text-2xl font-black text-foreground font-mono">{activeFile.code_lines}</p>
+                  </div>
+                  <div className="border rounded-xl p-4 bg-muted/10 space-y-1">
+                    <span className="text-xs text-muted-foreground font-medium">Total Lines</span>
+                    <p className="text-2xl font-black text-foreground font-mono">{activeFile.total_lines}</p>
+                  </div>
+                </div>
+
+                {/* Line Breakdown Progress Bar visualization */}
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs font-semibold text-muted-foreground font-mono">
+                    <span>Lines breakdown</span>
+                    <span>{activeFile.total_lines} total</span>
+                  </div>
+                  <div className="h-3 w-full rounded-full bg-accent overflow-hidden flex shadow-inner">
+                    <div
+                      style={{ width: `${(activeFile.code_lines / activeFile.total_lines) * 100}%` }}
+                      className="bg-primary h-full transition-all duration-500"
+                      title={`Code Lines: ${activeFile.code_lines}`}
+                    />
+                    <div
+                      style={{ width: `${(activeFile.comment_lines / activeFile.total_lines) * 100}%` }}
+                      className="bg-emerald-500 h-full transition-all duration-500"
+                      title={`Comment Lines: ${activeFile.comment_lines}`}
+                    />
+                    <div
+                      style={{ width: `${(activeFile.blank_lines / activeFile.total_lines) * 100}%` }}
+                      className="bg-muted-foreground/30 h-full transition-all duration-500"
+                      title={`Blank Lines: ${activeFile.blank_lines}`}
+                    />
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] font-mono font-medium text-muted-foreground">
+                    <div className="flex items-center gap-1.5">
+                      <span className="h-2 w-2 rounded-full bg-primary" />
+                      <span>Code: {activeFile.code_lines}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                      <span>Comment: {activeFile.comment_lines}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="h-2 w-2 rounded-full bg-muted-foreground/30" />
+                      <span>Blank: {activeFile.blank_lines}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border rounded-xl p-4 bg-muted/5 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-bold text-foreground">Complexity Score</h4>
+                    <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded bg-blue-500/10 text-blue-500 border border-blue-500/20">
+                      Total CC = {activeFile.metrics?.complexity_total || 0}
+                    </span>
+                  </div>
+                  <div className="space-y-2 text-xs font-mono text-muted-foreground">
+                    <div className="flex justify-between py-1 border-b">
+                      <span>Average CC/function</span>
+                      <span className="text-foreground font-semibold">{activeFile.metrics?.complexity_average.toFixed(1) || '0.0'}</span>
+                    </div>
+                    <div className="flex justify-between py-1 border-b">
+                      <span>Maximum function CC</span>
+                      <span className="text-foreground font-semibold">{activeFile.metrics?.complexity_max || 0}</span>
+                    </div>
+                    <div className="flex justify-between py-1">
+                      <span>Most complex function</span>
+                      <span className="text-foreground font-semibold max-w-[150px] truncate" title={activeFile.metrics?.complexity_max_function || 'None'}>
+                        {activeFile.metrics?.complexity_max_function || 'None'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border rounded-xl p-4 bg-muted/5 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-bold text-foreground">Documentation Coverage</h4>
+                    <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                      {activeFile.metrics?.coverage_percent.toFixed(0) || '0'}%
+                    </span>
+                  </div>
+                  <div className="space-y-2 text-xs font-mono text-muted-foreground">
+                    <div className="flex justify-between py-1 border-b">
+                      <span>Documented Symbols</span>
+                      <span className="text-foreground font-semibold">{activeFile.metrics?.documentation_symbols || 0}</span>
+                    </div>
+                    <div className="flex justify-between py-1">
+                      <span>Total Documentable</span>
+                      <span className="text-foreground font-semibold">{activeFile.metrics?.total_documentable || 0}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-muted-foreground space-y-2">
+                <File className="h-8 w-8 text-muted-foreground/50 animate-pulse" />
+                <span className="text-sm font-mono">Select a file to inspect details</span>
+              </div>
+            )}
+          </div>
+
+          {/* 3. Right Panel: Dynamic Details Tabs (4 cols) */}
+          <div className="lg:col-span-4 border rounded-2xl bg-card shadow-sm flex flex-col h-full overflow-hidden">
+            <div className="border-b bg-muted/15">
+              {/* Tab selector menu */}
+              <div className="flex overflow-x-auto divide-x border-b text-xs font-semibold text-muted-foreground scrollbar-none">
+                <button
+                  onClick={() => setActiveTab('metrics')}
+                  className={cn(
+                    'flex-1 py-3 px-1 text-center truncate transition-colors border-b-2',
+                    activeTab === 'metrics'
+                      ? 'border-primary text-foreground bg-background'
+                      : 'border-transparent hover:text-foreground hover:bg-muted/10'
+                  )}
+                >
+                  Metrics
+                </button>
+                <button
+                  onClick={() => setActiveTab('classes')}
+                  className={cn(
+                    'flex-1 py-3 px-1 text-center truncate transition-colors border-b-2',
+                    activeTab === 'classes'
+                      ? 'border-primary text-foreground bg-background'
+                      : 'border-transparent hover:text-foreground hover:bg-muted/10'
+                  )}
+                >
+                  Classes
+                </button>
+                <button
+                  onClick={() => setActiveTab('functions')}
+                  className={cn(
+                    'flex-1 py-3 px-1 text-center truncate transition-colors border-b-2',
+                    activeTab === 'functions'
+                      ? 'border-primary text-foreground bg-background'
+                      : 'border-transparent hover:text-foreground hover:bg-muted/10'
+                  )}
+                >
+                  Funcs
+                </button>
+                <button
+                  onClick={() => setActiveTab('imports')}
+                  className={cn(
+                    'flex-1 py-3 px-1 text-center truncate transition-colors border-b-2',
+                    activeTab === 'imports'
+                      ? 'border-primary text-foreground bg-background'
+                      : 'border-transparent hover:text-foreground hover:bg-muted/10'
+                  )}
+                >
+                  Imports
+                </button>
+                <button
+                  onClick={() => setActiveTab('ast')}
+                  className={cn(
+                    'flex-1 py-3 px-1 text-center truncate transition-colors border-b-2',
+                    activeTab === 'ast'
+                      ? 'border-primary text-foreground bg-background'
+                      : 'border-transparent hover:text-foreground hover:bg-muted/10'
+                  )}
+                >
+                  AST Nodes
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4">
+              {activeFile ? (
+                <div>
+                  {/* TAB: Metrics */}
+                  {activeTab === 'metrics' && (
+                    <div className="space-y-4">
+                      <h4 className="text-sm font-bold text-foreground">File Metric Breakdown</h4>
+                      <div className="space-y-3 font-mono text-xs">
+                        <div className="p-3 border rounded-xl bg-muted/5 flex items-center justify-between">
+                          <span className="text-muted-foreground">Language</span>
+                          <span className="font-bold text-foreground bg-accent px-2 py-0.5 rounded">{activeFile.language}</span>
+                        </div>
+                        <div className="p-3 border rounded-xl bg-muted/5 flex items-center justify-between">
+                          <span className="text-muted-foreground">File Size</span>
+                          <span className="font-bold text-foreground font-mono">{(activeFile.size_bytes / 1024).toFixed(1)} KB</span>
+                        </div>
+                        <div className="p-3 border rounded-xl bg-muted/5 flex items-center justify-between">
+                          <span className="text-muted-foreground">Total Complexity</span>
+                          <span className="font-bold text-foreground">{activeFile.metrics?.complexity_total || 0}</span>
+                        </div>
+                        <div className="p-3 border rounded-xl bg-muted/5 flex items-center justify-between">
+                          <span className="text-muted-foreground">Average Complexity</span>
+                          <span className="font-bold text-foreground">{activeFile.metrics?.complexity_average || '0.0'}</span>
+                        </div>
+                        <div className="p-3 border rounded-xl bg-muted/5 flex items-center justify-between">
+                          <span className="text-muted-foreground">Docstrings Coverage</span>
+                          <span className="font-bold text-foreground">{activeFile.metrics?.coverage_percent || 0}%</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TAB: Classes */}
+                  {activeTab === 'classes' && (
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-bold text-foreground">Extracted Classes ({activeFileClasses.length})</h4>
+                      {activeFileClasses.length > 0 ? (
+                        activeFileClasses.map((cls) => (
+                          <div key={cls.id} className="border rounded-xl p-3 bg-muted/5 space-y-2">
+                            <div className="flex items-center justify-between font-mono">
+                              <span className="font-bold text-sm text-foreground truncate">{cls.name}</span>
+                              <span className="text-[10px] text-muted-foreground">Lines: {cls.start_line}-{cls.end_line}</span>
+                            </div>
+                            {cls.docstring && (
+                              <p className="text-xs text-muted-foreground bg-accent p-2 rounded italic truncate">
+                                "{cls.docstring.trim()}"
+                              </p>
+                            )}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center text-xs text-muted-foreground p-6 border rounded-xl border-dashed">
+                          No classes detected in this source file.
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* TAB: Functions */}
+                  {activeTab === 'functions' && (
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-bold text-foreground">Functions & Methods ({activeFileFunctions.length})</h4>
+                      {activeFileFunctions.length > 0 ? (
+                        activeFileFunctions.map((fn) => (
+                          <div key={fn.id} className="border rounded-xl p-3 bg-muted/5 space-y-2">
+                            <div className="flex items-center justify-between font-mono">
+                              <span className="font-bold text-sm text-foreground truncate flex items-center gap-1">
+                                {fn.is_async && <Zap className="h-3.5 w-3.5 text-amber-500 fill-amber-500/10" />}
+                                {fn.name}
+                              </span>
+                              <span className="text-[10px] text-muted-foreground">Lines: {fn.start_line}-{fn.end_line}</span>
+                            </div>
+                            {fn.parent_name && (
+                              <p className="text-[10px] text-muted-foreground font-mono">
+                                Member of: <span className="text-foreground font-semibold">{fn.parent_name}</span>
+                              </p>
+                            )}
+                            {fn.docstring && (
+                              <p className="text-xs text-muted-foreground bg-accent p-2 rounded italic truncate">
+                                "{fn.docstring.trim()}"
+                              </p>
+                            )}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center text-xs text-muted-foreground p-6 border rounded-xl border-dashed">
+                          No functions detected in this source file.
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* TAB: Imports */}
+                  {activeTab === 'imports' && (
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-bold text-foreground">Imports Detected</h4>
+                      {activeFile.imports && activeFile.imports.length > 0 ? (
+                        activeFile.imports.map((imp, idx) => (
+                          <div key={idx} className="border rounded-xl p-3 bg-muted/5 space-y-1.5">
+                            <div className="flex items-center justify-between font-mono">
+                              <span className="font-bold text-xs text-foreground truncate" title={imp.module}>
+                                {imp.module}
+                              </span>
+                              <span className="text-[10px] text-muted-foreground">Line {imp.line}</span>
+                            </div>
+                            {imp.names && imp.names.length > 0 && (
+                              <div className="flex flex-wrap gap-1">
+                                {imp.names.map((name, nIdx) => (
+                                  <span key={nIdx} className="text-[10px] font-mono px-2 py-0.5 rounded bg-accent text-foreground">
+                                    {name}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center text-xs text-muted-foreground p-6 border rounded-xl border-dashed">
+                          No imports found in this source file.
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* TAB: AST Nodes */}
+                  {activeTab === 'ast' && (
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-bold text-foreground">Semantic AST Nodes</h4>
+                      {activeFileSymbols.length > 0 ? (
+                        <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                          {activeFileSymbols.map((sym) => (
+                            <div key={sym.id} className="border rounded-xl p-3 bg-muted/5 font-mono text-xs space-y-1">
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-foreground truncate">{sym.name}</span>
+                                <span className="text-[10px] text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded font-bold">
+                                  {sym.kind}
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2 text-[10px] text-muted-foreground pt-1 border-t mt-1">
+                                <div>
+                                  Range: {sym.start_line}-{sym.end_line}
+                                </div>
+                                <div className="text-right">
+                                  Visibility: {sym.is_exported ? 'exported' : 'internal'}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center text-xs text-muted-foreground p-6 border rounded-xl border-dashed">
+                          No AST syntax symbols found.
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center text-xs text-muted-foreground p-6 border rounded-xl border-dashed">
+                  Select a file to inspect dynamic details.
+                </div>
+              )}
+            </div>
+          </div>
+
+        </div>
+      )}
+
+      {/* Add Repository Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-2xl border bg-card p-6 shadow-xl space-y-6">
+            <div className="space-y-1">
+              <h3 className="text-lg font-bold tracking-tight">Add Git Repository</h3>
+              <p className="text-xs text-muted-foreground">
+                Provide cloning parameters for git background sync logic.
+              </p>
+            </div>
+            
+            <form onSubmit={handleAddRepository} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground">Repository Name</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. my-project"
+                  className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  value={newRepoName}
+                  onChange={(e) => {
+                    setNewRepoName(e.target.value);
+                    if (!newRepoFullName && user) {
+                      setNewRepoFullName(`${user.username}/${e.target.value}`);
+                    }
+                  }}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground">Full Name (owner/repo)</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. octocat/Spoon-Knife"
+                  className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary font-mono"
+                  value={newRepoFullName}
+                  onChange={(e) => setNewRepoFullName(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground">Clone URL (HTTPS)</label>
+                <input
+                  type="url"
+                  required
+                  placeholder="https://github.com/octocat/Spoon-Knife.git"
+                  className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary font-mono"
+                  value={newRepoCloneUrl}
+                  onChange={(e) => {
+                    setNewRepoCloneUrl(e.target.value);
+                    // Autofill if empty
+                    if (e.target.value.endsWith('.git')) {
+                      const parts = e.target.value.replace('.git', '').split('/');
+                      const repoName = parts[parts.length - 1];
+                      const owner = parts[parts.length - 2];
+                      if (repoName && !newRepoName) {
+                        setNewRepoName(repoName);
+                      }
+                      if (owner && repoName && !newRepoFullName) {
+                        setNewRepoFullName(`${owner}/${repoName}`);
+                      }
+                    }
+                  }}
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <Button type="button" variant="ghost" onClick={() => setShowAddModal(false)} size="sm">
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isSubmitLoading} size="sm" className="shadow-md">
+                  {isSubmitLoading ? 'Registering...' : 'Register'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
+}
+
+// Tree view helper item component
+function FileTreeItem({ node, level, onSelectFile, activeFilePath, expandedFolders, toggleFolder }: any) {
+  const isExpanded = expandedFolders.has(node.path);
+  const paddingLeft = `${level * 12 + 8}px`;
+
+  if (node.isFolder) {
+    return (
+      <div>
+        <button
+          onClick={() => toggleFolder(node.path)}
+          style={{ paddingLeft }}
+          className="w-full flex items-center gap-2 py-1.5 text-sm text-foreground/80 hover:text-foreground hover:bg-muted/50 rounded-lg text-left transition-colors font-medium"
+        >
+          {isExpanded ? (
+            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+          ) : (
+            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+          )}
+          {isExpanded ? (
+            <FolderOpen className="h-4.5 w-4.5 shrink-0 text-amber-500 fill-amber-500/10" />
+          ) : (
+            <Folder className="h-4.5 w-4.5 shrink-0 text-amber-500 fill-amber-500/10" />
+          )}
+          <span className="truncate">{node.name}</span>
+        </button>
+        {isExpanded && node.children && (
+          <div className="space-y-0.5 mt-0.5">
+            {node.children.map((child: any) => (
+              <FileTreeItem
+                key={child.path}
+                node={child}
+                level={level + 1}
+                onSelectFile={onSelectFile}
+                activeFilePath={activeFilePath}
+                expandedFolders={expandedFolders}
+                toggleFolder={toggleFolder}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  } else {
+    const isActive = activeFilePath === node.path;
+    return (
+      <button
+        onClick={() => onSelectFile(node.fileData)}
+        style={{ paddingLeft: `${level * 12 + 24}px` }}
+        className={cn(
+          'w-full flex items-center gap-2 py-1.5 text-sm rounded-lg text-left transition-colors font-mono',
+          isActive
+            ? 'bg-primary text-primary-foreground font-semibold shadow-sm'
+            : 'text-foreground/75 hover:text-foreground hover:bg-muted/50'
+        )}
+      >
+        <FileCode className={cn('h-4.5 w-4.5 shrink-0', isActive ? 'text-primary-foreground' : 'text-blue-500')} />
+        <span className="truncate">{node.name}</span>
+      </button>
+    );
+  }
 }

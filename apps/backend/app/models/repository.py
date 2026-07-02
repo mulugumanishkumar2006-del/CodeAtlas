@@ -23,3 +23,13 @@ class Repository(Base):
     jobs = relationship(
         "Job", back_populates="repository", cascade="all, delete-orphan"
     )
+    files = relationship(
+        "File", back_populates="repository", cascade="all, delete-orphan"
+    )
+    relationships = relationship(
+        "Relationship", back_populates="repository", cascade="all, delete-orphan"
+    )
+    statistics = relationship(
+        "RepositoryStatistics", back_populates="repository", uselist=False, cascade="all, delete-orphan"
+    )
+

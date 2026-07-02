@@ -33,7 +33,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (storedToken) {
         setToken(storedToken);
         try {
-          const res = await fetch('http://localhost:8000/api/v1/auth/me', {
+          const res = await fetch('/api/v1/auth/me', {
             headers: {
               Authorization: `Bearer ${storedToken}`,
             },
@@ -58,7 +58,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(newToken);
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:8000/api/v1/auth/me', {
+      const res = await fetch('/api/v1/auth/me', {
         headers: {
           Authorization: `Bearer ${newToken}`,
         },

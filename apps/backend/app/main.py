@@ -1,9 +1,15 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+# pyrefly: ignore [missing-import]
 from app.api.v1 import auth, health, repositories
+from app.models import base_models
+# pyrefly: ignore [missing-import]
 from app.core.config import settings
+# pyrefly: ignore [missing-import]
 from app.core.logging import setup_logging
+# pyrefly: ignore [missing-import]
+
 
 setup_logging()
 
