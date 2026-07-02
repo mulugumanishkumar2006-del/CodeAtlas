@@ -411,6 +411,25 @@ class RelationshipBuilder:
                             file_path=path,
                             line=sym.position.start_row if sym.position else None,
                         ))
+                else:
+                    # Register an external class node in the graph
+                    ext_node_id = f"symbol::external::{base_name}"
+                    if ext_node_id not in graph.nodes:
+                        graph.add_node(GraphNode(
+                            id=ext_node_id,
+                            kind="Class",
+                            name=base_name,
+                            file_path="<external>",
+                            language=sym.language,
+                        ))
+                    graph.add_edge(GraphEdge(
+                        source_id=_symbol_id(path, sym.name),
+                        target_id=ext_node_id,
+                        kind=EdgeKind.INHERITS,
+                        label=f"{sym.name} extends {base_name}",
+                        file_path=path,
+                        line=sym.position.start_row if sym.position else None,
+                    ))
 
     # ------------------------------------------------------------------
     # Composition edges

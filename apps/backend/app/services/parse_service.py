@@ -206,7 +206,54 @@ class ParseService:
         try:
             graph = self.relationship_builder.build(extractions, asts)
 
-            # 1. Save GraphNodes
+            # Pre-populate top-level architectural layer module nodes
+            layers = ["API", "Service", "Repository", "Database"]
+            for layer in layers:
+                layer_id = f"layer::{layer}"
+                db_graph_node = GraphNode(
+                    id=layer_id,
+                    repository_id=repo_id,
+                    type=GraphNodeType.MODULE.value,
+                    name=layer,
+                    properties={"layer": layer}
+                )
+                db.add(db_graph_node)
+
+            # Helper to classify folder/file path into architectural layer
+            def get_architectural_layer(path: str) -> str:
+                path_lower = path.lower()
+                if "api" in path_lower:
+                    return "API"
+                if "service" in path_lower:
+                    return "Service"
+                if "repository" in path_lower or "repos" in path_lower:
+                    return "Repository"
+                if "db" in path_lower or "database" in path_lower or "models" in path_lower:
+                    return "Database"
+                return "Other"
+
+            # Dynamically identify folders to register Folder nodes
+            folder_paths = set()
+            for filepath in extractions.keys():
+                parts = filepath.split("/")[:-1]
+                accum = []
+                for p in parts:
+                    accum.append(p)
+                    folder_paths.add("/".join(accum))
+
+            for folder in folder_paths:
+                folder_id = f"folder::{folder}"
+                folder_name = folder.split("/")[-1]
+                db_graph_node = GraphNode(
+                    id=folder_id,
+                    repository_id=repo_id,
+                    type=GraphNodeType.FOLDER.value,
+                    name=folder_name,
+                    properties={"path": folder}
+                )
+                db.add(db_graph_node)
+
+            # 1. Save GraphNodes from the parsed codebase
             for node_id, node in graph.nodes.items():
                 node_type = GraphNodeType.FILE
                 kind_lower = node.kind.lower()
@@ -236,7 +283,8 @@ class ParseService:
                 )
                 db.add(db_graph_node)
 
-            # 2. Save GraphRelationships
+            # 2. Save GraphRelationships and map folder & layer dependencies
+            written_layer_relations = set()
             for edge in graph.edges:
                 rel_type = GraphRelationshipType.DEPENDS_ON
                 kind = edge.kind.value
@@ -262,6 +310,30 @@ class ParseService:
                     properties={"label": edge.label, "line": edge.line, "file_path": edge.file_path}
                 )
                 db.add(db_graph_rel)
+
+                # Determine module/layer dependencies based on this edge's files
+                src_path = edge.file_path or ""
+                target_path = ""
+                if edge.target_id.startswith("symbol::") or edge.target_id.startswith("file::"):
+                    parts = edge.target_id.split("::")
+                    target_path = parts[1] if len(parts) > 1 else ""
+
+                if src_path and target_path:
+                    layer_A = get_architectural_layer(src_path)
+                    layer_B = get_architectural_layer(target_path)
+                    if layer_A != "Other" and layer_B != "Other" and layer_A != layer_B:
+                        layer_rel_key = (layer_A, layer_B)
+                        if layer_rel_key not in written_layer_relations:
+                            written_layer_relations.add(layer_rel_key)
+                            db_layer_rel = GraphRelationship(
+                                id=str(uuid.uuid4()),
+                                repository_id=repo_id,
+                                source_id=f"layer::{layer_A}",
+                                target_id=f"layer::{layer_B}",
+                                type=GraphRelationshipType.DEPENDS_ON.value,
+                                properties={"label": f"{layer_A} communication with {layer_B}"}
+                            )
+                            db.add(db_layer_rel)
 
                 # Also save old relationship model for backward compatibility
                 db_rel = Relationship(

@@ -223,3 +223,98 @@ def login():
 
     token_calls_save = [r for r in call_edges if "generate_token" in r["source_id"] and "save_session" in r["target_id"]]
     assert len(token_calls_save) > 0
+
+
+def test_inheritance_and_module_dependency_graph(client):
+    import shutil
+    from app.services.parse_service import ParseService
+    from app.core.config import settings
+
+    # 1. Setup mock repository with API Service DB files containing class inheritance
+    repo_id = "test_graph_repo"
+    cloned_dir = os.path.join(settings.CLONED_REPOS_DIR, repo_id)
+    shutil.rmtree(cloned_dir, ignore_errors=True)
+
+    # Create layer directory structures
+    os.makedirs(os.path.join(cloned_dir, "app", "api"), exist_ok=True)
+    os.makedirs(os.path.join(cloned_dir, "app", "services"), exist_ok=True)
+    os.makedirs(os.path.join(cloned_dir, "app", "db"), exist_ok=True)
+
+    # API Layer: calls services
+    api_content = """\
+from app.services.auth import AdminService
+
+def handle_login():
+    AdminService().execute_login()
+"""
+    with open(os.path.join(cloned_dir, "app", "api", "auth.py"), "w", encoding="utf-8") as f:
+        f.write(api_content)
+
+    # Service Layer: class Admin inheriting from User, calls database
+    service_content = """\
+from app.db.connection import DatabaseConnection
+
+class User:
+    def __init__(self, name):
+        self.name = name
+
+class Admin(User):
+    def execute_login(self):
+        DatabaseConnection().query_data()
+"""
+    with open(os.path.join(cloned_dir, "app", "services", "auth.py"), "w", encoding="utf-8") as f:
+        f.write(service_content)
+
+    # Database Layer
+    db_content = """\
+class DatabaseConnection:
+    def query_data(self):
+        pass
+"""
+    with open(os.path.join(cloned_dir, "app", "db", "connection.py"), "w", encoding="utf-8") as f:
+        f.write(db_content)
+
+    # 2. Parse mock repository and update DB tables
+    db = SessionLocal()
+    try:
+        parse_service = ParseService()
+        parse_service.parse_repository(db, repo_id)
+    finally:
+        db.close()
+
+    # 3. Retrieve graph from GET API
+    res = client.get(f"/api/v1/repositories/{repo_id}/graph")
+    assert res.status_code == 200
+    graph_data = res.json()
+
+    # 4. Assert Inheritance Edge exists
+    # Admin inherits from User
+    inherits_edges = [r for r in graph_data["relationships"] if r["type"] == "INHERITS"]
+    assert len(inherits_edges) > 0
+    admin_extends_user = [r for r in inherits_edges if "Admin" in r["source_id"] and "User" in r["target_id"]]
+    assert len(admin_extends_user) > 0
+
+    # 5. Assert Folders exist as nodes
+    folder_nodes = [n for n in graph_data["nodes"] if n["type"] == "Folder"]
+    assert len(folder_nodes) > 0
+    folder_names = {f["name"] for f in folder_nodes}
+    assert "api" in folder_names
+    assert "services" in folder_names
+    assert "db" in folder_names
+
+    # 6. Assert Module Dependency layers exist and have COMM edges
+    module_nodes = [n for n in graph_data["nodes"] if n["type"] == "Module"]
+    assert len(module_nodes) > 0
+    module_names = {m["name"] for m in module_nodes}
+    assert "API" in module_names
+    assert "Service" in module_names
+    assert "Database" in module_names
+
+    # Assert API depends on Service (api/auth.py calls services/auth.py)
+    depends_edges = [r for r in graph_data["relationships"] if r["type"] == "DEPENDS_ON"]
+    api_depends_service = [r for r in depends_edges if "layer::API" in r["source_id"] and "layer::Service" in r["target_id"]]
+    assert len(api_depends_service) > 0
+
+    # Assert Service depends on Database (services/auth.py calls db/connection.py)
+    service_depends_db = [r for r in depends_edges if "layer::Service" in r["source_id"] and "layer::Database" in r["target_id"]]
+    assert len(service_depends_db) > 0
