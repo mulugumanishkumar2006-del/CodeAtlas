@@ -225,6 +225,96 @@ def login():
     assert len(token_calls_save) > 0
 
 
+def test_graph_analysis_suite(client):
+    import shutil
+    from app.services.parse_service import ParseService
+    from app.core.config import settings
+
+    # 1. Setup mock repository files on disk creating cycles, coupling and call context
+    repo_id = "test_graph_repo"
+    cloned_dir = os.path.join(settings.CLONED_REPOS_DIR, repo_id)
+    shutil.rmtree(cloned_dir, ignore_errors=True)
+    os.makedirs(os.path.join(cloned_dir, "app"), exist_ok=True)
+
+    # File A: imports B, defines function_A calling function_B
+    file_a_content = """\
+from app.file_b import function_B
+
+def function_A():
+    function_B()
+"""
+    with open(os.path.join(cloned_dir, "app", "file_a.py"), "w", encoding="utf-8") as f:
+        f.write(file_a_content)
+
+    # File B: imports C, defines function_B calling function_C
+    file_b_content = """\
+from app.file_c import function_C
+
+def function_B():
+    function_C()
+"""
+    with open(os.path.join(cloned_dir, "app", "file_b.py"), "w", encoding="utf-8") as f:
+        f.write(file_b_content)
+
+    # File C: imports A, defines function_C calling function_A (Circular Dependency Loop!)
+    file_c_content = """\
+from app.file_a import function_A
+
+def function_C():
+    function_A()
+"""
+    with open(os.path.join(cloned_dir, "app", "file_c.py"), "w", encoding="utf-8") as f:
+        f.write(file_c_content)
+
+    # 2. Parse repository
+    db = SessionLocal()
+    try:
+        parse_service = ParseService()
+        parse_service.parse_repository(db, repo_id)
+    finally:
+        db.close()
+
+    # 3. Verify Circular Dependency Detection (Feature 6)
+    res = client.get(f"/api/v1/repositories/{repo_id}/analysis/circular")
+    assert res.status_code == 200
+    circular_data = res.json()
+    assert circular_data["total_cycles"] > 0
+    # The cycle list should contain a report tracing our cycle loop
+    cycle_found = False
+    for c in circular_data["cycles"]:
+        if "function_A" in c["description"] and "function_B" in c["description"]:
+            cycle_found = True
+            assert len(c["suggested_fixes"]) > 0
+            assert "function_A" in c["affected_modules"] or "function_B" in c["affected_modules"]
+    assert cycle_found
+
+    # 4. Verify Coupling Analysis (Feature 7)
+    res = client.get(f"/api/v1/repositories/{repo_id}/analysis/coupling")
+    assert res.status_code == 200
+    coupling_data = res.json()
+    assert len(coupling_data["metrics"]) > 0
+    # Checks that Fan-in / Fan-out values are calculated
+    node_metrics = {m["name"]: m for m in coupling_data["metrics"]}
+    assert "function_A" in node_metrics
+    assert node_metrics["function_A"]["fan_in"] > 0
+    assert node_metrics["function_A"]["fan_out"] > 0
+    # Instability score check (value between 0.0 and 1.0)
+    assert 0.0 <= node_metrics["function_A"]["coupling_score"] <= 1.0
+
+    # 5. Verify Impact Analysis Engine (Feature 8)
+    # If we delete function_C, check that it affects function_B and function_A due to cycle / dependency flow
+    payload = {"symbol_name": "function_C"}
+    res = client.post(f"/api/v1/repositories/{repo_id}/analysis/impact", json=payload)
+    assert res.status_code == 200
+    impact_data = res.json()
+    assert impact_data["total_affected_nodes"] > 0
+    affected_names = {detail["name"] for detail in impact_data["affected_details"]}
+    # Deleting function_C affects function_B because function_B calls function_C
+    assert "function_B" in affected_names
+    # Risk should be computed
+    assert impact_data["risk"] in ("LOW", "MEDIUM", "HIGH")
+
+
 def test_inheritance_and_module_dependency_graph(client):
     import shutil
     from app.services.parse_service import ParseService

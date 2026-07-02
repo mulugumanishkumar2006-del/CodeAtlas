@@ -14,9 +14,17 @@ from app.schemas.graph import (
     GraphRelationshipResponse,
     RepositoryGraphResponse,
 )
+from app.schemas.analysis import (
+    CircularDependencyResponse,
+    CouplingAnalysisResponse,
+    ImpactRequest,
+    ImpactAnalysisResponse,
+)
+from app.services.analysis_service import AnalysisService
 from app.api.v1.auth import get_current_user
 
 router = APIRouter()
+analysis_service = AnalysisService()
 
 
 @router.post(
@@ -117,3 +125,52 @@ def get_repository_graph(
         nodes=[GraphNodeResponse.model_validate(n) for n in nodes],
         relationships=[GraphRelationshipResponse.model_validate(r) for r in relationships],
     )
+
+
+@router.get(
+    "/repositories/{repo_id}/analysis/circular",
+    response_model=CircularDependencyResponse,
+)
+def get_circular_dependencies(
+    repo_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    repo = db.query(Repository).filter(Repository.id == repo_id).first()
+    if not repo or repo.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repository not found")
+
+    return analysis_service.detect_circular_dependencies(db, repo_id)
+
+
+@router.get(
+    "/repositories/{repo_id}/analysis/coupling",
+    response_model=CouplingAnalysisResponse,
+)
+def get_coupling_analysis(
+    repo_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    repo = db.query(Repository).filter(Repository.id == repo_id).first()
+    if not repo or repo.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repository not found")
+
+    return analysis_service.calculate_coupling_analysis(db, repo_id)
+
+
+@router.post(
+    "/repositories/{repo_id}/analysis/impact",
+    response_model=ImpactAnalysisResponse,
+)
+def get_impact_analysis(
+    repo_id: str,
+    request: ImpactRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    repo = db.query(Repository).filter(Repository.id == repo_id).first()
+    if not repo or repo.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repository not found")
+
+    return analysis_service.run_impact_analysis(db, repo_id, request.symbol_name)
