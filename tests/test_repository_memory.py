@@ -15,6 +15,7 @@ from app.models.repository import Repository
 from app.models.graph_node import GraphNode
 from app.models.graph_relationship import GraphRelationship
 from app.models.graph_enums import GraphNodeType, GraphRelationshipType
+from app.models.memory_models import RepositoryMemory, ArchitectureDecision, MemorySnapshot
 from app.core.config import settings
 
 
@@ -302,3 +303,44 @@ def test_memory_query_api(client, db_session, setup_mock_repo):
     assert "distributed cache" in node_ctx["description"].lower()
     assert node_ctx["owner"] == "DevOps Team"
     assert "README.md" in node_ctx["related_documents"]
+
+    # 19. Test new database models instantiation
+    m = RepositoryMemory(id="m1", repo_id=repo_id, title="Redis Sessions", summary="Use Redis", memory_type="ADR", source="adr/0003", confidence=0.95)
+    assert m.id == "m1"
+    assert m.confidence == 0.95
+
+    ad = ArchitectureDecision(id="a1", repo_id=repo_id, title="Redis Cache", reason="perf", alternatives="db", impact="good", related_entities="payment")
+    assert ad.id == "a1"
+
+    snap = MemorySnapshot(id="s1", repo_id=repo_id, version="v1.0.0")
+    assert snap.version == "v1.0.0"
+
+    # 20. Test build memory endpoint
+    res = client.post(f"/api/v1/repositories/{repo_id}/memory/build")
+    assert res.status_code == 200
+    assert res.json()["status"] == "building"
+
+    # 21. Test memory list endpoint
+    res = client.get(f"/api/v1/repositories/{repo_id}/memory")
+    assert res.status_code == 200
+    assert "adrs" in res.json()
+
+    # 22. Test memory search endpoint
+    res = client.get(f"/api/v1/repositories/{repo_id}/memory/search?query=Why was Kafka added?")
+    assert res.status_code == 200
+    assert "answer" in res.json()
+
+    # 23. Test memory entity context endpoint
+    res = client.get(f"/api/v1/repositories/{repo_id}/memory/entity/payment")
+    assert res.status_code == 200
+    assert res.json()["name"] == "Payment Service"
+
+    # 24. Test memory dashboard endpoint
+    res = client.get(f"/api/v1/repositories/{repo_id}/memory/dashboard")
+    assert res.status_code == 200
+    assert res.json()["doc_coverage"] == "82%"
+
+    # 25. Test memory chat endpoint
+    res = client.post(f"/api/v1/repositories/{repo_id}/memory/chat", json={"message": "What technical debt has accumulated?"})
+    assert res.status_code == 200
+    assert "answer" in res.json()

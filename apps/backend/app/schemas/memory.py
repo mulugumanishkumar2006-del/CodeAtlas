@@ -22,3 +22,6 @@ class MemoryStatisticsResponse(BaseModel):
     knowledge_confidence: str
     recently_learned_concepts: List[str]
     unlinked_documentation: List[str]
+
+class ChatRequest(BaseModel):
+    message: str

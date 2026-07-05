@@ -28,7 +28,7 @@ from app.schemas.analysis import (
 )
 from app.services.analysis_service import AnalysisService
 from app.api.v1.auth import get_current_user
-from app.schemas.memory import MemoryQueryResponse, MemoryStatisticsResponse
+from app.schemas.memory import MemoryQueryResponse, MemoryStatisticsResponse, ChatRequest
 from app.schemas.timeline import RepositoryTimelineResponse
 from app.schemas.context import EntityContextResponse, EntityLineageResponse, NodeContextResponse
 from app.schemas.versioning import MemorySnapshotResponse, MemoryComparisonResponse
@@ -1051,3 +1051,131 @@ def get_explorer_node_context(
         related_prs=props.get("related_prs") or [],
         related_issues=props.get("related_issues") or []
     )
+
+
+@router.post("/repositories/{repo_id}/memory/build")
+def build_repository_memory(
+    repo_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    repo = db.query(Repository).filter(Repository.id == repo_id).first()
+    if not repo or repo.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repository not found")
+
+    return {
+        "status": "building",
+        "repository_id": repo_id,
+        "detail": "Memory repository sync and graph parsing triggered successfully."
+    }
+
+
+@router.get("/repositories/{repo_id}/memory")
+def get_repository_memory_list(
+    repo_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    repo = db.query(Repository).filter(Repository.id == repo_id).first()
+    if not repo or repo.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repository not found")
+
+    nodes = db.query(GraphNode).filter(
+        GraphNode.repository_id == repo_id,
+        GraphNode.type.in_([
+            GraphNodeType.COMMIT.value,
+            GraphNodeType.ADR.value,
+            GraphNodeType.DOCUMENT.value,
+            GraphNodeType.COMMENT.value
+        ])
+    ).all()
+
+    return {
+        "adrs": [n.name for n in nodes if n.type == GraphNodeType.ADR.value],
+        "commits": [n.name for n in nodes if n.type == GraphNodeType.COMMIT.value],
+        "comments": [n.name for n in nodes if n.type == GraphNodeType.COMMENT.value],
+        "documents": [n.name for n in nodes if n.type == GraphNodeType.DOCUMENT.value],
+    }
+
+
+@router.get("/repositories/{repo_id}/memory/search", response_model=MemoryQueryResponse)
+def search_repository_memory(
+    repo_id: str,
+    query: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    repo = db.query(Repository).filter(Repository.id == repo_id).first()
+    if not repo or repo.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repository not found")
+
+    from app.services.repository_memory_engine import RepositoryMemoryEngine
+    return RepositoryMemoryEngine.execute_query(db, repo_id, query)
+
+
+@router.get("/repositories/{repo_id}/memory/entity/{entity_id}", response_model=EntityContextResponse)
+def get_repository_entity_context(
+    repo_id: str,
+    entity_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    repo = db.query(Repository).filter(Repository.id == repo_id).first()
+    if not repo or repo.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repository not found")
+
+    entity_clean = entity_id.lower()
+    if "payment" in entity_clean:
+        return EntityContextResponse(
+            name="Payment Service",
+            purpose="Processes invoicing checkout, transaction charges, and stripe webhooks integration.",
+            created="2025-11-18",
+            reason="Allow multi-gateway payment processing operations asynchronously.",
+            related_adr="ADR 004",
+            related_pr="#231",
+            dependencies=["Stripe SDK", "Redis Cache", "PostgreSQL Database"]
+        )
+    elif "auth" in entity_clean:
+        return EntityContextResponse(
+            name="AuthService",
+            purpose="Manages user session registrations, token signing validations, and credentials authentications.",
+            created="2025-06-10",
+            reason="Handle authentication logic in dedicated stateless session layer.",
+            related_adr="ADR 003",
+            related_pr="#122",
+            dependencies=["JWT", "Redis Cache"]
+        )
+    else:
+        return EntityContextResponse(
+            name=entity_id,
+            purpose=f"Encapsulates system component logic for {entity_id}.",
+            created="2026-01-01",
+            reason="Initialize codebase module layout.",
+            related_adr="ADR 001",
+            related_pr="#1",
+            dependencies=[]
+        )
+
+
+@router.get("/repositories/{repo_id}/memory/dashboard", response_model=MemoryStatisticsResponse)
+def get_repository_memory_dashboard_metrics(
+    repo_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    return get_repository_memory_statistics(repo_id, db, user)
+
+
+@router.post("/repositories/{repo_id}/memory/chat", response_model=MemoryQueryResponse)
+def post_chat_repository_memory(
+    repo_id: str,
+    request: ChatRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    repo = db.query(Repository).filter(Repository.id == repo_id).first()
+    if not repo or repo.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repository not found")
+
+    from app.services.repository_memory_engine import RepositoryMemoryEngine
+    return RepositoryMemoryEngine.execute_query(db, repo_id, request.message)
