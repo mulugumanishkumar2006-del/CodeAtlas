@@ -3,11 +3,13 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, BarChart3, Settings, ShieldAlert, HeartPulse } from 'lucide-react';
+import { LayoutDashboard, BarChart3, Settings, ShieldAlert, HeartPulse, Layers, Brain } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+  { name: 'Architecture Explorer', href: '/architecture', icon: Layers },
+  { name: 'Repository Memory', href: '/memory', icon: Brain },
   { name: 'Analytics', href: '/analytics', icon: BarChart3 },
   { name: 'System Health', href: '/health', icon: HeartPulse },
   { name: 'Security', href: '/security', icon: ShieldAlert },

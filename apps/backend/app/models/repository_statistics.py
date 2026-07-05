@@ -21,5 +21,6 @@ class RepositoryStatistics(Base):
     average_complexity = Column(Float, default=0.0, nullable=False)
     documentation_coverage = Column(Float, default=0.0, nullable=False)
     languages = Column(JSON, nullable=True)  # e.g., {"Python": 12}
+    entity_statistics = Column(JSON, nullable=True)  # e.g., {"File": 15, "API": 5}
 
     repository = relationship("Repository", back_populates="statistics")

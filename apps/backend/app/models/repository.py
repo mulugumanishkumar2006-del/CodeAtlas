@@ -18,6 +18,8 @@ class Repository(Base):
     user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    summary = Column(String, nullable=True)
+    graph_version = Column(String, default="1.0.0", nullable=False)
 
     owner = relationship("User", back_populates="repositories")
     jobs = relationship(

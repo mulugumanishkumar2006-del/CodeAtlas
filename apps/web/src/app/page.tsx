@@ -25,6 +25,7 @@ import {
   Network,
   Eye,
   Layers,
+  Cpu,
 } from 'lucide-react';
 import { useAuth } from '@/context/auth-context';
 import { Button } from '@/components/ui/button';
@@ -106,19 +107,109 @@ export default function Home() {
   const [activeFile, setActiveFile] = React.useState<FileData | null>(null);
   const [activeTab, setActiveTab] = React.useState<'metrics' | 'classes' | 'functions' | 'imports' | 'ast'>('metrics');
 
-  // Graph visualizer state
-  const [workspaceView, setWorkspaceView] = React.useState<'explorer' | 'graph'>('explorer');
+  const [workspaceView, setWorkspaceView] = React.useState<'overview' | 'explorer' | 'symbols' | 'relationships' | 'graph' | 'architecture' | 'query'>('overview');
+  const [repoStats, setRepoStats] = React.useState<any | null>(null);
   const [graphNodes, setGraphNodes] = React.useState<any[]>([]);
   const [graphEdges, setGraphEdges] = React.useState<any[]>([]);
   const [layoutNodes, setLayoutNodes] = React.useState<any[]>([]);
   const [selectedGraphNode, setSelectedGraphNode] = React.useState<any | null>(null);
   const [graphSearchQuery, setGraphSearchQuery] = React.useState<string>('');
+  
+  // Semantic Query Playground State
+  const [semanticQuery, setSemanticQuery] = React.useState<string>('');
+  const [semanticQueryResponse, setSemanticQueryResponse] = React.useState<any | null>(null);
+  const [semanticQueryLoading, setSemanticQueryLoading] = React.useState<boolean>(false);
+
+  const handleSemanticQuerySubmit = async (queryText: string) => {
+    if (!token || !selectedRepoId || !queryText.trim()) return;
+    setSemanticQueryLoading(true);
+    setSemanticQueryResponse(null);
+    try {
+      const res = await fetch(`/api/v1/repositories/${selectedRepoId}/query/semantic?query=${encodeURIComponent(queryText)}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSemanticQueryResponse(data);
+      }
+    } catch (e) {
+      console.error('Semantic query error', e);
+    } finally {
+      setSemanticQueryLoading(false);
+    }
+  };
+
+  // Architecture Patterns State
+  const [archPatterns, setArchPatterns] = React.useState<any[]>([]);
+  const [archLoading, setArchLoading] = React.useState<boolean>(false);
+
+  const fetchPatterns = React.useCallback(async () => {
+    if (!token || !selectedRepoId) return;
+    setArchLoading(true);
+    try {
+      const res = await fetch(`/api/v1/repositories/${selectedRepoId}/knowledge/patterns`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setArchPatterns(data.patterns || []);
+      }
+    } catch (e) {
+      console.error('Failed to fetch patterns', e);
+    } finally {
+      setArchLoading(false);
+    }
+  }, [token, selectedRepoId]);
+
+  React.useEffect(() => {
+    if (workspaceView === 'architecture' && selectedRepoId) {
+      fetchPatterns();
+    }
+  }, [workspaceView, selectedRepoId, fetchPatterns]);
+
+  // Semantic Search Engine UI State
+  const [semanticSearchActive, setSemanticSearchActive] = React.useState<boolean>(false);
+  const [semanticSearchLoading, setSemanticSearchLoading] = React.useState<boolean>(false);
+  const [collapseClusters, setCollapseClusters] = React.useState<boolean>(false);
+
+  const triggerSemanticSearch = async (queryText: string) => {
+    if (!token || !selectedRepoId || !queryText.trim()) {
+      setHighlightedNodes(new Set());
+      return;
+    }
+    setSemanticSearchLoading(true);
+    try {
+      const res = await fetch(`/api/v1/repositories/${selectedRepoId}/knowledge/search?query=${encodeURIComponent(queryText)}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const nodeIds = new Set<string>(data.map((n: any) => n.id));
+        setHighlightedNodes(nodeIds);
+      }
+    } catch (e) {
+      console.error('Semantic search error', e);
+    } finally {
+      setSemanticSearchLoading(false);
+    }
+  };
+
   const [graphTypeFilter, setGraphTypeFilter] = React.useState<string>('all');
-  const [graphViewMode, setGraphViewMode] = React.useState<'all' | 'layers' | 'circular' | 'orphans'>('all');
+  const [graphViewMode, setGraphViewMode] = React.useState<'all' | 'layers' | 'circular' | 'orphans' | 'domains'>('all');
+  const [domainClusters, setDomainClusters] = React.useState<any[]>([]);
   const [highlightedNodes, setHighlightedNodes] = React.useState<Set<string>>(new Set());
   const [highlightedEdges, setHighlightedEdges] = React.useState<Set<string>>(new Set());
   const [graphLoading, setGraphLoading] = React.useState<boolean>(false);
   const [graphErrorMessage, setGraphErrorMessage] = React.useState<string | null>(null);
+
+  // Relationship Search State
+  const [relQuery, setRelQuery] = React.useState<string>('');
+  const [relType, setRelType] = React.useState<string>('all');
+  const [relSrcType, setRelSrcType] = React.useState<string>('all');
+  const [relTgtType, setRelTgtType] = React.useState<string>('all');
+  const [relationshipsResults, setRelationshipsResults] = React.useState<any[]>([]);
+  const [relLoading, setRelLoading] = React.useState<boolean>(false);
+  const [relErrorMessage, setRelErrorMessage] = React.useState<string | null>(null);
 
   // Zoom / Pan
   const [zoom, setZoom] = React.useState<number>(1);
@@ -126,12 +217,66 @@ export default function Home() {
   const [isPanning, setIsPanning] = React.useState<boolean>(false);
   const [panStart, setPanStart] = React.useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
+  // Shortest Path Solver (BFS on undirected connection graph)
+  const findShortestPath = (nodesList: any[], edgesList: any[], startId: string, endId: string) => {
+    if (startId === endId) return [startId];
+    
+    const adj: Record<string, string[]> = {};
+    nodesList.forEach(n => { adj[n.id] = []; });
+    edgesList.forEach(e => {
+      if (adj[e.source_id] && adj[e.target_id]) {
+        adj[e.source_id].push(e.target_id);
+        adj[e.target_id].push(e.source_id);
+      }
+    });
+    
+    const queue: string[][] = [[startId]];
+    const visited = new Set<string>([startId]);
+    
+    while (queue.length > 0) {
+      const path = queue.shift()!;
+      const node = path[path.length - 1];
+      
+      if (node === endId) return path;
+      
+      const neighbors = adj[node] || [];
+      for (const neighbor of neighbors) {
+        if (!visited.has(neighbor)) {
+          visited.add(neighbor);
+          queue.push([...path, neighbor]);
+        }
+      }
+    }
+    return null;
+  };
+
+  const fetchStats = React.useCallback(async () => {
+    if (!token || !selectedRepoId) return;
+    try {
+      const res = await fetch(`/api/v1/repositories/${selectedRepoId}/knowledge/statistics`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setRepoStats(data.statistics || {});
+      }
+    } catch (e) {
+      console.error('Failed to fetch statistics', e);
+    }
+  }, [token, selectedRepoId]);
+
+  React.useEffect(() => {
+    if (selectedRepoId) {
+      fetchStats();
+    }
+  }, [selectedRepoId, fetchStats]);
+
   const fetchGraphData = React.useCallback(async () => {
     if (!token || !selectedRepoId) return;
     setGraphLoading(true);
     setGraphErrorMessage(null);
     try {
-      const res = await fetch(`/api/v1/repositories/${selectedRepoId}/graph`, {
+      const res = await fetch(`/api/v1/repositories/${selectedRepoId}/knowledge`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
@@ -232,6 +377,73 @@ export default function Home() {
     setHighlightedEdges(new Set());
     setGraphViewMode('all');
   }, [workspaceView, selectedRepoId, fetchGraphData]);
+
+  const fetchRelationshipsSearch = React.useCallback(async () => {
+    if (!token || !selectedRepoId) return;
+    setRelLoading(true);
+    setRelErrorMessage(null);
+    try {
+      const params = new URLSearchParams();
+      if (relQuery) params.append('query', relQuery);
+      if (relType && relType !== 'all') params.append('type', relType);
+      if (relSrcType && relSrcType !== 'all') params.append('source_type', relSrcType);
+      if (relTgtType && relTgtType !== 'all') params.append('target_type', relTgtType);
+      
+      const res = await fetch(`/api/v1/repositories/${selectedRepoId}/relationships/search?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setRelationshipsResults(data);
+      } else {
+        setRelErrorMessage('Failed to search relationships.');
+      }
+    } catch (err) {
+      console.error(err);
+      setRelErrorMessage('Error fetching relationships search.');
+    } finally {
+      setRelLoading(false);
+    }
+  }, [token, selectedRepoId, relQuery, relType, relSrcType, relTgtType]);
+
+  React.useEffect(() => {
+    if (workspaceView === 'relationships' && selectedRepoId) {
+      fetchRelationshipsSearch();
+    }
+  }, [workspaceView, selectedRepoId, fetchRelationshipsSearch]);
+
+  const handleViewInGraph = (sourceId: string, targetId: string, type: string) => {
+    // Make sure graph data is loaded
+    if (graphNodes.length === 0) {
+      fetchGraphData().then(() => {
+        const tgtNode = graphNodes.find(n => n.id === targetId) || graphNodes.find(n => n.id === sourceId);
+        if (tgtNode) {
+          setSelectedGraphNode(tgtNode);
+        }
+        setHighlightedNodes(new Set([sourceId, targetId]));
+        const matchingEdge = graphEdges.find(e => e.source_id === sourceId && e.target_id === targetId && e.type === type);
+        if (matchingEdge) {
+          setHighlightedEdges(new Set([matchingEdge.id]));
+        } else {
+          setHighlightedEdges(new Set());
+        }
+        setWorkspaceView('graph');
+      });
+    } else {
+      const tgtNode = graphNodes.find(n => n.id === targetId) || graphNodes.find(n => n.id === sourceId);
+      if (tgtNode) {
+        setSelectedGraphNode(tgtNode);
+      }
+      setHighlightedNodes(new Set([sourceId, targetId]));
+      const matchingEdge = graphEdges.find(e => e.source_id === sourceId && e.target_id === targetId && e.type === type);
+      if (matchingEdge) {
+        setHighlightedEdges(new Set([matchingEdge.id]));
+      } else {
+        setHighlightedEdges(new Set());
+      }
+      setWorkspaceView('graph');
+    }
+  };
 
   const handleMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
     setIsPanning(true);
@@ -510,6 +722,93 @@ export default function Home() {
     return activeFileSymbols.filter((s) => s.kind === 'function' || s.kind === 'method');
   }, [activeFileSymbols]);
 
+  const { displayNodes, displayEdges } = React.useMemo(() => {
+    if (!collapseClusters || domainClusters.length === 0) {
+      return { displayNodes: layoutNodes, displayEdges: graphEdges };
+    }
+
+    const collapsedNodes: any[] = [];
+    const collapsedNodeIds = new Set<string>();
+
+    domainClusters.forEach((cluster) => {
+      const contained = layoutNodes.filter((n: any) => cluster.node_ids.includes(n.id));
+      if (contained.length > 0) {
+        const avgX = contained.reduce((sum: number, n: any) => sum + (n.x || 0), 0) / contained.length;
+        const avgY = contained.reduce((sum: number, n: any) => sum + (n.y || 0), 0) / contained.length;
+        collapsedNodes.push({
+          id: `cluster::${cluster.name}`,
+          name: cluster.name,
+          type: 'DomainCluster',
+          x: avgX,
+          y: avgY,
+          isClusterNode: true,
+          containedNodeIds: cluster.node_ids,
+          properties: { description: cluster.description }
+        });
+        cluster.node_ids.forEach((id: string) => collapsedNodeIds.add(id));
+      }
+    });
+
+    // Add remaining nodes
+    layoutNodes.forEach((n: any) => {
+      if (!collapsedNodeIds.has(n.id)) {
+        collapsedNodes.push(n);
+      }
+    });
+
+    // Map edges
+    const edgeMap = new Map<string, any>();
+    graphEdges.forEach((e: any) => {
+      let sourceId = e.source_id;
+      let targetId = e.target_id;
+
+      const srcCluster = domainClusters.find((c: any) => c.node_ids.includes(sourceId));
+      const tgtCluster = domainClusters.find((c: any) => c.node_ids.includes(targetId));
+
+      if (srcCluster) sourceId = `cluster::${srcCluster.name}`;
+      if (tgtCluster) targetId = `cluster::${tgtCluster.name}`;
+
+      if (sourceId === targetId) return; // internal connection, hide
+
+      const key = `${sourceId}->${targetId}`;
+      if (!edgeMap.has(key)) {
+        edgeMap.set(key, {
+          id: `collapsed-edge::${key}`,
+          source_id: sourceId,
+          target_id: targetId,
+          type: e.type
+        });
+      }
+    });
+
+    return { displayNodes: collapsedNodes, displayEdges: Array.from(edgeMap.values()) };
+  }, [layoutNodes, graphEdges, domainClusters, collapseClusters]);
+
+  const metrics = React.useMemo(() => {
+    if (files.length === 0) return null;
+    let complexity_total = 0;
+    let complexity_max = 0;
+    let complexity_max_function = "None";
+    let file_count_with_metrics = 0;
+    files.forEach((f) => {
+      if (f.metrics) {
+        complexity_total += f.metrics.complexity_total || 0;
+        if ((f.metrics.complexity_max || 0) > complexity_max) {
+          complexity_max = f.metrics.complexity_max;
+          complexity_max_function = f.metrics.complexity_max_function || "None";
+        }
+        file_count_with_metrics++;
+      }
+    });
+    const complexity_average = file_count_with_metrics > 0 ? Math.round(complexity_total / file_count_with_metrics) : 0;
+    return {
+      complexity_total,
+      complexity_average,
+      complexity_max,
+      complexity_max_function
+    };
+  }, [files]);
+
   return (
     <div className="space-y-6">
       {/* Top Header bar with selector */}
@@ -528,26 +827,81 @@ export default function Home() {
           {selectedRepo?.status === 'cloned' && files.length > 0 && (
             <div className="flex items-center rounded-lg border bg-muted/30 p-1 mr-2 shadow-inner">
               <button
+                onClick={() => setWorkspaceView('overview')}
+                className={cn(
+                  "px-3 py-1 rounded-md text-[11px] font-semibold tracking-tight transition-all",
+                  workspaceView === 'overview' 
+                    ? "bg-background text-foreground shadow border" 
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                Overview
+              </button>
+              <button
                 onClick={() => setWorkspaceView('explorer')}
                 className={cn(
-                  "px-3.5 py-1.5 rounded-md text-xs font-semibold tracking-tight transition-all",
+                  "px-3 py-1 rounded-md text-[11px] font-semibold tracking-tight transition-all",
                   workspaceView === 'explorer' 
                     ? "bg-background text-foreground shadow border" 
                     : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                Workspace Explorer
+                Files
+              </button>
+              <button
+                onClick={() => setWorkspaceView('symbols')}
+                className={cn(
+                  "px-3 py-1 rounded-md text-[11px] font-semibold tracking-tight transition-all",
+                  workspaceView === 'symbols' 
+                    ? "bg-background text-foreground shadow border" 
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                Symbols
+              </button>
+              <button
+                onClick={() => setWorkspaceView('relationships')}
+                className={cn(
+                  "px-3 py-1 rounded-md text-[11px] font-semibold tracking-tight transition-all",
+                  workspaceView === 'relationships' 
+                    ? "bg-background text-foreground shadow border" 
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                Dependencies
               </button>
               <button
                 onClick={() => setWorkspaceView('graph')}
                 className={cn(
-                  "px-3.5 py-1.5 rounded-md text-xs font-semibold tracking-tight transition-all",
+                  "px-3 py-1 rounded-md text-[11px] font-semibold tracking-tight transition-all",
                   workspaceView === 'graph' 
                     ? "bg-background text-foreground shadow border" 
                     : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                Interactive Dependency Graph
+                Knowledge Graph ⭐
+              </button>
+              <button
+                onClick={() => setWorkspaceView('architecture')}
+                className={cn(
+                  "px-3 py-1 rounded-md text-[11px] font-semibold tracking-tight transition-all",
+                  workspaceView === 'architecture' 
+                    ? "bg-background text-foreground shadow border" 
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                Architecture
+              </button>
+              <button
+                onClick={() => setWorkspaceView('query')}
+                className={cn(
+                  "px-3 py-1 rounded-md text-[11px] font-semibold tracking-tight transition-all",
+                  workspaceView === 'query' 
+                    ? "bg-background text-foreground shadow border" 
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                Search
               </button>
             </div>
           )}
@@ -670,6 +1024,607 @@ export default function Home() {
             {isParseLoading ? 'Parsing...' : 'Trigger Parsing Engine'}
           </Button>
         </div>
+      ) : workspaceView === 'overview' ? (
+        <div className="grid gap-6 md:grid-cols-12 items-start h-[calc(100vh-230px)] overflow-y-auto">
+          {/* Main repo info metrics cards (8 cols) */}
+          <div className="md:col-span-8 space-y-6">
+            <div className="border rounded-2xl bg-card p-6 shadow-sm space-y-4">
+              <h3 className="text-lg font-bold tracking-tight text-foreground flex items-center gap-2">
+                📂 Repository Knowledge Overview
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                Repository statistics, metrics, and entity distributions loaded in the local Neo4j/PostgreSQL graph databases.
+              </p>
+              
+              <div className="grid gap-4 grid-cols-2 sm:grid-cols-3">
+                <div className="border rounded-xl p-4 bg-muted/10 text-left">
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Complexity Total</span>
+                  <p className="text-xl font-bold font-mono mt-1 text-primary">{metrics?.complexity_total || 0}</p>
+                </div>
+                <div className="border rounded-xl p-4 bg-muted/10 text-left">
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Complexity Average</span>
+                  <p className="text-xl font-bold font-mono mt-1 text-teal-400">{metrics?.complexity_average || 0}</p>
+                </div>
+                <div className="border rounded-xl p-4 bg-muted/10 text-left">
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Complexity Max</span>
+                  <p className="text-xl font-bold font-mono mt-1 text-amber-500">{metrics?.complexity_max || 0}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Entity distribution stats card */}
+            <div className="border rounded-2xl bg-card p-6 shadow-sm space-y-4">
+              <h4 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Knowledge Graph Entity Count</h4>
+              {repoStats && Object.keys(repoStats).length > 0 ? (
+                <div className="grid gap-4 grid-cols-2 sm:grid-cols-3">
+                  {Object.entries(repoStats).map(([type, count]: any) => (
+                    <div key={type} className="border rounded-xl p-4 bg-muted/10 text-left hover:scale-[1.01] transition-transform">
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{type}s</span>
+                      <p className="text-xl font-bold font-mono mt-1 text-foreground">{count}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-6 text-xs text-muted-foreground">
+                  No entities statistics available. Parse the codebase to populate.
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Quick links & summary details panel (4 cols) */}
+          <div className="md:col-span-4 border rounded-2xl bg-card p-6 shadow-sm space-y-4">
+            <h4 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Repository Metadata</h4>
+            <div className="divide-y space-y-2 text-xs">
+              <div className="flex justify-between py-2 font-mono">
+                <span className="text-muted-foreground">Name:</span>
+                <span className="font-bold text-foreground">{selectedRepo?.name}</span>
+              </div>
+              <div className="flex justify-between py-2 font-mono">
+                <span className="text-muted-foreground">Status:</span>
+                <span className="font-bold text-teal-400 capitalize">{selectedRepo?.status}</span>
+              </div>
+              <div className="flex justify-between py-2 font-mono">
+                <span className="text-muted-foreground">Path:</span>
+                <span className="font-bold text-foreground truncate max-w-[200px]" title={selectedRepo?.clone_url}>{selectedRepo?.clone_url}</span>
+              </div>
+              <div className="flex justify-between py-2 font-mono">
+                <span className="text-muted-foreground">Max Complexity:</span>
+                <span className="font-bold text-foreground truncate max-w-[200px]" title={metrics?.complexity_max_function || ''}>{metrics?.complexity_max_function || 'None'}</span>
+              </div>
+            </div>
+            
+            <div className="pt-4 border-t flex flex-col gap-2">
+              <Button onClick={() => setWorkspaceView('explorer')} className="w-full text-xs font-semibold">
+                Explore Files
+              </Button>
+              <Button onClick={() => setWorkspaceView('graph')} variant="outline" className="w-full text-xs font-semibold">
+                View Knowledge Graph
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : workspaceView === 'symbols' ? (
+        <div className="flex flex-col border rounded-2xl bg-card shadow-sm h-[calc(100vh-230px)] overflow-hidden">
+          {/* Header */}
+          <div className="p-4 border-b bg-muted/20 flex items-center justify-between">
+            <span className="font-semibold text-sm tracking-tight flex items-center gap-2">
+              <Zap className="h-4.5 w-4.5 text-primary animate-pulse" />
+              Repository Flat Symbols List
+            </span>
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-primary/10 text-primary font-bold">
+              {symbols.length} Symbol(s) Extracted
+            </span>
+          </div>
+
+          {/* List */}
+          <div className="flex-1 overflow-y-auto p-6">
+            {symbols.length === 0 ? (
+              <div className="text-center p-8 text-muted-foreground text-xs">
+                No symbols extracted yet. Parse the codebase.
+              </div>
+            ) : (
+              <div className="border rounded-xl bg-card overflow-hidden">
+                <table className="min-w-full divide-y divide-border/60">
+                  <thead className="bg-muted/30">
+                    <tr className="text-left text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                      <th className="py-3 px-4">Symbol Name</th>
+                      <th className="py-3 px-4">Kind</th>
+                      <th className="py-3 px-4">File Path</th>
+                      <th className="py-3 px-4">Complexity</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y font-mono text-xs">
+                    {symbols.map((sym: any, idx: number) => (
+                      <tr key={idx} className="hover:bg-muted/10 transition-colors">
+                        <td className="py-3 px-4 font-bold text-foreground break-all">{sym.name}</td>
+                        <td className="py-3 px-4">
+                          <span className="px-2 py-0.5 border rounded-full text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+                            {sym.kind}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-muted-foreground truncate max-w-[240px]" title={sym.file_path}>
+                          {sym.file_path}
+                        </td>
+                        <td className="py-3 px-4 font-bold text-foreground">{sym.complexity || 1}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : workspaceView === 'architecture' ? (
+        <div className="flex flex-col border rounded-2xl bg-card shadow-sm h-[calc(100vh-230px)] overflow-hidden">
+          {/* Header */}
+          <div className="p-4 border-b bg-muted/20 flex items-center justify-between">
+            <span className="font-semibold text-sm tracking-tight flex items-center gap-2">
+              <Layers className="h-4.5 w-4.5 text-primary animate-pulse" />
+              Architectural Pattern Analytics
+            </span>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-6">
+            {archLoading ? (
+              <div className="h-full flex flex-col items-center justify-center space-y-3">
+                <RefreshCw className="h-8 w-8 text-primary animate-spin" />
+                <span className="text-sm font-semibold text-muted-foreground font-mono">Running architecture inference...</span>
+              </div>
+            ) : archPatterns && Object.keys(archPatterns).length > 0 ? (
+              <div className="grid gap-6 md:grid-cols-2">
+                {Object.entries(archPatterns).map(([patternName, pattern]: any) => (
+                  <div key={patternName} className="border rounded-2xl p-5 bg-card/60 hover:shadow-md transition-all space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-base font-bold text-foreground">{patternName}</h4>
+                      <span className="text-xs font-mono font-bold bg-primary/10 border text-primary px-2.5 py-0.5 rounded-full">
+                        Score: {Math.round(pattern.confidence * 100)}%
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      {pattern.description}
+                    </p>
+
+                    <div className="w-full bg-muted/20 rounded-full h-2 shadow-inner">
+                      <div
+                        className="bg-primary h-2 rounded-full transition-all duration-500"
+                        style={{ width: `${pattern.confidence * 100}%` }}
+                      />
+                    </div>
+
+                    {pattern.evidence && pattern.evidence.length > 0 && (
+                      <div className="space-y-1.5 pt-2 border-t">
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Structural Evidence</span>
+                        <ul className="text-[11px] font-mono text-muted-foreground list-disc pl-4 space-y-1">
+                          {pattern.evidence.map((ev: string, idx: number) => (
+                            <li key={idx} className="break-all">{ev}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center p-8 text-muted-foreground text-xs">
+                No architectural patterns detected.
+              </div>
+            )}
+          </div>
+        </div>
+      ) : workspaceView === 'query' ? (
+        <div className="flex flex-col border rounded-2xl bg-card shadow-sm h-[calc(100vh-230px)] overflow-hidden">
+          {/* Header */}
+          <div className="p-4 border-b bg-muted/20 flex items-center justify-between">
+            <span className="font-semibold text-sm tracking-tight flex items-center gap-2">
+              <Cpu className="h-4 w-4 text-primary animate-pulse" />
+              Knowledge Query Engine
+            </span>
+            <span className="text-[10px] bg-accent px-2 py-0.5 rounded font-mono font-bold text-muted-foreground uppercase">
+              Semantic Search
+            </span>
+          </div>
+
+          <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden items-stretch">
+            {/* Left query entry column (4 cols) */}
+            <div className="lg:col-span-4 border-r p-6 space-y-6 flex flex-col justify-between overflow-y-auto">
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-bold tracking-tight text-foreground uppercase tracking-wide">Enter Question</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">Ask questions about codebase ownership, configurations, data writes, or endpoints.</p>
+                </div>
+                
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleSemanticQuerySubmit(semanticQuery);
+                  }}
+                  className="space-y-2"
+                >
+                  <textarea
+                    value={semanticQuery}
+                    onChange={(e) => setSemanticQuery(e.target.value)}
+                    placeholder="e.g. Which modules interact with Redis?"
+                    className="w-full h-24 rounded-lg border bg-background px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary shadow-inner resize-none text-foreground placeholder-muted-foreground/60"
+                  />
+                  <Button
+                    type="submit"
+                    disabled={semanticQueryLoading || !semanticQuery.trim()}
+                    className="w-full flex items-center justify-center gap-1.5 shadow-md h-8 text-xs font-bold"
+                  >
+                    {semanticQueryLoading && <RefreshCw className="h-3.5 w-3.5 animate-spin" />}
+                    Analyze Query
+                  </Button>
+                </form>
+                
+                {/* Example queries checklist */}
+                <div className="space-y-2 pt-4 border-t">
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Example Templates</span>
+                  <div className="flex flex-col gap-1.5">
+                    {[
+                      "Which services own this API?",
+                      "Which modules interact with Redis?",
+                      "Which functions write to the database?",
+                      "Which services expose public endpoints?",
+                      "Which modules belong to Authentication?",
+                      "Which APIs use JWT?"
+                    ].map((q) => (
+                      <button
+                        key={q}
+                        onClick={() => {
+                          setSemanticQuery(q);
+                          handleSemanticQuerySubmit(q);
+                        }}
+                        className="text-[11px] font-semibold text-foreground text-left py-1.5 px-2.5 rounded border bg-muted/30 hover:bg-primary/5 hover:border-primary/40 transition-colors w-full break-words"
+                      >
+                        💡 {q}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right query results column (8 cols) */}
+            <div className="lg:col-span-8 flex flex-col overflow-hidden bg-muted/5">
+              {semanticQueryLoading ? (
+                <div className="flex-1 flex flex-col items-center justify-center space-y-3">
+                  <RefreshCw className="h-8 w-8 text-primary animate-spin" />
+                  <span className="text-sm font-semibold text-muted-foreground font-mono">Parsing semantic patterns...</span>
+                </div>
+              ) : semanticQueryResponse ? (
+                <div className="flex-1 flex flex-col overflow-hidden p-6 space-y-4">
+                  {/* Intent header */}
+                  <div className="p-4 border rounded-xl bg-primary/5 border-primary/20 space-y-1">
+                    <span className="text-[9px] font-bold text-primary uppercase tracking-wider">Inferred Intent</span>
+                    <h4 className="text-xs font-bold text-foreground">
+                      {semanticQueryResponse.inferred_intent}
+                    </h4>
+                  </div>
+
+                  {/* Results list */}
+                  <div className="flex-1 border rounded-xl bg-card overflow-hidden flex flex-col shadow-sm">
+                    <div className="p-3 border-b bg-muted/20 flex items-center justify-between text-xs font-bold text-muted-foreground">
+                      <span>Query Results</span>
+                      <span className="font-mono">{semanticQueryResponse.results.length} matched</span>
+                    </div>
+
+                    {semanticQueryResponse.results.length === 0 ? (
+                      <div className="flex-1 flex flex-col items-center justify-center text-center p-8 space-y-2">
+                        <AlertCircle className="h-8 w-8 text-muted-foreground" />
+                        <h4 className="text-xs font-bold text-foreground">No matches found in repository graph</h4>
+                        <p className="text-[11px] text-muted-foreground max-w-xs">
+                          Try adjusting keywords or selecting an alternative query template.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="flex-1 overflow-y-auto divide-y">
+                        {semanticQueryResponse.results.map((res: any, idx: number) => (
+                          <div key={idx} className="p-4 flex items-center justify-between hover:bg-muted/10 transition-colors">
+                            <div className="space-y-1 text-left flex-1 min-w-0 pr-4">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-bold text-foreground font-mono truncate">{res.name}</span>
+                                <span className="text-[9px] px-1.5 py-0.5 border rounded-full font-bold uppercase tracking-wider text-muted-foreground">
+                                  {res.type}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-muted-foreground leading-normal break-words">{res.details}</p>
+                            </div>
+                            
+                            <Button
+                              onClick={() => {
+                                setWorkspaceView('graph');
+                                setSelectedGraphNode({ id: res.id, name: res.name, type: res.type });
+                                setHighlightedNodes(new Set([res.id, ...(res.target ? [res.target] : [])]));
+                              }}
+                              variant="outline"
+                              size="xs"
+                              className="flex items-center gap-1 font-bold text-[10px] hover:border-primary hover:text-primary transition-all flex-shrink-0"
+                            >
+                              <Eye className="h-3 w-3" /> View in Graph
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground text-center p-8 space-y-2">
+                  <Cpu className="h-10 w-10 text-muted-foreground/20 animate-pulse" />
+                  <h4 className="text-xs font-bold text-foreground">Playground Idle</h4>
+                  <p className="text-[11px] max-w-xs">
+                    Choose one of the query templates on the left or type your own question to start querying.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : workspaceView === 'relationships' ? (
+        <div className="flex flex-col border rounded-2xl bg-card shadow-sm h-[calc(100vh-230px)] overflow-hidden">
+          {/* Header */}
+          <div className="p-4 border-b bg-muted/20 flex items-center justify-between">
+            <span className="font-semibold text-sm tracking-tight flex items-center gap-2">
+              <Network className="h-4.5 w-4.5 text-primary animate-pulse" />
+              Semantic Relationship Query Dashboard
+            </span>
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-primary/10 text-primary font-bold">
+              {relationshipsResults.length} Relationship(s) Found
+            </span>
+          </div>
+
+          {/* Search Panel */}
+          <div className="p-4 border-b bg-muted/5 grid gap-4 grid-cols-1 md:grid-cols-12 items-end">
+            <div className="md:col-span-4 space-y-1">
+              <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Keyword Search</label>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <input
+                  type="text"
+                  placeholder="Match source, target, path..."
+                  value={relQuery}
+                  onChange={(e) => setRelQuery(e.target.value)}
+                  className="w-full pl-9 pr-3 py-1.5 rounded-lg border bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary shadow-sm"
+                  onKeyDown={(e) => e.key === 'Enter' && fetchRelationshipsSearch()}
+                />
+              </div>
+            </div>
+
+            <div className="md:col-span-2 space-y-1">
+              <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Relationship Type</label>
+              <select
+                value={relType}
+                onChange={(e) => setRelType(e.target.value)}
+                className="w-full rounded-lg border bg-background px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary shadow-sm font-medium"
+              >
+                <option value="all">All Types</option>
+                <option value="IMPORTS">IMPORTS</option>
+                <option value="CALLS">CALLS</option>
+                <option value="OWNS">OWNS</option>
+                <option value="IMPLEMENTS">IMPLEMENTS</option>
+                <option value="INHERITS">INHERITS</option>
+                <option value="DEPENDS_ON">DEPENDS_ON</option>
+                <option value="USES">USES</option>
+                <option value="CONNECTS_TO">CONNECTS_TO</option>
+                <option value="READS">READS</option>
+                <option value="WRITES">WRITES</option>
+                <option value="EXPOSES">EXPOSES</option>
+                <option value="QUERIES">QUERIES</option>
+                <option value="CONSUMES">CONSUMES</option>
+                <option value="PRODUCES">PRODUCES</option>
+                <option value="BELONGS_TO">BELONGS_TO</option>
+                <option value="DEPLOYS_TO">DEPLOYS_TO</option>
+              </select>
+            </div>
+
+            <div className="md:col-span-2 space-y-1">
+              <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Source Type</label>
+              <select
+                value={relSrcType}
+                onChange={(e) => setRelSrcType(e.target.value)}
+                className="w-full rounded-lg border bg-background px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary shadow-sm font-medium"
+              >
+                <option value="all">All Sources</option>
+                <option value="Repository">Repository</option>
+                <option value="Folder">Folder</option>
+                <option value="File">File</option>
+                <option value="Module">Module</option>
+                <option value="Class">Class</option>
+                <option value="Interface">Interface</option>
+                <option value="Function">Function</option>
+                <option value="Method">Method</option>
+                <option value="API Endpoint">API Endpoint</option>
+                <option value="Database Table">Database Table</option>
+                <option value="External Service">External Service</option>
+                <option value="Environment">Environment</option>
+              </select>
+            </div>
+
+            <div className="md:col-span-2 space-y-1">
+              <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Target Type</label>
+              <select
+                value={relTgtType}
+                onChange={(e) => setRelTgtType(e.target.value)}
+                className="w-full rounded-lg border bg-background px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary shadow-sm font-medium"
+              >
+                <option value="all">All Targets</option>
+                <option value="Repository">Repository</option>
+                <option value="Folder">Folder</option>
+                <option value="File">File</option>
+                <option value="Module">Module</option>
+                <option value="Class">Class</option>
+                <option value="Interface">Interface</option>
+                <option value="Function">Function</option>
+                <option value="Method">Method</option>
+                <option value="API Endpoint">API Endpoint</option>
+                <option value="Database Table">Database Table</option>
+                <option value="External Service">External Service</option>
+                <option value="Environment">Environment</option>
+              </select>
+            </div>
+
+            <div className="md:col-span-2 flex gap-2">
+              <Button onClick={fetchRelationshipsSearch} disabled={relLoading} className="flex-1 shadow-sm font-bold text-xs h-[38px]">
+                Search
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setRelQuery('');
+                  setRelType('all');
+                  setRelSrcType('all');
+                  setRelTgtType('all');
+                  setTimeout(() => fetchRelationshipsSearch(), 0);
+                }}
+                className="shadow-sm font-bold text-xs h-[38px]"
+              >
+                Reset
+              </Button>
+            </div>
+          </div>
+
+          {/* Results List */}
+          <div className="flex-1 overflow-y-auto">
+            {relLoading ? (
+              <div className="flex flex-col items-center justify-center h-full space-y-2 py-16">
+                <RefreshCw className="h-8 w-8 text-primary animate-spin" />
+                <span className="text-xs text-muted-foreground">Searching relationship schema index...</span>
+              </div>
+            ) : relErrorMessage ? (
+              <div className="flex flex-col items-center justify-center p-8 text-center space-y-2 h-full">
+                <AlertCircle className="h-8 w-8 text-destructive" />
+                <p className="text-sm font-semibold">{relErrorMessage}</p>
+                <Button size="sm" onClick={fetchRelationshipsSearch}>Retry</Button>
+              </div>
+            ) : relationshipsResults.length === 0 ? (
+              <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground text-xs h-full space-y-2">
+                <Network className="h-8 w-8 text-muted-foreground/30" />
+                <p>No semantic relationships found matching the criteria.</p>
+              </div>
+            ) : (
+              <div className="p-4 overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b text-muted-foreground font-mono uppercase text-[9px] tracking-wider bg-muted/10">
+                      <th className="py-2.5 px-4 font-bold">Source Node</th>
+                      <th className="py-2.5 px-4 font-bold text-center">Relationship Type</th>
+                      <th className="py-2.5 px-4 font-bold">Target Node</th>
+                      <th className="py-2.5 px-4 font-bold">Context / Location</th>
+                      <th className="py-2.5 px-4 font-bold text-center">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {relationshipsResults.map((rel: any) => {
+                      // Color mapping helper for Relationship Types
+                      const typeColors: Record<string, string> = {
+                        IMPORTS: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
+                        CALLS: 'bg-purple-500/10 text-purple-500 border-purple-500/20',
+                        OWNS: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
+                        IMPLEMENTS: 'bg-cyan-500/10 text-cyan-500 border-cyan-500/20',
+                        INHERITS: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
+                        DEPENDS_ON: 'bg-teal-500/10 text-teal-500 border-teal-500/20',
+                        USES: 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20',
+                        CONNECTS_TO: 'bg-rose-500/10 text-rose-500 border-rose-500/20',
+                        READS: 'bg-pink-500/10 text-pink-500 border-pink-500/20',
+                        WRITES: 'bg-orange-500/10 text-orange-500 border-orange-500/20',
+                        EXPOSES: 'bg-fuchsia-500/10 text-fuchsia-500 border-fuchsia-500/20',
+                        QUERIES: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20',
+                        CONSUMES: 'bg-violet-500/10 text-violet-500 border-violet-500/20',
+                        PRODUCES: 'bg-sky-500/10 text-sky-500 border-sky-500/20',
+                        BELONGS_TO: 'bg-slate-500/10 text-slate-500 border-slate-500/20',
+                        DEPLOYS_TO: 'bg-lime-500/10 text-lime-500 border-lime-500/20',
+                      };
+
+                      // Icon helper for node types
+                      const getNodeIcon = (type: string) => {
+                        switch (type) {
+                          case 'Folder': return '📂';
+                          case 'File': return '📄';
+                          case 'Module': return '📦';
+                          case 'Class': return '🏛️';
+                          case 'Interface': return '⚙️';
+                          case 'Function': return '⚡';
+                          case 'Method': return '🔧';
+                          case 'API Endpoint': return '🌐';
+                          case 'Database Table': return '🗄️';
+                          case 'External Service': return '☁️';
+                          case 'Environment': return '🌍';
+                          case 'Repository': return '📦';
+                          default: return '🔹';
+                        }
+                      };
+
+                      const sourcePath = rel.source.properties?.path || rel.source.properties?.file_path || '';
+                      const targetPath = rel.target.properties?.path || rel.target.properties?.file_path || '';
+
+                      return (
+                        <tr key={rel.id} className="border-b border-border/40 hover:bg-muted/10 transition-colors">
+                          <td className="py-3 px-4 font-mono">
+                            <div className="flex flex-col">
+                              <span className="font-bold text-foreground flex items-center gap-1.5">
+                                <span className="text-sm" title={rel.source.type}>{getNodeIcon(rel.source.type)}</span>
+                                {rel.source.name}
+                              </span>
+                              {sourcePath && <span className="text-[10px] text-muted-foreground truncate max-w-[200px]" title={sourcePath}>{sourcePath}</span>}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <span className={cn(
+                              "inline-block text-[9px] font-bold px-2 py-0.5 border rounded-full font-mono uppercase tracking-wider",
+                              typeColors[rel.type] || 'bg-muted text-muted-foreground border-border/60'
+                            )}>
+                              {rel.type}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 font-mono">
+                            <div className="flex flex-col">
+                              <span className="font-bold text-foreground flex items-center gap-1.5">
+                                <span className="text-sm" title={rel.target.type}>{getNodeIcon(rel.target.type)}</span>
+                                {rel.target.name}
+                              </span>
+                              {targetPath && <span className="text-[10px] text-muted-foreground truncate max-w-[200px]" title={targetPath}>{targetPath}</span>}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 text-muted-foreground font-mono">
+                            <div className="flex flex-col gap-0.5">
+                              {rel.properties?.file_path && (
+                                <span className="text-[10px] truncate max-w-[220px]" title={rel.properties.file_path}>
+                                  📍 {rel.properties.file_path}
+                                </span>
+                              )}
+                              {rel.properties?.line && (
+                                <span className="text-[10px]">
+                                  🔢 Line {rel.properties.line}
+                                </span>
+                              )}
+                              {rel.properties?.label && (
+                                <span className="text-[10px] text-foreground font-sans font-medium italic">
+                                  {rel.properties.label}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <Button
+                              onClick={() => handleViewInGraph(rel.source.id, rel.target.id, rel.type)}
+                              variant="outline"
+                              size="xs"
+                              className="font-bold text-[10px] gap-1 hover:border-primary hover:text-primary transition-all shadow-sm"
+                            >
+                              <Eye className="h-3 w-3" /> View in Graph
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
       ) : workspaceView === 'graph' ? (
         <div className="grid gap-6 grid-cols-1 lg:grid-cols-12 items-start h-[calc(100vh-230px)] overflow-hidden border rounded-2xl bg-card shadow-sm">
           {/* Main Visualizer Canvas Area (8 cols) */}
@@ -684,15 +1639,43 @@ export default function Home() {
               {/* View options */}
               <div className="flex flex-wrap items-center gap-2">
                 {/* Search */}
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
-                  <input
-                    type="text"
-                    placeholder="Search node..."
-                    value={graphSearchQuery}
-                    onChange={(e) => setGraphSearchQuery(e.target.value)}
-                    className="pl-8 pr-3 py-1 rounded-md border bg-background text-xs focus:outline-none focus:ring-1 focus:ring-primary w-32"
-                  />
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+                    <input
+                      type="text"
+                      placeholder={semanticSearchActive ? "Concept (Enter)..." : "Search node..."}
+                      value={graphSearchQuery}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setGraphSearchQuery(val);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && semanticSearchActive) {
+                          triggerSemanticSearch(graphSearchQuery);
+                        }
+                      }}
+                      className="pl-8 pr-3 py-1 rounded-md border bg-background text-xs focus:outline-none focus:ring-1 focus:ring-primary w-32"
+                    />
+                  </div>
+                  <label className="flex items-center gap-1 text-[10px] font-bold text-muted-foreground select-none cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={semanticSearchActive}
+                      onChange={(e) => {
+                        const active = e.target.checked;
+                        setSemanticSearchActive(active);
+                        if (active) {
+                          triggerSemanticSearch(graphSearchQuery);
+                        } else {
+                          setHighlightedNodes(new Set());
+                        }
+                      }}
+                      className="rounded border bg-background text-primary focus:ring-1 focus:ring-primary shadow-sm"
+                    />
+                    <span>Semantic</span>
+                  </label>
+                  {semanticSearchLoading && <RefreshCw className="h-3.5 w-3.5 animate-spin text-primary" />}
                 </div>
 
                 {/* Filter Type */}
@@ -702,11 +1685,19 @@ export default function Home() {
                   className="rounded-md border bg-background px-2.5 py-1 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-primary shadow-sm"
                 >
                   <option value="all">All Types</option>
-                  <option value="Folder">Folders</option>
-                  <option value="File">Files</option>
-                  <option value="Module">Modules</option>
-                  <option value="Class">Classes</option>
-                  <option value="Function">Functions</option>
+                  <option value="Repository">Repository</option>
+                  <option value="Domain">Domain (Folder)</option>
+                  <option value="Module">Module (File)</option>
+                  <option value="Service">Service</option>
+                  <option value="API">API (Endpoint)</option>
+                  <option value="Function">Function / Method</option>
+                  <option value="Docker Service">Docker Service</option>
+                  <option value="GitHub Action">GitHub Action</option>
+                  <option value="Cron Job">Cron Job</option>
+                  <option value="Environment">Environment</option>
+                  <option value="Cache">Cache (Redis)</option>
+                  <option value="Database Table">Database Table</option>
+                  <option value="External Service">External Service</option>
                 </select>
 
                 {/* View Mode / Quick Query selectors */}
@@ -752,6 +1743,22 @@ export default function Home() {
                           setHighlightedEdges(new Set());
                         }
                       } catch (err) { console.error(err); }
+                    } else if (val === 'domains') {
+                      try {
+                        const res = await fetch(`/api/v1/repositories/${selectedRepoId}/knowledge/domains`, {
+                          headers: { Authorization: `Bearer ${token}` }
+                        });
+                        if (res.ok) {
+                          const data = await res.json();
+                          setDomainClusters(data.domains || []);
+                          const allDomainNodeIds = new Set<string>();
+                          data.domains.forEach((d: any) => {
+                            d.node_ids.forEach((id: string) => allDomainNodeIds.add(id));
+                          });
+                          setHighlightedNodes(allDomainNodeIds);
+                          setHighlightedEdges(new Set());
+                        }
+                      } catch (err) { console.error(err); }
                     }
                   }}
                   className="rounded-md border bg-background px-2.5 py-1 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-primary shadow-sm text-primary"
@@ -759,7 +1766,37 @@ export default function Home() {
                   <option value="all">View Mode: Default</option>
                   <option value="circular">Highlight Cycles</option>
                   <option value="orphans">Highlight Orphans</option>
+                  <option value="domains">Highlight Domains</option>
                 </select>
+
+                {/* Collapse Clusters toggle */}
+                <label className="flex items-center gap-1 text-[10px] font-bold text-muted-foreground select-none cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={collapseClusters}
+                    onChange={async (e) => {
+                      const active = e.target.checked;
+                      setCollapseClusters(active);
+                      setSelectedGraphNode(null);
+                      setHighlightedNodes(new Set());
+                      setHighlightedEdges(new Set());
+                      
+                      if (active && domainClusters.length === 0) {
+                        try {
+                          const res = await fetch(`/api/v1/repositories/${selectedRepoId}/knowledge/domains`, {
+                            headers: { Authorization: `Bearer ${token}` }
+                          });
+                          if (res.ok) {
+                            const data = await res.json();
+                            setDomainClusters(data.domains || []);
+                          }
+                        } catch (err) { console.error(err); }
+                      }
+                    }}
+                    className="rounded border bg-background text-primary focus:ring-1 focus:ring-primary shadow-sm"
+                  />
+                  <span>Collapse Domains</span>
+                </label>
 
                 {/* Reset button */}
                 <Button
@@ -820,10 +1857,10 @@ export default function Home() {
 
                   <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
                     {/* Render Relationships (Edges) */}
-                    {graphEdges
+                    {displayEdges
                       .filter((e: any) => {
-                        const srcNode = layoutNodes.find(n => n.id === e.source_id);
-                        const tgtNode = layoutNodes.find(n => n.id === e.target_id);
+                        const srcNode = displayNodes.find(n => n.id === e.source_id);
+                        const tgtNode = displayNodes.find(n => n.id === e.target_id);
                         if (!srcNode || !tgtNode) return false;
                         if (graphTypeFilter !== 'all') {
                           if (srcNode.type !== graphTypeFilter && tgtNode.type !== graphTypeFilter) return false;
@@ -831,8 +1868,8 @@ export default function Home() {
                         return true;
                       })
                       .map((edge: any) => {
-                        const source = layoutNodes.find(n => n.id === edge.source_id);
-                        const target = layoutNodes.find(n => n.id === edge.target_id);
+                        const source = displayNodes.find(n => n.id === edge.source_id);
+                        const target = displayNodes.find(n => n.id === edge.target_id);
                         if (!source || !target) return null;
 
                         const isHighlighted = highlightedEdges.has(edge.id);
@@ -879,11 +1916,10 @@ export default function Home() {
                         );
                       })}
 
-                    {/* Render Nodes */}
-                    {layoutNodes
+                    {displayNodes
                       .filter((n: any) => {
                         if (graphTypeFilter !== 'all' && n.type !== graphTypeFilter) return false;
-                        if (graphSearchQuery && !n.name.toLowerCase().includes(graphSearchQuery.toLowerCase())) return false;
+                        if (graphSearchQuery && !semanticSearchActive && !n.name.toLowerCase().includes(graphSearchQuery.toLowerCase())) return false;
                         return true;
                       })
                       .map((node: any) => {
@@ -894,21 +1930,69 @@ export default function Home() {
                         let colorClass = "fill-muted border bg-muted/10";
                         let borderStroke = "stroke-muted-foreground/40";
                         
-                        if (node.type === "Folder") {
+                        const domainColors: Record<string, { fill: string, stroke: string }> = {
+                          "Authentication & Security": { fill: "fill-purple-500/15", stroke: "stroke-purple-500" },
+                          "Billing & Payment": { fill: "fill-emerald-500/15", stroke: "stroke-emerald-500" },
+                          "Database & Storage": { fill: "fill-blue-500/15", stroke: "stroke-blue-500" },
+                          "Analytics & Monitoring": { fill: "fill-amber-500/15", stroke: "stroke-amber-500" },
+                          "Notifications & Messaging": { fill: "fill-red-500/15", stroke: "stroke-red-500" },
+                          "Background Tasks & Queues": { fill: "fill-pink-500/15", stroke: "stroke-pink-500" },
+                          "Core System": { fill: "fill-slate-500/15", stroke: "stroke-slate-500" }
+                        };
+
+                        let domainColor = null;
+                        if (graphViewMode === 'domains' && domainClusters.length > 0) {
+                          const foundCluster = domainClusters.find((d: any) => d.node_ids.includes(node.id));
+                          if (foundCluster) {
+                            domainColor = domainColors[foundCluster.name];
+                          }
+                        }
+
+                        if (node.isClusterNode || node.type === "DomainCluster") {
+                          colorClass = "fill-indigo-500/25";
+                          borderStroke = "stroke-indigo-500 stroke-[2.5px] stroke-dasharray-[2,2]";
+                        } else if (domainColor) {
+                          colorClass = domainColor.fill;
+                          borderStroke = domainColor.stroke;
+                        } else if (node.type === "Folder" || node.type === "Domain") {
                           colorClass = "fill-yellow-500/10";
                           borderStroke = "stroke-yellow-500";
-                        } else if (node.type === "File") {
+                        } else if (node.type === "File" || node.type === "Module") {
                           colorClass = "fill-blue-500/10";
                           borderStroke = "stroke-blue-500";
-                        } else if (node.type === "Module") {
-                          colorClass = "fill-indigo-500/10";
-                          borderStroke = "stroke-indigo-500";
-                        } else if (node.type === "Class") {
-                          colorClass = "fill-amber-500/10";
-                          borderStroke = "stroke-amber-500";
+                        } else if (node.type === "Class" || node.type === "Service") {
+                          colorClass = "fill-teal-500/10";
+                          borderStroke = "stroke-teal-500";
+                        } else if (node.type === "API Endpoint" || node.type === "API") {
+                          colorClass = "fill-emerald-500/10";
+                          borderStroke = "stroke-emerald-500";
                         } else if (node.type === "Function" || node.type === "Method") {
                           colorClass = "fill-purple-500/10";
                           borderStroke = "stroke-purple-500";
+                        } else if (node.type === "Docker Service") {
+                          colorClass = "fill-sky-500/10";
+                          borderStroke = "stroke-sky-500";
+                        } else if (node.type === "GitHub Action") {
+                          colorClass = "fill-orange-500/10";
+                          borderStroke = "stroke-orange-500";
+                        } else if (node.type === "Cron Job") {
+                          colorClass = "fill-red-500/10";
+                          borderStroke = "stroke-red-500";
+                        } else if (node.type === "Environment") {
+                          colorClass = "fill-lime-500/10";
+                          borderStroke = "stroke-lime-500";
+                        } else if (node.type === "Cache") {
+                          colorClass = "fill-pink-500/10";
+                          borderStroke = "stroke-pink-500";
+                        } else if (node.type === "Database Table") {
+                          colorClass = "fill-indigo-500/10";
+                          borderStroke = "stroke-indigo-500";
+                        } else if (node.type === "External Service") {
+                          colorClass = "fill-fuchsia-500/10";
+                          borderStroke = "stroke-fuchsia-500";
+                        } else if (node.type === "Repository") {
+                          colorClass = "fill-slate-500/10";
+                          borderStroke = "stroke-slate-500";
                         }
 
                         return (
@@ -936,13 +2020,13 @@ export default function Home() {
                           >
                             {(isSelected || isHighlighted) && (
                               <circle
-                                r="22"
+                                r={node.isClusterNode ? "32" : "22"}
                                 className="fill-rose-500/20 animate-ping opacity-75"
                               />
                             )}
                             
                             <circle
-                              r={isSelected ? "18" : "14"}
+                              r={node.isClusterNode ? "24" : isSelected ? "18" : "14"}
                               className={cn(
                                 "transition-all duration-300 stroke-[1.5px]",
                                 colorClass,
@@ -958,19 +2042,20 @@ export default function Home() {
                               className={cn(
                                 "font-mono font-black text-[9px]",
                                 isFaded ? "fill-muted-foreground/15" : "fill-foreground",
-                                isSelected ? "fill-rose-400" : ""
+                                isSelected ? "fill-rose-400" : "",
+                                node.isClusterNode && "text-[12px] font-sans fill-indigo-400 font-extrabold"
                               )}
                             >
-                              {node.type.substring(0, 2).toUpperCase()}
+                              {node.isClusterNode ? "🏰" : node.type.substring(0, 2).toUpperCase()}
                             </text>
 
                             <text
                               textAnchor="middle"
-                              y={isSelected ? "32" : "26"}
+                              y={node.isClusterNode ? "38" : isSelected ? "32" : "26"}
                               className={cn(
                                 "text-[9px] font-bold select-none truncate max-w-[80px]",
                                 isFaded ? "fill-muted-foreground/10" : "fill-foreground",
-                                isSelected ? "fill-rose-400 text-[10px]" : "hidden group-hover:block"
+                                node.isClusterNode ? "block fill-indigo-400 text-[10px]" : isSelected ? "fill-rose-400 text-[10px]" : "hidden group-hover:block"
                               )}
                             >
                               {node.name}
@@ -1013,17 +2098,45 @@ export default function Home() {
                   </p>
                 </div>
 
-                <div className="border rounded-xl p-4 bg-muted/10 space-y-2 text-xs">
-                  <span className="font-bold text-muted-foreground uppercase tracking-wider text-[10px]">Properties</span>
-                  <div className="space-y-1 font-mono text-foreground break-all max-h-36 overflow-y-auto">
-                    {Object.entries(selectedGraphNode.properties || {}).map(([k, v]: any) => (
-                      <div key={k} className="flex justify-between border-b border-border/40 py-1">
-                        <span className="text-muted-foreground">{k}:</span>
-                        <span>{typeof v === 'object' ? JSON.stringify(v) : String(v)}</span>
-                      </div>
-                    ))}
+                {selectedGraphNode.isClusterNode ? (
+                  <div className="border rounded-xl p-4 bg-muted/10 space-y-2 text-xs">
+                    <span className="font-bold text-muted-foreground uppercase tracking-wider text-[10px]">Contained Modules</span>
+                    <div className="space-y-1 max-h-36 overflow-y-auto">
+                      {(selectedGraphNode.containedNodeIds || []).map((nid: string) => {
+                        const name = nid.split('::').pop();
+                        return (
+                          <div key={nid} className="border-b border-border/40 py-1.5 flex items-center justify-between text-[11px]">
+                            <span className="font-mono text-foreground font-bold truncate max-w-[180px]" title={nid}>{name}</span>
+                            <Button
+                              onClick={() => {
+                                setCollapseClusters(false);
+                                setSelectedGraphNode({ id: nid, name, type: 'Module' });
+                                setHighlightedNodes(new Set([nid]));
+                              }}
+                              variant="ghost"
+                              size="xs"
+                              className="text-[9px] hover:text-primary p-1 h-5"
+                            >
+                              Expand
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="border rounded-xl p-4 bg-muted/10 space-y-2 text-xs">
+                    <span className="font-bold text-muted-foreground uppercase tracking-wider text-[10px]">Properties</span>
+                    <div className="space-y-1 font-mono text-foreground break-all max-h-36 overflow-y-auto">
+                      {Object.entries(selectedGraphNode.properties || {}).map(([k, v]: any) => (
+                        <div key={k} className="flex justify-between border-b border-border/40 py-1">
+                          <span className="text-muted-foreground">{k}:</span>
+                          <span>{typeof v === 'object' ? JSON.stringify(v) : String(v)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-3">
                   <span className="font-bold text-muted-foreground uppercase tracking-wider text-[10px]">Dependency Queries</span>
@@ -1120,6 +2233,123 @@ export default function Home() {
                     💥 Show Downstream Blast Radius
                   </Button>
                 </div>
+
+                {/* Shortest Path Finder Widget */}
+                <div className="border rounded-xl p-4 bg-muted/10 space-y-2.5 text-xs">
+                  <span className="font-bold text-muted-foreground uppercase tracking-wider text-[10px] flex items-center gap-1">
+                    🎯 Shortest Path Finder
+                  </span>
+                  <p className="text-[10px] text-muted-foreground leading-normal">
+                    Find the shortest path of relationships from this node to another target node.
+                  </p>
+                  <div className="flex gap-1.5">
+                    <select
+                      id="shortest-path-target"
+                      className="flex-1 rounded-md border bg-background px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-primary text-foreground"
+                    >
+                      <option value="">Select target node...</option>
+                      {displayNodes
+                        .filter((n: any) => n.id !== selectedGraphNode.id)
+                        .map((n: any) => (
+                          <option key={n.id} value={n.id}>{n.name} ({n.type})</option>
+                        ))
+                      }
+                    </select>
+                    <Button
+                      onClick={() => {
+                        const targetSelect = document.getElementById("shortest-path-target") as HTMLSelectElement;
+                        if (targetSelect && targetSelect.value) {
+                          const path = findShortestPath(displayNodes, displayEdges, selectedGraphNode.id, targetSelect.value);
+                          if (path) {
+                            setHighlightedNodes(new Set(path));
+                            // highlight edges
+                            const edgesSet = new Set<string>();
+                            for (let i = 0; i < path.length - 1; i++) {
+                              const edge = displayEdges.find((e: any) => 
+                                (e.source_id === path[i] && e.target_id === path[i+1]) ||
+                                (e.source_id === path[i+1] && e.target_id === path[i])
+                              );
+                              if (edge) edgesSet.add(edge.id);
+                            }
+                            setHighlightedEdges(edgesSet);
+                          } else {
+                            alert("No relationship path found between these nodes.");
+                          }
+                        }
+                      }}
+                      variant="default"
+                      size="xs"
+                      className="font-bold"
+                    >
+                      Find
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : graphViewMode === 'domains' && domainClusters.length > 0 ? (
+              <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                <div>
+                  <h3 className="font-bold text-sm text-foreground flex items-center gap-1.5">
+                    <Layers className="h-4 w-4 text-primary animate-pulse" />
+                    Business Domains Clustered
+                  </h3>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    Click a business subdomain in the list to highlight its specific modules and database items.
+                  </p>
+                </div>
+
+                <div className="space-y-2.5">
+                  {domainClusters.map((cluster) => {
+                    const colors: Record<string, string> = {
+                      "Authentication & Security": "border-l-4 border-l-purple-500 bg-purple-500/5",
+                      "Billing & Payment": "border-l-4 border-l-emerald-500 bg-emerald-500/5",
+                      "Database & Storage": "border-l-4 border-l-blue-500 bg-blue-500/5",
+                      "Analytics & Monitoring": "border-l-4 border-l-amber-500 bg-amber-500/5",
+                      "Notifications & Messaging": "border-l-4 border-l-red-500 bg-red-500/5",
+                      "Background Tasks & Queues": "border-l-4 border-l-pink-500 bg-pink-500/5",
+                      "Core System": "border-l-4 border-l-slate-500 bg-slate-500/5",
+                    };
+                    const borderClass = colors[cluster.name] || "border-l-4 border-l-primary bg-primary/5";
+                    
+                    return (
+                      <div
+                        key={cluster.name}
+                        onClick={() => {
+                          const nodesSet = new Set<string>(cluster.node_ids);
+                          setHighlightedNodes(nodesSet);
+                          setHighlightedEdges(new Set());
+                        }}
+                        className={cn(
+                          "p-3 rounded-lg border text-left cursor-pointer hover:shadow-sm transition-all duration-200 hover:scale-[1.01]",
+                          borderClass
+                        )}
+                      >
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-xs font-extrabold text-foreground">{cluster.name}</h4>
+                          <span className="text-[10px] font-mono font-bold bg-background border px-1.5 py-0.5 rounded text-muted-foreground">
+                            {cluster.node_ids.length} nodes
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground leading-relaxed mt-1">
+                          {cluster.description}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+                
+                <Button
+                  onClick={() => {
+                    const allNodeIds = new Set<string>();
+                    domainClusters.forEach((d: any) => d.node_ids.forEach((id: string) => allNodeIds.add(id)));
+                    setHighlightedNodes(allNodeIds);
+                  }}
+                  variant="outline"
+                  size="sm"
+                  className="w-full text-xs font-semibold"
+                >
+                  ✨ Show All Domains
+                </Button>
               </div>
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-muted-foreground text-xs space-y-2">

@@ -14,7 +14,10 @@ class AnalysisService:
         Find circular dependency loops (e.g. A -> B -> C -> A) in the repository graph.
         """
         # Load relationships
-        relationships = db.query(GraphRelationship).filter(GraphRelationship.repository_id == repo_id).all()
+        relationships = db.query(GraphRelationship).filter(
+            GraphRelationship.repository_id == repo_id,
+            ~GraphRelationship.type.in_(["OWNS", "BELONGS_TO", "DEPLOYS_TO"])
+        ).all()
         
         # Build adjacency list (source_id -> list of target_id)
         adj: Dict[str, Set[str]] = collections.defaultdict(set)
@@ -100,7 +103,10 @@ class AnalysisService:
         Measure coupling metrics: Fan-in, Fan-out, Instability Coupling Score, and Degree Centrality.
         """
         nodes = db.query(GraphNode).filter(GraphNode.repository_id == repo_id).all()
-        relationships = db.query(GraphRelationship).filter(GraphRelationship.repository_id == repo_id).all()
+        relationships = db.query(GraphRelationship).filter(
+            GraphRelationship.repository_id == repo_id,
+            ~GraphRelationship.type.in_(["OWNS", "BELONGS_TO", "DEPLOYS_TO"])
+        ).all()
 
         fan_in: Dict[str, int] = {n.id: 0 for n in nodes}
         fan_out: Dict[str, int] = {n.id: 0 for n in nodes}
@@ -186,7 +192,10 @@ class AnalysisService:
             }
 
         # Load all relationships for traversal
-        relationships = db.query(GraphRelationship).filter(GraphRelationship.repository_id == repo_id).all()
+        relationships = db.query(GraphRelationship).filter(
+            GraphRelationship.repository_id == repo_id,
+            ~GraphRelationship.type.in_(["OWNS", "BELONGS_TO", "DEPLOYS_TO"])
+        ).all()
 
         # Build reverse adjacency list (target_id -> list of source_id)
         # We traverse incoming edges, i.e., from target back to source
@@ -384,7 +393,10 @@ class AnalysisService:
         """
         Show downstream impact (transitive CALLS/IMPORTS/INHERITS edges downwards).
         """
-        relationships = db.query(GraphRelationship).filter(GraphRelationship.repository_id == repo_id).all()
+        relationships = db.query(GraphRelationship).filter(
+            GraphRelationship.repository_id == repo_id,
+            ~GraphRelationship.type.in_(["OWNS", "BELONGS_TO", "DEPLOYS_TO"])
+        ).all()
 
         adj = collections.defaultdict(list)
         for r in relationships:
@@ -440,7 +452,10 @@ class AnalysisService:
             ])
         ).all()
 
-        relationships = db.query(GraphRelationship).filter(GraphRelationship.repository_id == repo_id).all()
+        relationships = db.query(GraphRelationship).filter(
+            GraphRelationship.repository_id == repo_id,
+            ~GraphRelationship.type.in_(["OWNS", "BELONGS_TO", "DEPLOYS_TO"])
+        ).all()
 
         active_node_ids = {n.id for n in nodes}
         connected_ids = set()
@@ -461,3 +476,37 @@ class AnalysisService:
             "total_orphans": len(orphans),
             "orphans": orphans
         }
+
+    def detect_architecture_patterns(self, db: Session, repo_id: str) -> Dict[str, Any]:
+        """
+        Detect architectural design patterns and return confidence scores + evidence.
+        """
+        from app.services.architecture_detector import ArchitectureDetector
+        detector = ArchitectureDetector()
+        detected = detector.detect(db, repo_id)
+        return {"patterns": detected}
+
+    def detect_domains(self, db: Session, repo_id: str) -> Dict[str, Any]:
+        """
+        Analyze and cluster related nodes into logical business domains.
+        """
+        from app.services.domain_detector import DomainDetector
+        detector = DomainDetector()
+        clusters = detector.detect_domains(db, repo_id)
+        return {"domains": clusters}
+
+    def execute_semantic_query(self, db: Session, repo_id: str, query: str) -> Dict[str, Any]:
+        """
+        Execute semantic queries on the repository graph structure.
+        """
+        from app.services.knowledge_query_engine import KnowledgeQueryEngine
+        engine = KnowledgeQueryEngine()
+        return engine.execute_query(db, repo_id, query)
+
+    def search_repository_semantically(self, db: Session, repo_id: str, query: str) -> List[Dict[str, Any]]:
+        """
+        Perform a concept-expanded semantic search against nodes.
+        """
+        from app.services.semantic_search_engine import SemanticSearchEngine
+        engine = SemanticSearchEngine()
+        return engine.search_nodes(db, repo_id, query)

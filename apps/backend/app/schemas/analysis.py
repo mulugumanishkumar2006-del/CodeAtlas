@@ -65,3 +65,52 @@ class ImpactAnalysisResponse(BaseModel):
     affected_counts: AffectedCounts
     risk: str
     affected_details: List[AffectedDetail]
+
+
+# 4. Architecture Pattern Detection
+class PatternDetail(BaseModel):
+    pattern: str
+    confidence: float
+    description: str
+    evidence: List[str]
+
+
+class ArchitecturePatternResponse(BaseModel):
+    patterns: List[PatternDetail]
+
+
+# 5. Domain Detection
+class DomainCluster(BaseModel):
+    name: str
+    description: str
+    node_ids: List[str]
+
+
+class DomainDetectionResponse(BaseModel):
+    domains: List[DomainCluster]
+
+
+# 6. Knowledge Query Engine
+class SemanticQueryResult(BaseModel):
+    id: str
+    name: str
+    type: str
+    relationship: Optional[str] = None
+    target: Optional[str] = None
+    details: Optional[str] = None
+
+
+class SemanticQueryResponse(BaseModel):
+    query: str
+    inferred_intent: str
+    results: List[SemanticQueryResult]
+
+
+# 7. Repository Search Engine
+class SemanticSearchNodeResponse(BaseModel):
+    id: str
+    name: str
+    type: str
+    properties: Optional[Dict[str, Any]] = None
+    score: float
+    matched_concepts: List[str]

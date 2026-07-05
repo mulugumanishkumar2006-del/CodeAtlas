@@ -42,3 +42,14 @@ class GraphRelationshipResponse(BaseModel):
 class RepositoryGraphResponse(BaseModel):
     nodes: List[GraphNodeResponse]
     relationships: List[GraphRelationshipResponse]
+
+
+class RelationshipSearchResponse(BaseModel):
+    id: str
+    source: GraphNodeResponse
+    target: GraphNodeResponse
+    type: str
+    properties: Optional[Dict[str, Any]] = None
+
+    class Config:
+        from_attributes = True

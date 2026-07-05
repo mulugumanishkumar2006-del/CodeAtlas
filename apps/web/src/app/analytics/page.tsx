@@ -10,7 +10,10 @@ import {
   Zap,
   TrendingUp,
   Cpu,
-  Award
+  Award,
+  Layers,
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 import { useAuth } from '@/context/auth-context';
 import { Button } from '@/components/ui/button';
@@ -48,15 +51,24 @@ interface RepositoryMetrics {
   files: FileMetricSummary[];
 }
 
+interface PatternDetail {
+  pattern: string;
+  confidence: number;
+  description: string;
+  evidence: string[];
+}
+
 export default function AnalyticsPage() {
   const { token } = useAuth();
   const [repos, setRepos] = React.useState<Repository[]>([]);
   const [selectedRepoId, setSelectedRepoId] = React.useState<string>('');
   const [metrics, setMetrics] = React.useState<RepositoryMetrics | null>(null);
   const [languages, setLanguages] = React.useState<Record<string, number>>({});
+  const [patterns, setPatterns] = React.useState<PatternDetail[]>([]);
   
   const [loading, setLoading] = React.useState(true);
   const [metricsLoading, setMetricsLoading] = React.useState(false);
+  const [patternsLoading, setPatternsLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
   const selectedRepo = repos.find((r) => r.id === selectedRepoId);
@@ -90,18 +102,24 @@ export default function AnalyticsPage() {
     fetchRepos();
   }, [token]);
 
-  // Fetch metrics and languages for selected repo
+  // Fetch metrics, languages, and architecture patterns for selected repo
   const fetchMetricsData = React.useCallback(async () => {
     if (!token || !selectedRepoId) return;
     setMetricsLoading(true);
+    setPatternsLoading(true);
     setMetrics(null);
     setLanguages({});
+    setPatterns([]);
     try {
       const metricsRes = await fetch(`/api/v1/repositories/${selectedRepoId}/metrics`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       
       const langsRes = await fetch(`/api/v1/repositories/${selectedRepoId}/languages`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      const patternsRes = await fetch(`/api/v1/repositories/${selectedRepoId}/analysis/architecture`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -114,10 +132,16 @@ export default function AnalyticsPage() {
         const langsData = await langsRes.json();
         setLanguages(langsData.languages || {});
       }
+
+      if (patternsRes.ok) {
+        const patternsData = await patternsRes.json();
+        setPatterns(patternsData.patterns || []);
+      }
     } catch (e) {
       console.error('Failed to load metrics data', e);
     } finally {
       setMetricsLoading(false);
+      setPatternsLoading(false);
     }
   }, [token, selectedRepoId]);
 
@@ -143,7 +167,7 @@ export default function AnalyticsPage() {
             Codebase Analytics
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Evaluate code quality metrics, complexity distributions, and programming language parameters.
+            Evaluate code quality metrics, complexity distributions, programming languages, and architectural design patterns.
           </p>
         </div>
 
@@ -207,7 +231,7 @@ export default function AnalyticsPage() {
       ) : metricsLoading ? (
         <div className="flex flex-col items-center justify-center p-16 border rounded-2xl bg-card shadow-sm space-y-4">
           <RefreshCw className="h-8 w-8 text-primary animate-spin" />
-          <span className="text-sm text-muted-foreground">Analyzing complexity and schemas...</span>
+          <span className="text-sm text-muted-foreground">Analyzing complexity, schemas, and architecture pattern structures...</span>
         </div>
       ) : !metrics ? (
         <div className="flex flex-col items-center justify-center border rounded-2xl p-16 bg-card shadow-sm space-y-4">
@@ -359,6 +383,105 @@ export default function AnalyticsPage() {
                 </table>
               </div>
             </div>
+          </div>
+
+          {/* Architecture Pattern Detection Section */}
+          <div className="border rounded-2xl bg-card p-6 shadow-sm space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold tracking-tight text-foreground uppercase tracking-wide flex items-center gap-2">
+                  <Layers className="h-5 w-5 text-primary" />
+                  Architectural Patterns Detected
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Automatically inferred software design models, interface layouts, and deployment paradigms.
+                </p>
+              </div>
+              {patternsLoading && (
+                <RefreshCw className="h-4 w-4 text-muted-foreground animate-spin" />
+              )}
+            </div>
+
+            {patternsLoading ? (
+              <div className="flex flex-col items-center justify-center py-12 space-y-3">
+                <RefreshCw className="h-6 w-6 text-primary animate-spin" />
+                <span className="text-xs text-muted-foreground font-mono">Analyzing module graph connections...</span>
+              </div>
+            ) : patterns.length === 0 ? (
+              <div className="flex flex-col items-center justify-center border border-dashed rounded-xl p-10 text-center bg-muted/20 space-y-2">
+                <AlertCircle className="h-8 w-8 text-muted-foreground" />
+                <h4 className="text-sm font-bold text-foreground">No Design Patterns Inferred</h4>
+                <p className="text-xs text-muted-foreground max-w-sm">
+                  We could not map this codebase to a high confidence architectural pattern. Consider introducing standard folders (e.g. models, services, repositories) to help the parser classify structure.
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-6 md:grid-cols-2">
+                {patterns.map((p) => {
+                  const confPct = Math.round(p.confidence * 100);
+                  const confColor =
+                    p.confidence > 0.7
+                      ? 'bg-emerald-500'
+                      : p.confidence > 0.4
+                      ? 'bg-amber-500'
+                      : 'bg-slate-500';
+                  const confTextColor =
+                    p.confidence > 0.7
+                      ? 'text-emerald-500'
+                      : p.confidence > 0.4
+                      ? 'text-amber-500'
+                      : 'text-slate-500';
+                  
+                  return (
+                    <div
+                      key={p.pattern}
+                      className="border rounded-xl bg-card hover:shadow-md transition-all duration-300 p-5 space-y-4 hover:scale-[1.01]"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-1">
+                          <h4 className="text-base font-extrabold text-foreground flex items-center gap-1.5">
+                            <CheckCircle2 className="h-4 w-4 text-primary" />
+                            {p.pattern}
+                          </h4>
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            {p.description}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <span className={cn('text-lg font-black font-mono', confTextColor)}>
+                            {confPct}%
+                          </span>
+                          <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Confidence</p>
+                        </div>
+                      </div>
+
+                      {/* Confidence slider bar */}
+                      <div className="space-y-1">
+                        <div className="h-2 w-full bg-accent rounded-full overflow-hidden">
+                          <div
+                            style={{ width: `${confPct}%` }}
+                            className={cn('h-full rounded-full transition-all duration-500 ease-out', confColor)}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Evidence block */}
+                      <div className="space-y-2 pt-2 border-t">
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Structural Evidence</span>
+                        <ul className="space-y-1.5">
+                          {p.evidence.map((ev, i) => (
+                            <li key={i} className="text-xs text-foreground/80 flex items-start gap-2">
+                              <span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0" />
+                              <span className="font-mono leading-tight break-all">{ev}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}

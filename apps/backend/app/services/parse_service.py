@@ -207,18 +207,41 @@ class ParseService:
         try:
             graph = self.relationship_builder.build(extractions, asts)
 
+            # Helper to map raw types to canonical ontology types
+            def map_to_ontology_type(node_type: str, node_name: str) -> str:
+                t_lower = node_type.lower()
+                n_lower = node_name.lower()
+                if t_lower == "repository":
+                    return "Repository"
+                if t_lower in ("folder", "domain"):
+                    return "Domain"
+                if t_lower in ("file", "module"):
+                    return "Module"
+                if t_lower == "service" or (t_lower == "class" and "service" in n_lower):
+                    return "Service"
+                if t_lower in ("api endpoint", "api", "api_endpoint"):
+                    return "API"
+                if t_lower in ("function", "method"):
+                    return "Function"
+                return node_type
+
+            # Track node IDs added in this parsing transaction to avoid duplicate inserts
+            added_node_ids = set()
+
             # Pre-populate top-level architectural layer module nodes
             layers = ["API", "Service", "Repository", "Database"]
             for layer in layers:
                 layer_id = f"layer::{layer}"
-                db_graph_node = GraphNode(
-                    id=layer_id,
-                    repository_id=repo_id,
-                    type=GraphNodeType.MODULE.value,
-                    name=layer,
-                    properties={"layer": layer}
-                )
-                db.add(db_graph_node)
+                if layer_id not in added_node_ids:
+                    db_graph_node = GraphNode(
+                        id=layer_id,
+                        repository_id=repo_id,
+                        type=GraphNodeType.MODULE.value,
+                        name=layer,
+                        properties={"layer": layer, "raw_type": GraphNodeType.MODULE.value}
+                    )
+                    db.add(db_graph_node)
+                    added_node_ids.add(layer_id)
 
             # Helper to classify folder/file path into architectural layer
             def get_architectural_layer(path: str) -> str:
@@ -244,17 +267,120 @@ class ParseService:
 
             for folder in folder_paths:
                 folder_id = f"folder::{folder}"
-                folder_name = folder.split("/")[-1]
-                db_graph_node = GraphNode(
-                    id=folder_id,
-                    repository_id=repo_id,
-                    type=GraphNodeType.FOLDER.value,
-                    name=folder_name,
-                    properties={"path": folder}
-                )
-                db.add(db_graph_node)
+                if folder_id not in added_node_ids:
+                    folder_name = folder.split("/")[-1]
+                    canonical_type = map_to_ontology_type(GraphNodeType.FOLDER.value, folder_name)
+                    db_graph_node = GraphNode(
+                        id=folder_id,
+                        repository_id=repo_id,
+                        type=canonical_type,
+                        name=folder_name,
+                        properties={"path": folder, "raw_type": GraphNodeType.FOLDER.value}
+                    )
+                    db.add(db_graph_node)
+                    added_node_ids.add(folder_id)
 
-            # 1. Save GraphNodes from the parsed codebase
+            # --- Enriched Nodes (Feature 3) ---
+            # 1. Save Repository Node
+            repo_node_id = f"repository::{repo_id}"
+            if repo_node_id not in added_node_ids:
+                db_repo_node = GraphNode(
+                    id=repo_node_id,
+                    repository_id=repo_id,
+                    type=GraphNodeType.REPOSITORY.value,
+                    name=repo.name,
+                    properties={"full_name": repo.full_name, "clone_url": repo.clone_url, "raw_type": GraphNodeType.REPOSITORY.value}
+                )
+                db.add(db_repo_node)
+                added_node_ids.add(repo_node_id)
+
+            # 2. Save Environment Node & Repository DEPLOYS_TO Environment relationship
+            env_name = settings.ENVIRONMENT
+            env_node_id = f"env::{repo_id}::{env_name}"
+            if env_node_id not in added_node_ids:
+                db_env_node = GraphNode(
+                    id=env_node_id,
+                    repository_id=repo_id,
+                    type=GraphNodeType.ENVIRONMENT.value,
+                    name=env_name,
+                    properties={"environment": env_name, "raw_type": GraphNodeType.ENVIRONMENT.value}
+                )
+                db.add(db_env_node)
+                added_node_ids.add(env_node_id)
+
+            db_deploys = GraphRelationship(
+                id=str(uuid.uuid4()),
+                repository_id=repo_id,
+                source_id=repo_node_id,
+                target_id=env_node_id,
+                type=GraphRelationshipType.DEPLOYS_TO.value,
+                properties={"label": f"deploys to {env_name} environment"}
+            )
+            db.add(db_deploys)
+
+            # --- Enriched Relationships (Feature 3) ---
+            # 3. Class/File ownership relationships (OWNS and BELONGS_TO)
+            for path, extraction in extractions.items():
+                file_node_id = f"file::{path}"
+                for sym in extraction.symbols:
+                    sym_id = f"symbol::{path}::{sym.parent_name}.{sym.name}" if sym.parent_name else f"symbol::{path}::{sym.name}"
+                    
+                    if not sym.parent_name:
+                        # File OWNS symbol
+                        db.add(GraphRelationship(
+                            id=str(uuid.uuid4()),
+                            repository_id=repo_id,
+                            source_id=file_node_id,
+                            target_id=sym_id,
+                            type=GraphRelationshipType.OWNS.value,
+                            properties={"label": f"owns {sym.name}"}
+                        ))
+                        # Symbol BELONGS_TO File
+                        db.add(GraphRelationship(
+                            id=str(uuid.uuid4()),
+                            repository_id=repo_id,
+                            source_id=sym_id,
+                            target_id=file_node_id,
+                            type=GraphRelationshipType.BELONGS_TO.value,
+                            properties={"label": f"belongs to {path}"}
+                        ))
+                    else:
+                        parent_id = f"symbol::{path}::{sym.parent_name}"
+                        # Class OWNS Method
+                        db.add(GraphRelationship(
+                            id=str(uuid.uuid4()),
+                            repository_id=repo_id,
+                            source_id=parent_id,
+                            target_id=sym_id,
+                            type=GraphRelationshipType.OWNS.value,
+                            properties={"label": f"owns {sym.name}"}
+                        ))
+                        # Method BELONGS_TO Class
+                        db.add(GraphRelationship(
+                            id=str(uuid.uuid4()),
+                            repository_id=repo_id,
+                            source_id=sym_id,
+                            target_id=parent_id,
+                            type=GraphRelationshipType.BELONGS_TO.value,
+                            properties={"label": f"belongs to {sym.parent_name}"}
+                        ))
+
+            # 4. File exposures (EXPOSES)
+            for path, extraction in extractions.items():
+                file_node_id = f"file::{path}"
+                for sym in extraction.symbols:
+                    if sym.is_exported:
+                        sym_id = f"symbol::{path}::{sym.parent_name}.{sym.name}" if sym.parent_name else f"symbol::{path}::{sym.name}"
+                        db.add(GraphRelationship(
+                            id=str(uuid.uuid4()),
+                            repository_id=repo_id,
+                            source_id=file_node_id,
+                            target_id=sym_id,
+                            type=GraphRelationshipType.EXPOSES.value,
+                            properties={"label": f"exposes {sym.name}"}
+                        ))
+
+            # Save GraphNodes from the parsed codebase
             for node_id, node in graph.nodes.items():
                 node_type = GraphNodeType.FILE
                 kind_lower = node.kind.lower()
@@ -275,16 +401,119 @@ class ParseService:
                 elif kind_lower == "constant":
                     node_type = GraphNodeType.VARIABLE
 
-                db_graph_node = GraphNode(
-                    id=node.id,
-                    repository_id=repo_id,
-                    type=node_type.value,
-                    name=node.name,
-                    properties=node.metadata or {}
-                )
-                db.add(db_graph_node)
+                canonical_type = map_to_ontology_type(node_type.value, node.name)
+                if node.id not in added_node_ids:
+                    db_graph_node = GraphNode(
+                        id=node.id,
+                        repository_id=repo_id,
+                        type=canonical_type,
+                        name=node.name,
+                        properties={**(node.metadata or {}), "raw_type": node_type.value}
+                    )
+                    db.add(db_graph_node)
+                    added_node_ids.add(node.id)
 
-            # 2. Save GraphRelationships and map folder & layer dependencies
+            # 5. Extract Service to API exposes (EXPOSES) and Database read/writes (READS, WRITES)
+            api_nodes = []
+            service_nodes = []
+            db_table_nodes = []
+            for node_id, node in graph.nodes.items():
+                is_service = "service" in node.name.lower() or "service" in node_id.lower()
+                is_api = "api" in node.name.lower() or "router" in node_id.lower() or "endpoint" in node.name.lower()
+                is_db = "db" in node.name.lower() or "database" in node_id.lower() or "model" in node.name.lower()
+                if is_service:
+                    service_nodes.append(node)
+                if is_api:
+                    api_nodes.append(node)
+                if is_db and node.kind.lower() == "class":
+                    db_table_nodes.append(node)
+
+            for s_node in service_nodes:
+                for a_node in api_nodes:
+                    db.add(GraphRelationship(
+                        id=str(uuid.uuid4()),
+                        repository_id=repo_id,
+                        source_id=s_node.id,
+                        target_id=a_node.id,
+                        type=GraphRelationshipType.EXPOSES.value,
+                        properties={"label": f"exposes API endpoint {a_node.name}"}
+                    ))
+                for d_node in db_table_nodes:
+                    db.add(GraphRelationship(
+                        id=str(uuid.uuid4()),
+                        repository_id=repo_id,
+                        source_id=s_node.id,
+                        target_id=d_node.id,
+                        type=GraphRelationshipType.READS.value,
+                        properties={"label": f"reads from database table {d_node.name}"}
+                    ))
+                    db.add(GraphRelationship(
+                        id=str(uuid.uuid4()),
+                        repository_id=repo_id,
+                        source_id=s_node.id,
+                        target_id=d_node.id,
+                        type=GraphRelationshipType.WRITES.value,
+                        properties={"label": f"writes to database table {d_node.name}"}
+                    ))
+
+            # 6. Cache connections (CONNECTS_TO) and Celery queues (CONSUMES, PRODUCES)
+            has_redis = False
+            has_celery = False
+            for n in graph.nodes.values():
+                n_lower = n.name.lower()
+                if "redis" in n_lower or "cache" in n_lower:
+                    has_redis = True
+                if "celery" in n_lower or "queue" in n_lower:
+                    has_celery = True
+
+            if has_redis:
+                cache_id = f"cache::{repo_id}::redis"
+                if cache_id not in added_node_ids:
+                    db.add(GraphNode(
+                        id=cache_id,
+                        repository_id=repo_id,
+                        type=GraphNodeType.EXTERNAL_SERVICE.value,
+                        name="RedisCache",
+                        properties={"type": "Redis", "raw_type": GraphNodeType.EXTERNAL_SERVICE.value}
+                    ))
+                    added_node_ids.add(cache_id)
+                for path in extractions.keys():
+                    if "cache" in path.lower() or "redis" in path.lower():
+                        db.add(GraphRelationship(
+                            id=str(uuid.uuid4()),
+                            repository_id=repo_id,
+                            source_id=f"file::{path}",
+                            target_id=cache_id,
+                            type=GraphRelationshipType.CONNECTS_TO.value,
+                            properties={"label": "connects to Redis Cache"}
+                        ))
+
+            if has_celery:
+                queue_node_id = f"queue::{repo_id}::celery"
+                if queue_node_id not in added_node_ids:
+                    db.add(GraphNode(
+                        id=queue_node_id,
+                        repository_id=repo_id,
+                        type=GraphNodeType.EXTERNAL_SERVICE.value,
+                        name="CeleryQueue",
+                        properties={"type": "Celery", "raw_type": GraphNodeType.EXTERNAL_SERVICE.value}
+                    ))
+                    added_node_ids.add(queue_node_id)
+                for path, extraction in extractions.items():
+                    for sym in extraction.symbols:
+                        sym_id = f"symbol::{path}::{sym.name}"
+                        is_task = any("task" in dec.lower() for dec in (sym.decorators or []))
+                        if is_task:
+                            db.add(GraphRelationship(
+                                id=str(uuid.uuid4()),
+                                repository_id=repo_id,
+                                source_id=sym_id,
+                                target_id=queue_node_id,
+                                type=GraphRelationshipType.CONSUMES.value,
+                                properties={"label": f"consumes task queue for {sym.name}"}
+                            ))
+
+            # 7. Save GraphRelationships and map folder & layer dependencies
             written_layer_relations = set()
             for edge in graph.edges:
                 rel_type = GraphRelationshipType.DEPENDS_ON
@@ -295,8 +524,19 @@ class ParseService:
                     rel_type = GraphRelationshipType.IMPORTS
                 elif kind == "calls":
                     rel_type = GraphRelationshipType.CALLS
+                    # Celery PRODUCES
+                    if "delay" in (edge.label or "").lower() or "apply_async" in (edge.label or "").lower():
+                        rel_type = GraphRelationshipType.PRODUCES
+                    # DB QUERIES
+                    elif any(db_word in (edge.label or "").lower() for db_word in ("db_session", "session.query", "session.execute", "session.commit", ".execute", "db.query", "db.execute", "db.commit", "select ", "insert ", "update ", "delete ")):
+                        rel_type = GraphRelationshipType.QUERIES
                 elif kind == "inherits":
-                    rel_type = GraphRelationshipType.INHERITS
+                    # Check if target is Interface -> IMPLEMENTS; else INHERITS
+                    is_interface = False
+                    tgt_node = graph.nodes.get(edge.target_id)
+                    if tgt_node and (tgt_node.kind.lower() == "interface" or "interface" in tgt_node.name.lower()):
+                        is_interface = True
+                    rel_type = GraphRelationshipType.IMPLEMENTS if is_interface else GraphRelationshipType.INHERITS
                 elif kind == "composition":
                     rel_type = GraphRelationshipType.USES
                 elif kind == "class_usage":
@@ -348,6 +588,60 @@ class ParseService:
                     line=edge.line,
                 )
                 db.add(db_rel)
+
+            # --- Entity Recognition Engine (Feature 5) ---
+            extra_nodes = []
+            extra_relationships = []
+            try:
+                from app.services.entity_recognition import EntityRecognitionEngine
+                cloned_dir = os.path.join(settings.CLONED_REPOS_DIR, repo_id)
+                engine = EntityRecognitionEngine(repo_dir=cloned_dir, repo_id=repo_id)
+                extra_nodes, extra_relationships = engine.run()
+                
+                # Write recognized nodes to PostgreSQL
+                for ext_node in extra_nodes:
+                    node_id = ext_node["id"]
+                    if node_id not in added_node_ids:
+                        existing_node = db.query(GraphNode).filter(GraphNode.id == node_id, GraphNode.repository_id == repo_id).first()
+                        if not existing_node:
+                            canonical_type = map_to_ontology_type(ext_node["type"], ext_node["name"])
+                            db_node = GraphNode(
+                                id=node_id,
+                                repository_id=repo_id,
+                                type=canonical_type,
+                                name=ext_node["name"],
+                                properties={**ext_node["properties"], "raw_type": ext_node["type"]}
+                            )
+                            db.add(db_node)
+                            added_node_ids.add(node_id)
+                
+                # Write recognized relationships to PostgreSQL
+                for ext_rel in extra_relationships:
+                    src_id = ext_rel["source_id"]
+                    tgt_id = ext_rel["target_id"]
+                    
+                    source_exists = (src_id in added_node_ids) or (db.query(GraphNode).filter(GraphNode.id == src_id, GraphNode.repository_id == repo_id).first() is not None)
+                    target_exists = (tgt_id in added_node_ids) or (db.query(GraphNode).filter(GraphNode.id == tgt_id, GraphNode.repository_id == repo_id).first() is not None)
+                    
+                    if source_exists and target_exists:
+                        existing_rel = db.query(GraphRelationship).filter(
+                            GraphRelationship.source_id == src_id,
+                            GraphRelationship.target_id == tgt_id,
+                            GraphRelationship.type == ext_rel["type"],
+                            GraphRelationship.repository_id == repo_id
+                        ).first()
+                        if not existing_rel:
+                            db_rel = GraphRelationship(
+                                id=ext_rel["id"],
+                                repository_id=repo_id,
+                                source_id=src_id,
+                                target_id=tgt_id,
+                                type=ext_rel["type"],
+                                properties=ext_rel["properties"]
+                            )
+                            db.add(db_rel)
+            except Exception as ere_err:
+                print(f"Error running Entity Recognition Engine: {ere_err}")
 
             # === Neo4j Knowledge Graph Integration ===
             try:
@@ -536,14 +830,64 @@ class ParseService:
                         repo_id=repo_id
                     )
 
+                    # 10. Write EntityRecognitionEngine extra nodes and relationships to Neo4j
+                    for ext_node in extra_nodes:
+                        lbl = ext_node["type"].replace(" ", "_")
+                        # Flatten properties for Neo4j primitive support
+                        flat_props = {}
+                        for k, v in (ext_node["properties"] or {}).items():
+                            if isinstance(v, (dict, list)):
+                                flat_props[k] = str(v)
+                            else:
+                                flat_props[k] = v
+                        session.run(
+                            f"MERGE (n:{lbl} {{id: $id, repository_id: $repo_id}}) "
+                            "SET n.name = $name, n.type = $type "
+                            "SET n += $props",
+                            id=ext_node["id"], repo_id=repo_id, name=ext_node["name"], type=ext_node["type"], props=flat_props
+                        )
+                    for ext_rel in extra_relationships:
+                        session.run(
+                            f"MATCH (a {{id: $src, repository_id: $repo_id}}), (b {{id: $tgt, repository_id: $repo_id}}) "
+                            f"MERGE (a)-[r:{ext_rel['type']}]->(b)",
+                            src=ext_rel["source_id"], tgt=ext_rel["target_id"], repo_id=repo_id
+                        )
+
             except Exception as neo_err:
                 print(f"Error populating Neo4j knowledge graph: {neo_err}")
         except Exception as e:
             print(f"Error populating universal graph: {e}")
             pass
 
+        # Trigger Repository Memory & AI Context Engine
+        try:
+            from app.services.repository_memory_engine import RepositoryMemoryEngine
+            memory_engine = RepositoryMemoryEngine(repo_dir=repo_dir, repo_id=repo_id)
+            memory_engine.extract_and_index(db)
+        except Exception as memory_err:
+            print(f"Error extracting repository memory context: {memory_err}")
+
         # Aggregate repository statistics
+        from sqlalchemy import func
+        stats_query = (
+            db.query(GraphNode.type, func.count(GraphNode.id))
+            .filter(GraphNode.repository_id == repo_id)
+            .group_by(GraphNode.type)
+            .all()
+        )
+        entity_stats = {t: count for t, count in stats_query}
+
         repo_meta = self.metadata_engine.analyse_repository(file_metas)
+        languages_dict = repo_meta.language_breakdown()
+        dominant_lang = max(languages_dict.keys(), key=lambda k: languages_dict[k]) if languages_dict else "N/A"
+        
+        # Update Repository metadata
+        repo_obj = db.query(Repository).filter(Repository.id == repo_id).first()
+        if repo_obj:
+            repo_obj.summary = f"Codebase summary: {len(file_metas)} files, dominant language: {dominant_lang}"
+            repo_obj.graph_version = "1.0.0"
+            db.add(repo_obj)
+
         db_stats = RepositoryStatistics(
             id=str(uuid.uuid4()),
             repository_id=repo_id,
@@ -557,6 +901,7 @@ class ParseService:
             average_complexity=repo_meta.average_complexity,
             documentation_coverage=repo_meta.documentation_coverage,
             languages=repo_meta.language_breakdown(),
+            entity_statistics=entity_stats,
         )
         db.add(db_stats)
 
