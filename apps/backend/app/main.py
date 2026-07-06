@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # pyrefly: ignore [missing-import]
-from app.api.v1 import auth, health, repositories, graph
+from app.api.v1 import auth, health, repositories, graph, evolution
 from app.models import base_models
 # pyrefly: ignore [missing-import]
 from app.core.config import settings
@@ -46,3 +46,7 @@ app.include_router(
 app.include_router(
     graph.router, prefix=settings.API_V1_STR, tags=["graph"]
 )
+app.include_router(
+    evolution.router, prefix=settings.API_V1_STR, tags=["evolution"]
+)
+

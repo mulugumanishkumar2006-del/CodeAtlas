@@ -13,3 +13,5 @@ from app.models.repository_statistics import RepositoryStatistics
 from app.models.graph_node import GraphNode
 from app.models.graph_relationship import GraphRelationship
 from app.models.memory_models import RepositoryMemory, ArchitectureDecision, MemorySnapshot
+from app.models.evolution import CommitSnapshot, ComponentSnapshot
+

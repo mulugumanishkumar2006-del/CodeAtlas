@@ -30,6 +30,8 @@ import {
 import { useAuth } from '@/context/auth-context';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { TimeMachine } from '@/components/time-machine';
+
 
 // Interfaces mapping to backend types
 interface FileMetrics {
@@ -107,7 +109,7 @@ export default function Home() {
   const [activeFile, setActiveFile] = React.useState<FileData | null>(null);
   const [activeTab, setActiveTab] = React.useState<'metrics' | 'classes' | 'functions' | 'imports' | 'ast'>('metrics');
 
-  const [workspaceView, setWorkspaceView] = React.useState<'overview' | 'explorer' | 'symbols' | 'relationships' | 'graph' | 'architecture' | 'query'>('overview');
+  const [workspaceView, setWorkspaceView] = React.useState<'overview' | 'explorer' | 'symbols' | 'relationships' | 'graph' | 'architecture' | 'query' | 'timeline'>('overview');
   const [repoStats, setRepoStats] = React.useState<any | null>(null);
   const [graphNodes, setGraphNodes] = React.useState<any[]>([]);
   const [graphEdges, setGraphEdges] = React.useState<any[]>([]);
@@ -903,6 +905,17 @@ export default function Home() {
               >
                 Search
               </button>
+              <button
+                onClick={() => setWorkspaceView('timeline')}
+                className={cn(
+                  "px-3 py-1 rounded-md text-[11px] font-semibold tracking-tight transition-all",
+                  workspaceView === 'timeline' 
+                    ? "bg-background text-foreground shadow border" 
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                Time Machine 🎬
+              </button>
             </div>
           )}
           {repos.length > 0 ? (
@@ -1024,6 +1037,8 @@ export default function Home() {
             {isParseLoading ? 'Parsing...' : 'Trigger Parsing Engine'}
           </Button>
         </div>
+      ) : workspaceView === 'timeline' ? (
+        <TimeMachine repoId={selectedRepoId} token={token} />
       ) : workspaceView === 'overview' ? (
         <div className="grid gap-6 md:grid-cols-12 items-start h-[calc(100vh-230px)] overflow-y-auto">
           {/* Main repo info metrics cards (8 cols) */}
