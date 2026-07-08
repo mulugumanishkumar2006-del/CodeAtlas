@@ -81,6 +81,7 @@ export default function RepositoryMemoryPage() {
   const [entityLineage, setEntityLineage] = React.useState<any[]>([]);
   const [entityLoading, setEntityLoading] = React.useState<boolean>(false);
   const [expandedAdrId, setExpandedAdrId] = React.useState<string | null>(null);
+  const [expandedCommitId, setExpandedCommitId] = React.useState<string | null>(null);
 
   // Versioning state
   const [snapshots, setSnapshots] = React.useState<any[]>([]);

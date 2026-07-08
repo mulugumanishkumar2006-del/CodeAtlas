@@ -22,6 +22,7 @@ import {
   Folder,
   Database,
   Sparkles,
+  Activity,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -43,6 +44,11 @@ interface CommitSnapshot {
   documentation_coverage: number;
   dependencies_count: number;
   languages: Record<string, number> | null;
+  maintainability_index?: number;
+  health_score?: number;
+  average_function_size?: number;
+  architecture_patterns?: any[];
+  graph_data?: any;
 }
 
 interface ComponentSnapshot {
@@ -95,6 +101,7 @@ interface ArchitectureDiff {
   removed_components: ComponentSnapshot[];
   changed_components: ComponentMetricDiff[];
   evolution_highlights?: string[];
+  debt_hike_reason?: string;
 }
 
 interface TimeMachineProps {
@@ -837,139 +844,152 @@ export function TimeMachine({ repoId, token }: TimeMachineProps) {
                 </div>
 
                 {/* Rolling Cinema Ticker */}
-                {activeCommit && (
-                  <div className="border rounded-xl p-3 bg-muted/10 font-mono text-[9px] text-muted-foreground flex items-center gap-3 overflow-hidden shadow-inner w-full">
-                    <span className="relative flex h-2 w-2 shrink-0">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                    </span>
-                    <span className="font-extrabold text-foreground shrink-0 uppercase tracking-wider">Cinematic Feed:</span>
-                    <marquee scrollamount="2.5" className="flex-1 font-semibold text-foreground/80">
-                      SHA: {activeCommit.commit_sha.slice(0, 7)} &bull; {activeCommit.message} &bull; Author: {activeCommit.author_name} &bull; 🟢 Health rating: {activeCommit.health_score}% &bull; Files: {activeCommit.total_files} &bull; LOC: {activeCommit.code_lines} &bull; Complexity: {activeCommit.complexity_total} &bull; Maintainability: {activeCommit.maintainability_index || 100}
-                    </marquee>
-                  </div>
-                )}
+                {activeCommit && (() => {
+                  const commit = activeCommit as any;
+                  return (
+                    <div className="border rounded-xl p-3 bg-muted/10 font-mono text-[9px] text-muted-foreground flex items-center gap-3 overflow-hidden shadow-inner w-full">
+                      <span className="relative flex h-2 w-2 shrink-0">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                      </span>
+                      <span className="font-extrabold text-foreground shrink-0 uppercase tracking-wider">Cinematic Feed:</span>
+                      <div style={{ overflowX: 'auto', whiteSpace: 'nowrap' }} className="flex-1 font-semibold text-foreground/80 scrollbar-none">
+                        SHA: {commit.commit_sha.slice(0, 7)} &bull; {commit.message} &bull; Author: {commit.author_name} &bull; 🟢 Health rating: {commit.health_score}% &bull; Files: {commit.total_files} &bull; LOC: {commit.code_lines} &bull; Complexity: {commit.complexity_total} &bull; Maintainability: {commit.maintainability_index || 100}
+                      </div>
+                    </div>
+                  );
+                })()}
                 
                 {/* Patterns & Health Sidecard */}
-                <div className="border rounded-xl p-4 bg-muted/10 space-y-4 flex flex-col justify-between">
-                  <div className="space-y-3">
-                    <div className="text-xs uppercase font-extrabold text-muted-foreground tracking-wider">Repository Health</div>
-                    <div className="flex items-center gap-3">
-                      <div className="text-3xl font-black tracking-tight text-foreground font-mono">
-                        {activeCommit?.health_score || 100}
-                      </div>
-                      <span className={cn(
-                        "text-[10px] font-extrabold px-2 py-0.5 rounded border uppercase shrink-0 font-mono",
-                        (activeCommit?.health_score || 100) > 75 
-                          ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" 
-                          : (activeCommit?.health_score || 100) > 50 
-                          ? "bg-amber-500/10 text-amber-600 border-amber-500/20" 
-                          : "bg-rose-500/10 text-rose-600 border-rose-500/20"
-                      )}>
-                        {(activeCommit?.health_score || 100) > 75 ? "Excellent" : (activeCommit?.health_score || 100) > 50 ? "Fair" : "Poor"}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2 border-t pt-3 flex-1 flex flex-col justify-end">
-                    <div className="text-xs uppercase font-extrabold text-muted-foreground tracking-wider">Detected Patterns</div>
-                    {activeCommit?.architecture_patterns && activeCommit.architecture_patterns.length > 0 ? (
-                      <div className="space-y-1.5 overflow-y-auto max-h-[140px] pr-1 mt-1">
-                        {activeCommit.architecture_patterns.map((p: any, idx: number) => (
-                          <div key={idx} className="bg-card border rounded p-1.5 text-[9px] space-y-0.5">
-                            <div className="flex justify-between font-bold text-foreground">
-                              <span>{p.pattern}</span>
-                              <span className="text-primary">{Math.round(p.confidence * 100)}%</span>
-                            </div>
-                            <p className="text-muted-foreground text-[8px] line-clamp-2 leading-snug">{p.description}</p>
+                {activeCommit && (() => {
+                  const commit = activeCommit as any;
+                  return (
+                    <div className="border rounded-xl p-4 bg-muted/10 space-y-4 flex flex-col justify-between">
+                      <div className="space-y-3">
+                        <div className="text-xs uppercase font-extrabold text-muted-foreground tracking-wider">Repository Health</div>
+                        <div className="flex items-center gap-3">
+                          <div className="text-3xl font-black tracking-tight text-foreground font-mono">
+                            {commit.health_score || 100}
                           </div>
-                        ))}
+                          <span className={cn(
+                            "text-[10px] font-extrabold px-2 py-0.5 rounded border uppercase shrink-0 font-mono",
+                            (commit.health_score || 100) > 75 
+                              ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" 
+                              : (commit.health_score || 100) > 50 
+                              ? "bg-amber-500/10 text-amber-600 border-amber-500/20" 
+                              : "bg-rose-500/10 text-rose-600 border-rose-500/20"
+                          )}>
+                            {(commit.health_score || 100) > 75 ? "Excellent" : (commit.health_score || 100) > 50 ? "Fair" : "Poor"}
+                          </span>
+                        </div>
                       </div>
-                    ) : (
-                      <div className="text-[10px] text-muted-foreground italic font-semibold mt-1">No architectural style matches found.</div>
-                    )}
-                  </div>
-                </div>
+                      
+                      <div className="space-y-2 border-t pt-3 flex-1 flex flex-col justify-end">
+                        <div className="text-xs uppercase font-extrabold text-muted-foreground tracking-wider">Detected Patterns</div>
+                        {commit.architecture_patterns && commit.architecture_patterns.length > 0 ? (
+                          <div className="space-y-1.5 overflow-y-auto max-h-[140px] pr-1 mt-1">
+                            {commit.architecture_patterns.map((p: any, idx: number) => (
+                              <div key={idx} className="bg-card border rounded p-1.5 text-[9px] space-y-0.5">
+                                <div className="flex justify-between font-bold text-foreground">
+                                  <span>{p.pattern}</span>
+                                  <span className="text-primary">{Math.round(p.confidence * 100)}%</span>
+                                </div>
+                                <p className="text-muted-foreground text-[8px] line-clamp-2 leading-snug">{p.description}</p>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-[10px] text-muted-foreground italic font-semibold mt-1">No architectural style matches found.</div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 
             {/* Metric Evolution Trends Sparklines */}
-            <div className="bg-card border rounded-2xl p-5 shadow-sm space-y-6">
-              <h3 className="font-extrabold text-lg flex items-center gap-2">
-                <Layers className="text-primary h-5 w-5" />
-                Evolutionary Sparklines
-              </h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                {/* Code Lines Trend */}
-                <div className="border rounded-xl p-4 bg-muted/20 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Lines of Code</span>
-                    <span className="text-lg font-black">{activeCommit?.code_lines.toLocaleString()} LOC</span>
-                  </div>
-                  <div className="h-20 flex items-end">
-                    {renderSparkline('code_lines', '#2563eb')}
+            {activeCommit && (() => {
+              const commit = activeCommit as any;
+              return (
+                <div className="bg-card border rounded-2xl p-5 shadow-sm space-y-6">
+                  <h3 className="font-extrabold text-lg flex items-center gap-2">
+                    <Layers className="text-primary h-5 w-5" />
+                    Evolutionary Sparklines
+                  </h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    
+                    {/* Code Lines Trend */}
+                    <div className="border rounded-xl p-4 bg-muted/20 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Lines of Code</span>
+                        <span className="text-lg font-black">{commit.code_lines?.toLocaleString()} LOC</span>
+                      </div>
+                      <div className="h-20 flex items-end">
+                        {renderSparkline('code_lines', '#2563eb')}
+                      </div>
+                    </div>
+
+                    {/* Total Complexity Trend */}
+                    <div className="border rounded-xl p-4 bg-muted/20 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Total Complexity</span>
+                        <span className="text-lg font-black">{commit.complexity_total?.toLocaleString()}</span>
+                      </div>
+                      <div className="h-20 flex items-end">
+                        {renderSparkline('complexity_total', '#d97706')}
+                      </div>
+                    </div>
+
+                    {/* Dependency count Trend */}
+                    <div className="border rounded-xl p-4 bg-muted/20 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">System Coupling Connections</span>
+                        <span className="text-lg font-black">{commit.dependencies_count} Edges</span>
+                      </div>
+                      <div className="h-20 flex items-end">
+                        {renderSparkline('dependencies_count', '#059669')}
+                      </div>
+                    </div>
+
+                    {/* Documentation coverage Trend */}
+                    <div className="border rounded-xl p-4 bg-muted/20 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Documentation Coverage</span>
+                        <span className="text-lg font-black">{Math.round((commit.documentation_coverage || 0) * 100)}%</span>
+                      </div>
+                      <div className="h-20 flex items-end">
+                        {renderSparkline('documentation_coverage', '#7c3aed')}
+                      </div>
+                    </div>
+
+                    {/* Maintainability Index Trend */}
+                    <div className="border rounded-xl p-4 bg-muted/20 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Maintainability Index</span>
+                        <span className="text-lg font-black">{commit.maintainability_index || 100} / 100</span>
+                      </div>
+                      <div className="h-20 flex items-end">
+                        {renderSparkline('maintainability_index', '#06b6d4')}
+                      </div>
+                    </div>
+
+                    {/* Average Function Size Trend */}
+                    <div className="border rounded-xl p-4 bg-muted/20 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Average Function Size</span>
+                        <span className="text-lg font-black">{commit.average_function_size || 0} LOC</span>
+                      </div>
+                      <div className="h-20 flex items-end">
+                        {renderSparkline('average_function_size', '#f43f5e')}
+                      </div>
+                    </div>
+
                   </div>
                 </div>
-
-                {/* Total Complexity Trend */}
-                <div className="border rounded-xl p-4 bg-muted/20 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Total Complexity</span>
-                    <span className="text-lg font-black">{activeCommit?.complexity_total.toLocaleString()}</span>
-                  </div>
-                  <div className="h-20 flex items-end">
-                    {renderSparkline('complexity_total', '#d97706')}
-                  </div>
-                </div>
-
-                {/* Dependency count Trend */}
-                <div className="border rounded-xl p-4 bg-muted/20 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">System Coupling Connections</span>
-                    <span className="text-lg font-black">{activeCommit?.dependencies_count} Edges</span>
-                  </div>
-                  <div className="h-20 flex items-end">
-                    {renderSparkline('dependencies_count', '#059669')}
-                  </div>
-                </div>
-
-                {/* Documentation coverage Trend */}
-                <div className="border rounded-xl p-4 bg-muted/20 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Documentation Coverage</span>
-                    <span className="text-lg font-black">{Math.round((activeCommit?.documentation_coverage || 0) * 100)}%</span>
-                  </div>
-                  <div className="h-20 flex items-end">
-                    {renderSparkline('documentation_coverage', '#7c3aed')}
-                  </div>
-                </div>
-
-                {/* Maintainability Index Trend */}
-                <div className="border rounded-xl p-4 bg-muted/20 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Maintainability Index</span>
-                    <span className="text-lg font-black">{activeCommit?.maintainability_index || 100} / 100</span>
-                  </div>
-                  <div className="h-20 flex items-end">
-                    {renderSparkline('maintainability_index', '#06b6d4')}
-                  </div>
-                </div>
-
-                {/* Average Function Size Trend */}
-                <div className="border rounded-xl p-4 bg-muted/20 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Average Function Size</span>
-                    <span className="text-lg font-black">{activeCommit?.average_function_size || 0} LOC</span>
-                  </div>
-                  <div className="h-20 flex items-end">
-                    {renderSparkline('average_function_size', '#f43f5e')}
-                  </div>
-                </div>
-
-              </div>
-            </div>
+              );
+            })()}
 
             {/* AI Evolution Insights Card */}
             {aiInsights && (
@@ -1694,7 +1714,7 @@ export function TimeMachine({ repoId, token }: TimeMachineProps) {
                             setActiveCommitIdx(commitIdx);
                             setIsPlaying(false);
                             const words = evt.message.split("'");
-                            const componentsToHighlight = words.filter((_, widx) => widx % 2 === 1);
+                            const componentsToHighlight = words.filter((_: any, widx: number) => widx % 2 === 1);
                             setHighlightedNodes(componentsToHighlight);
                           }
                         }}

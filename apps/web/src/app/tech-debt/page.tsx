@@ -28,7 +28,8 @@ import {
   DollarSign,
   TrendingDown,
   Users,
-  AlertCircle
+  AlertCircle,
+  HelpCircle
 } from 'lucide-react';
 import { useAuth } from '@/context/auth-context';
 import { Button } from '@/components/ui/button';
@@ -197,8 +198,40 @@ interface Repository {
 }
 
 // ──────────────────────────────────────────────────────────────────────
-// Mock Data for Fallback/Demo Mode
-// ──────────────────────────────────────────────────────────────────────
+const MOCK_REMEDIATIONS: RemediationPlan[] = [
+  {
+    file_path: "apps/backend/auth_service.py",
+    risk_level: "CRITICAL",
+    reasons: [
+      "High total cyclomatic complexity (42)",
+      "Low documentation coverage (32%)",
+      "Part of circular dependency loop with payment.py"
+    ],
+    action: "Split auth_service.py into LoginService, SessionService, and TokenService.",
+    estimated_effort: "4 days",
+    expected_improvement: "+30%",
+    why_debt_exists: "Repeated quick modifications without factoring in architectural boundaries.",
+    why_debt_increased: "Hotspot churn during sprint integrations.",
+    causing_dependencies: ["payment.py", "database.py"],
+    how_to_reduce: "Break circular references by extracting common validation classes."
+  },
+  {
+    file_path: "apps/backend/payment.py",
+    risk_level: "HIGH",
+    reasons: [
+      "High coupling with outer modules",
+      "File length exceeds 600 lines"
+    ],
+    action: "Extract secondary gateway helper functions into a payment sub-module.",
+    estimated_effort: "3 days",
+    expected_improvement: "+24%",
+    why_debt_exists: "Gateway logic was appended inline over time.",
+    why_debt_increased: "Added support for three new payment processors.",
+    causing_dependencies: ["auth_service.py"],
+    how_to_reduce: "Use dependency injection for gateway implementations."
+  }
+];
+
 const MOCK_SUMMARY: TechDebtSummary = {
   average_debt_score: 54.2,
   high_risk_components_count: 3,
@@ -670,6 +703,58 @@ function Sparkline({ data, color = "#6366f1" }: { data: number[]; color?: string
   );
 }
 
+interface LayoutRect {
+  node: HeatmapNode;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+function computeSliceAndDice(
+  node: HeatmapNode,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  depth: number = 0
+): LayoutRect[] {
+  const result: LayoutRect[] = [{ node, x, y, width: w, height: h }];
+
+  if (!node.children || node.children.length === 0) {
+    return result;
+  }
+
+  const totalValue = node.children.reduce((acc, child) => acc + (child.value || 100), 0);
+  if (totalValue === 0) return result;
+
+  let currentOffset = 0;
+  const vertical = depth % 2 === 0;
+
+  for (const child of node.children) {
+    const ratio = (child.value || 100) / totalValue;
+    let cx = x;
+    let cy = y;
+    let cw = w;
+    let ch = h;
+
+    if (vertical) {
+      cw = w * ratio;
+      cx = x + currentOffset;
+      currentOffset += cw;
+    } else {
+      ch = h * ratio;
+      cy = y + currentOffset;
+      currentOffset += ch;
+    }
+
+    const childRects = computeSliceAndDice(child, cx, cy, cw, ch, depth + 1);
+    result.push(...childRects);
+  }
+
+  return result;
+}
+
 export default function TechnicalDebtPage() {
   const { token } = useAuth();
 
@@ -849,7 +934,7 @@ export default function TechnicalDebtPage() {
   };
 
   const handleLocateTarget = (targetPath: string) => {
-    const fileNode = rects.find(r => r.node.path === targetPath || r.node.path.endsWith(targetPath))?.node;
+    const fileNode = rects.find((r: any) => r.node.path === targetPath || r.node.path.endsWith(targetPath))?.node;
     if (fileNode) {
       setActiveView('developer');
       handleSelectNode(fileNode);

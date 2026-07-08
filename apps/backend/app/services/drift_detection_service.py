@@ -1,0 +1,352 @@
+import os
+import json
+import fnmatch
+from typing import List, Dict, Any, Optional, Set
+from sqlalchemy.orm import Session
+
+from app.core.config import settings
+from app.models.graph_node import GraphNode
+from app.models.graph_relationship import GraphRelationship
+from app.schemas.architecture import (
+    LayerRule,
+    BoundaryRule,
+    PatternRule,
+    DriftViolation,
+    GovernanceAlert,
+)
+
+class DriftDetectionService:
+    def get_repo_dir(self, repo_id: str) -> str:
+        return os.path.join(settings.CLONED_REPOS_DIR, repo_id)
+
+    def get_rules_path(self, repo_id: str) -> str:
+        return os.path.join(self.get_repo_dir(repo_id), ".codeatlas", "architecture.json")
+
+    def load_rules(self, repo_id: str) -> Dict[str, Any]:
+        """
+        Loads rules from the cloned repository. If not present, returns a default layered setup.
+        """
+        rules_path = self.get_rules_path(repo_id)
+        if os.path.exists(rules_path):
+            try:
+                with open(rules_path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception as e:
+                print(f"Error reading architecture rules from {rules_path}: {e}")
+
+        # Default fallback rules (Layered Architecture, typical for FastAPI/Node web apps)
+        return {
+            "layers": [
+                {
+                    "name": "API",
+                    "matching_patterns": ["*api*", "*controller*", "*route*"],
+                    "allowed_dependencies": ["Service"]
+                },
+                {
+                    "name": "Service",
+                    "matching_patterns": ["*service*", "*logic*"],
+                    "allowed_dependencies": ["Repository", "Database"]
+                },
+                {
+                    "name": "Repository",
+                    "matching_patterns": ["*repository*", "*dao*"],
+                    "allowed_dependencies": ["Database"]
+                },
+                {
+                    "name": "Database",
+                    "matching_patterns": ["*model*", "*entity*", "*table*"],
+                    "allowed_dependencies": []
+                }
+            ],
+            "boundaries": [
+                {
+                    "name": "auth",
+                    "matching_patterns": ["*/auth/*", "*/user*"]
+                },
+                {
+                    "name": "billing",
+                    "matching_patterns": ["*/billing/*", "*/payment*"]
+                }
+            ],
+            "patterns": [
+                {
+                    "type": "no_direct_db_access_from_api",
+                    "severity": "critical"
+                },
+                {
+                    "type": "no_circular_dependencies",
+                    "severity": "critical"
+                }
+            ]
+        }
+
+    def save_rules(self, repo_id: str, rules: Dict[str, Any]) -> None:
+        """
+        Saves custom architecture rules to .codeatlas/architecture.json in the cloned repository.
+        """
+        repo_dir = self.get_repo_dir(repo_id)
+        if not os.path.exists(repo_dir):
+            os.makedirs(repo_dir, exist_ok=True)
+            
+        codeatlas_dir = os.path.join(repo_dir, ".codeatlas")
+        os.makedirs(codeatlas_dir, exist_ok=True)
+        
+        rules_path = self.get_rules_path(repo_id)
+        with open(rules_path, "w", encoding="utf-8") as f:
+            json.dump(rules, f, indent=2)
+
+    def _match_patterns(self, text: str, patterns: List[str]) -> bool:
+        """
+        Helper function to check if text matches any patterns (glob-style or simple inclusion)
+        """
+        if not text:
+            return False
+        text_lower = text.lower()
+        for p in patterns:
+            p_lower = p.lower()
+            if fnmatch.fnmatch(text_lower, p_lower) or p_lower in text_lower:
+                return True
+        return False
+
+    def detect_drift(self, db: Session, repo_id: str) -> Dict[str, Any]:
+        """
+        Runs the violation engine comparing actual knowledge graph elements
+        against defined rules.
+        """
+        rules = self.load_rules(repo_id)
+        
+        layers_config = [LayerRule(**l) for l in rules.get("layers", [])]
+        boundaries_config = [BoundaryRule(**b) for b in rules.get("boundaries", [])]
+        patterns_config = [PatternRule(**p) for p in rules.get("patterns", [])]
+
+        # 1. Fetch nodes and relationships from DB
+        nodes = db.query(GraphNode).filter(GraphNode.repository_id == repo_id).all()
+        relationships = db.query(GraphRelationship).filter(GraphRelationship.repository_id == repo_id).all()
+
+        nodes_map = {n.id: n for n in nodes}
+
+        # 2. Map nodes to Layers and Boundaries
+        node_to_layer: Dict[str, str] = {}
+        node_to_boundary: Dict[str, str] = {}
+
+        for n in nodes:
+            name = n.name or ""
+            props = n.properties or {}
+            path = props.get("path", "") or props.get("file_path", "") or ""
+
+            # Check layer mapping
+            for layer in layers_config:
+                if self._match_patterns(name, layer.matching_patterns) or self._match_patterns(path, layer.matching_patterns):
+                    node_to_layer[n.id] = layer.name
+                    break  # map to first matching layer
+
+            # Check boundary mapping
+            for boundary in boundaries_config:
+                if self._match_patterns(name, boundary.matching_patterns) or self._match_patterns(path, boundary.matching_patterns):
+                    node_to_boundary[n.id] = boundary.name
+                    break
+
+        violations: List[DriftViolation] = []
+        alerts: List[GovernanceAlert] = []
+
+        # 3. Check Layer and Boundary Violations on Relationships
+        for rel in relationships:
+            src = nodes_map.get(rel.source_id)
+            tgt = nodes_map.get(rel.target_id)
+            if not src or not tgt:
+                continue
+
+            src_layer = node_to_layer.get(src.id)
+            tgt_layer = node_to_layer.get(tgt.id)
+
+            src_boundary = node_to_boundary.get(src.id)
+            tgt_boundary = node_to_boundary.get(tgt.id)
+
+            src_path = (src.properties or {}).get("path", "") or (src.properties or {}).get("file_path", "")
+            src_name = src.name
+
+            # A. Layer Violation
+            if src_layer and tgt_layer:
+                if src_layer != tgt_layer:
+                    # Find allowed dependencies for source layer
+                    layer_rule = next((l for l in layers_config if l.name == src_layer), None)
+                    allowed = layer_rule.allowed_dependencies if layer_rule else []
+                    if tgt_layer not in allowed:
+                        violations.append(
+                            DriftViolation(
+                                type="layer_violation",
+                                severity="warning",
+                                message=f"Layer Violation: '{src_name}' (Layer: {src_layer}) is coupled directly with '{tgt.name}' (Layer: {tgt_layer}), which is not allowed.",
+                                source_node={
+                                    "id": src.id,
+                                    "name": src.name,
+                                    "type": src.type,
+                                    "layer": src_layer,
+                                    "file_path": src_path
+                                },
+                                target_node={
+                                    "id": tgt.id,
+                                    "name": tgt.name,
+                                    "type": tgt.type,
+                                    "layer": tgt_layer,
+                                    "file_path": (tgt.properties or {}).get("path", "") or (tgt.properties or {}).get("file_path", "")
+                                },
+                                file_path=src_path
+                            )
+                        )
+
+            # B. Boundary Violation (Cross domain talk)
+            if src_boundary and tgt_boundary:
+                if src_boundary != tgt_boundary:
+                    violations.append(
+                        DriftViolation(
+                            type="boundary_violation",
+                            severity="warning",
+                            message=f"Boundary Violation: Component in domain '{src_boundary}' ({src_name}) directly imports module in domain '{tgt_boundary}' ({tgt.name}).",
+                            source_node={
+                                "id": src.id,
+                                "name": src.name,
+                                "type": src.type,
+                                "boundary": src_boundary,
+                                "file_path": src_path
+                            },
+                            target_node={
+                                "id": tgt.id,
+                                "name": tgt.name,
+                                "type": tgt.type,
+                                "boundary": tgt_boundary,
+                                "file_path": (tgt.properties or {}).get("path", "") or (tgt.properties or {}).get("file_path", "")
+                            },
+                            file_path=src_path
+                        )
+                    )
+
+            # C. Pattern Violation: no_direct_db_access_from_api
+            is_no_db_pattern_enabled = any(p.type == "no_direct_db_access_from_api" for p in patterns_config)
+            if is_no_db_pattern_enabled:
+                tgt_type = (tgt.type or "").lower()
+                tgt_name_lower = (tgt.name or "").lower()
+                
+                # Check if API calls Database layer or DB table directly
+                is_src_api = src_layer == "API" or (src.type or "").lower() == "api" or "api" in src_name.lower()
+                is_tgt_db = tgt_layer == "Database" or tgt_type == "database table" or "table" in tgt_name_lower or "db" in tgt_name_lower
+
+                if is_src_api and is_tgt_db:
+                    violations.append(
+                        DriftViolation(
+                            type="pattern_violation",
+                            severity="critical",
+                            message=f"Design Rule Breach: API module '{src_name}' interacts directly with Database table/model '{tgt.name}', bypassing service boundaries.",
+                            source_node={
+                                "id": src.id,
+                                "name": src.name,
+                                "type": src.type,
+                                "layer": src_layer or "API",
+                                "file_path": src_path
+                            },
+                            target_node={
+                                "id": tgt.id,
+                                "name": tgt.name,
+                                "type": tgt.type,
+                                "layer": tgt_layer or "Database",
+                                "file_path": (tgt.properties or {}).get("path", "") or (tgt.properties or {}).get("file_path", "")
+                            },
+                            file_path=src_path
+                        )
+                    )
+
+        # D. Pattern Violation: circular_dependencies
+        is_no_cycles_enabled = any(p.type == "no_circular_dependencies" for p in patterns_config)
+        if is_no_cycles_enabled:
+            # Build graph adjacency list
+            adj: Dict[str, List[str]] = {}
+            for rel in relationships:
+                s, t = rel.source_id, rel.target_id
+                if s and t:
+                    adj.setdefault(s, []).append(t)
+
+            visited: Dict[str, int] = {}  # 0 = unvisited, 1 = visiting, 2 = visited
+            cycles: List[List[str]] = []
+
+            def find_cycles_dfs(node_id: str, path: List[str]):
+                visited[node_id] = 1
+                path.append(node_id)
+
+                for neighbor in adj.get(node_id, []):
+                    if neighbor not in nodes_map:
+                        continue
+                    if visited.get(neighbor, 0) == 1:
+                        # Cycle found! Extract the path from neighbor to current
+                        try:
+                            start_idx = path.index(neighbor)
+                            cycle_path = path[start_idx:] + [neighbor]
+                            cycles.append(cycle_path)
+                        except ValueError:
+                            pass
+                    elif visited.get(neighbor, 0) == 0:
+                        find_cycles_dfs(neighbor, path)
+
+                path.pop()
+                visited[node_id] = 2
+
+            for n_id in nodes_map.keys():
+                if visited.get(n_id, 0) == 0:
+                    find_cycles_dfs(n_id, [])
+
+            # Process cycles and convert to violations
+            # Filter cycles to prevent excessive duplicates
+            seen_cycles = set()
+            for c_path in cycles:
+                # Normalize cycle to prevent permutations representing same cycle
+                normalized_c = tuple(sorted(c_path[:-1]))
+                if normalized_c not in seen_cycles:
+                    seen_cycles.add(normalized_c)
+                    
+                    names_path = [nodes_map[nid].name for nid in c_path if nid in nodes_map]
+                    message = "Circular import loop: " + " -> ".join(names_path)
+                    
+                    # Target node is the first node in loop
+                    first_node = nodes_map.get(c_path[0])
+                    
+                    violations.append(
+                        DriftViolation(
+                            type="circular_dependency",
+                            severity="critical",
+                            message=message,
+                            source_node={
+                                "id": first_node.id if first_node else "",
+                                "name": first_node.name if first_node else "Unknown",
+                                "type": first_node.type if first_node else "module",
+                            },
+                            file_path=(first_node.properties or {}).get("path", "") if first_node else ""
+                        )
+                    )
+
+        # 4. Calculate Compliance Score
+        critical_count = sum(1 for v in violations if v.severity == "critical")
+        warning_count = sum(1 for v in violations if v.severity == "warning")
+        info_count = sum(1 for v in violations if v.severity == "info")
+
+        # Formula with caps to ensure score remains between 0 and 100
+        score_penalty = (critical_count * 10) + (warning_count * 5) + (info_count * 2)
+        compliance_score = max(0.0, min(100.0, 100.0 - score_penalty))
+
+        # 5. Governance alerts generation
+        for v in violations:
+            if v.severity == "critical" or v.type == "layer_violation":
+                alerts.append(
+                    GovernanceAlert(
+                        type=v.type,
+                        severity=v.severity,
+                        message=v.message
+                    )
+                )
+
+        return {
+            "compliance_score": round(compliance_score, 1),
+            "violations": violations,
+            "alerts": alerts,
+            "layers": layers_config,
+            "boundaries": boundaries_config,
+            "patterns": patterns_config,
+        }

@@ -24,7 +24,17 @@ import {
   Server,
   Terminal,
   Brain,
+  ShieldAlert,
+  ShieldCheck,
+  Wrench,
+  ChevronRight,
+  Check,
+  Trash2,
+  Plus,
+  Info,
+  Settings,
 } from 'lucide-react';
+
 
 interface Repository {
   id: string;
@@ -47,6 +57,82 @@ export default function ArchitectureExplorerPage() {
   const [domains, setDomains] = React.useState<any[]>([]);
   const [patterns, setPatterns] = React.useState<any[]>([]);
   const [statistics, setStatistics] = React.useState<Record<string, number>>({});
+
+  // Drift and Compliance States
+  const [activeTab, setActiveTab] = React.useState<'explorer' | 'compliance'>('explorer');
+  const [driftReport, setDriftReport] = React.useState<any | null>(null);
+  const [driftLoading, setDriftLoading] = React.useState<boolean>(false);
+  const [rules, setRules] = React.useState<any | null>(null);
+  const [rulesLoading, setRulesLoading] = React.useState<boolean>(false);
+  const [savingRules, setSavingRules] = React.useState<boolean>(false);
+  const [editingRules, setEditingRules] = React.useState<any | null>(null);
+  
+  // Custom form edit states
+  const [activeRuleTab, setActiveRuleTab] = React.useState<'layers' | 'boundaries' | 'patterns'>('layers');
+
+  const fetchDriftReport = React.useCallback(async (repoId: string) => {
+    if (!token || !repoId) return;
+    setDriftLoading(true);
+    try {
+      const res = await fetch(`/api/v1/repositories/${repoId}/architecture/drift`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setDriftReport(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch drift report", err);
+    } finally {
+      setDriftLoading(false);
+    }
+  }, [token]);
+
+  const fetchRules = React.useCallback(async (repoId: string) => {
+    if (!token || !repoId) return;
+    setRulesLoading(true);
+    try {
+      const res = await fetch(`/api/v1/repositories/${repoId}/architecture/rules`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setRules(data);
+        setEditingRules(JSON.parse(JSON.stringify(data))); // deep copy
+      }
+    } catch (err) {
+      console.error("Failed to fetch rules", err);
+    } finally {
+      setRulesLoading(false);
+    }
+  }, [token]);
+
+  const saveRules = async (updatedRules: any) => {
+    if (!token || !selectedRepoId) return;
+    setSavingRules(true);
+    try {
+      const res = await fetch(`/api/v1/repositories/${selectedRepoId}/architecture/rules`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(updatedRules),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setRules(data);
+        setEditingRules(JSON.parse(JSON.stringify(data)));
+        // Refresh drift report to recalculate scores with new rules
+        fetchDriftReport(selectedRepoId);
+      }
+    } catch (err) {
+      console.error("Failed to save rules", err);
+    } finally {
+      setSavingRules(false);
+    }
+  };
+
 
   const [loading, setLoading] = React.useState(true);
   const [dataLoading, setDataLoading] = React.useState(false);
@@ -151,12 +237,17 @@ export default function ArchitectureExplorerPage() {
         const statsData = await statsRes.json();
         setStatistics(statsData.statistics || {});
       }
+
+      // 5. Fetch architectural drift & rules
+      fetchDriftReport(repoId);
+      fetchRules(repoId);
     } catch (err: any) {
       setError(err.message || 'Error occurred while loading architecture data.');
     } finally {
       setDataLoading(false);
     }
-  }, [token]);
+  }, [token, fetchDriftReport, fetchRules]);
+
 
   React.useEffect(() => {
     if (selectedRepoId) {
@@ -282,6 +373,32 @@ export default function ArchitectureExplorerPage() {
         </div>
       </div>
 
+      {/* Premium Tabs navigation */}
+      <div className="flex border-b border-border/40 gap-6 mb-2">
+        <button
+          onClick={() => setActiveTab('explorer')}
+          className={`pb-3.5 text-xs uppercase tracking-wider font-bold border-b-2 transition-all flex items-center gap-1.5 ${
+            activeTab === 'explorer'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Network className="h-4 w-4" />
+          Interactive Graph Explorer
+        </button>
+        <button
+          onClick={() => setActiveTab('compliance')}
+          className={`pb-3.5 text-xs uppercase tracking-wider font-bold border-b-2 transition-all flex items-center gap-1.5 ${
+            activeTab === 'compliance'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <ShieldAlert className="h-4 w-4" />
+          Architectural Compliance & Drift
+        </button>
+      </div>
+
       {error && (
         <div className="p-4 border border-destructive/20 bg-destructive/5 rounded-xl flex items-start gap-3">
           <AlertCircle className="h-5 w-5 text-destructive mt-0.5" />
@@ -295,7 +412,9 @@ export default function ArchitectureExplorerPage() {
         </div>
       )}
 
-      {dataLoading ? (
+      {activeTab === 'explorer' && (
+        <>
+          {dataLoading ? (
         <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
           <RefreshCw className="h-10 w-10 text-primary animate-spin" />
           <p className="text-sm text-muted-foreground animate-pulse">Rebuilding modular architecture graph layout...</p>
@@ -658,9 +777,484 @@ export default function ArchitectureExplorerPage() {
                 ) : (
                   <p className="text-xs text-muted-foreground text-center py-4">No specific architecture patterns detected yet.</p>
                 )}
-              </div>
             </div>
           </div>
+        </div>
+      </div>
+    )}
+  </>
+)}
+
+      {/* Tab Content: Compliance & Drift Dashboard */}
+      {activeTab === 'compliance' && (
+        <div className="space-y-6 animate-in fade-in-50 duration-200">
+          {driftLoading || rulesLoading ? (
+            <div className="flex flex-col items-center justify-center min-h-[40vh] space-y-4">
+              <RefreshCw className="h-10 w-10 text-primary animate-spin" />
+              <p className="text-sm text-muted-foreground animate-pulse">Running architectural compliance engine...</p>
+            </div>
+          ) : !driftReport ? (
+            <div className="p-12 border border-dashed rounded-2xl text-center space-y-4 text-muted-foreground bg-card">
+              <ShieldAlert className="h-10 w-10 text-rose-500 mx-auto" />
+              <h3 className="font-bold text-sm">Failed to Run Compliance Engine</h3>
+              <p className="text-xs">The drift detection service encountered an issue. Ensure your repository contains a valid build.</p>
+            </div>
+          ) : (
+            <div className="grid gap-6 grid-cols-1 xl:grid-cols-12 items-start">
+              {/* Left Column: Metrics & Active Violations */}
+              <div className="xl:col-span-8 space-y-6">
+                
+                {/* Compliance score card */}
+                <div className="grid gap-6 grid-cols-1 md:grid-cols-3 border rounded-2xl bg-card p-6 shadow-sm">
+                  {/* Gauge */}
+                  <div className="flex flex-col items-center justify-center space-y-3 border-b md:border-b-0 md:border-r pb-6 md:pb-0 pr-0 md:pr-6">
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Compliance Score</span>
+                    <div className="relative flex items-center justify-center">
+                      <svg className="w-32 h-32 transform -rotate-90">
+                        <circle
+                          cx="64"
+                          cy="64"
+                          r="48"
+                          className="text-muted/10"
+                          strokeWidth="8"
+                          stroke="currentColor"
+                          fill="transparent"
+                        />
+                        <circle
+                          cx="64"
+                          cy="64"
+                          r="48"
+                          className={
+                            driftReport.compliance_score >= 90
+                              ? 'text-emerald-500'
+                              : driftReport.compliance_score >= 70
+                              ? 'text-yellow-500'
+                              : 'text-rose-500'
+                          }
+                          strokeWidth="8"
+                          strokeDasharray="301.6"
+                          strokeDashoffset={301.6 - (301.6 * (driftReport.compliance_score ?? 100)) / 100}
+                          strokeLinecap="round"
+                          stroke="currentColor"
+                          fill="transparent"
+                        />
+                      </svg>
+                      <div className="absolute flex flex-col items-center justify-center">
+                        <span className="text-3xl font-black text-foreground">
+                          {driftReport.compliance_score}%
+                        </span>
+                        <span className="text-[9px] font-bold uppercase text-muted-foreground mt-0.5">
+                          {driftReport.compliance_score >= 90
+                            ? 'Healthy'
+                            : driftReport.compliance_score >= 70
+                            ? 'Warning'
+                            : 'Critical'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* High level stats metrics */}
+                  <div className="md:col-span-2 grid grid-cols-2 gap-4 pl-0 md:pl-2">
+                    <div className="p-4 border rounded-xl bg-muted/5 flex flex-col justify-between hover:bg-muted/10 transition-all">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-semibold text-muted-foreground uppercase">Critical Breaches</span>
+                        <ShieldAlert className="h-4 w-4 text-rose-500" />
+                      </div>
+                      <p className="text-2xl font-black text-rose-500 mt-2">
+                        {driftReport.violations.filter((v: any) => v.severity === 'critical').length}
+                      </p>
+                      <span className="text-[9px] text-muted-foreground mt-1">Requires hotfixes</span>
+                    </div>
+
+                    <div className="p-4 border rounded-xl bg-muted/5 flex flex-col justify-between hover:bg-muted/10 transition-all">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-semibold text-muted-foreground uppercase">Design Warnings</span>
+                        <AlertCircle className="h-4 w-4 text-yellow-500" />
+                      </div>
+                      <p className="text-2xl font-black text-yellow-500 mt-2">
+                        {driftReport.violations.filter((v: any) => v.severity === 'warning').length}
+                      </p>
+                      <span className="text-[9px] text-muted-foreground mt-1">Diverging dependencies</span>
+                    </div>
+
+                    <div className="p-4 border rounded-xl bg-muted/5 flex flex-col justify-between hover:bg-muted/10 transition-all">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-semibold text-muted-foreground uppercase">Enforced Rules</span>
+                        <Settings className="h-4 w-4 text-primary" />
+                      </div>
+                      <p className="text-2xl font-black text-foreground mt-2">
+                        {(rules?.layers?.length ?? 0) + (rules?.boundaries?.length ?? 0) + (rules?.patterns?.length ?? 0)}
+                      </p>
+                      <span className="text-[9px] text-muted-foreground mt-1">Active guardrails</span>
+                    </div>
+
+                    <div className="p-4 border rounded-xl bg-muted/5 flex flex-col justify-between hover:bg-muted/10 transition-all">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-semibold text-muted-foreground uppercase">Architecture Grade</span>
+                        <Award className="h-4 w-4 text-violet-500" />
+                      </div>
+                      <p className="text-2xl font-black text-foreground mt-2">
+                        {driftReport.compliance_score >= 90 ? 'A+' : driftReport.compliance_score >= 80 ? 'B' : driftReport.compliance_score >= 70 ? 'C' : 'F'}
+                      </p>
+                      <span className="text-[9px] text-muted-foreground mt-1">Overall rating score</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Governance Alert List */}
+                {driftReport.alerts.length > 0 && (
+                  <div className="border border-yellow-500/20 bg-yellow-500/5 rounded-2xl p-5 space-y-3">
+                    <div className="flex items-center gap-2 text-yellow-600">
+                      <ShieldAlert className="h-4 w-4" />
+                      <h3 className="font-bold text-xs uppercase tracking-wider">Governance Violations Alerts</h3>
+                    </div>
+                    <div className="divide-y divide-yellow-500/10">
+                      {driftReport.alerts.map((alert: any, idx: number) => (
+                        <div key={idx} className="py-2.5 flex items-start gap-2.5 text-xs text-yellow-800 last:pb-0">
+                          <Info className="h-4 w-4 mt-0.5 text-yellow-600 flex-shrink-0" />
+                          <span>{alert.message}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Violations Details View */}
+                <div className="border rounded-2xl bg-card shadow-sm overflow-hidden">
+                  <div className="p-5 border-b bg-muted/20">
+                    <h3 className="font-bold text-sm flex items-center gap-2">
+                      <ShieldAlert className="h-4 w-4 text-rose-500" />
+                      Detected Architectural Drift Violations ({driftReport.violations.length})
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Active connections violating layer flow, domain boundary isolation, or design rules.
+                    </p>
+                  </div>
+
+                  {driftReport.violations.length === 0 ? (
+                    <div className="p-12 text-center space-y-3 text-muted-foreground">
+                      <ShieldCheck className="h-12 w-12 text-emerald-500 mx-auto" />
+                      <p className="text-sm font-bold text-foreground">Zero Architectural Drift Detected</p>
+                      <p className="text-xs">Your repository is fully compliant with the intended layout.</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead>
+                          <tr className="border-b bg-muted/30 text-muted-foreground font-semibold uppercase tracking-wider text-[9px]">
+                            <th className="p-4">Anomaly Details</th>
+                            <th className="p-4">Violator Source</th>
+                            <th className="p-4">Target Component</th>
+                            <th className="p-4">Remediation Guide</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {driftReport.violations.map((v: any, idx: number) => (
+                            <tr key={idx} className="hover:bg-muted/5 transition-all">
+                              <td className="p-4 space-y-1.5 max-w-[280px]">
+                                <div className="flex items-center gap-1.5">
+                                  <span className={`px-2 py-0.5 text-[8px] uppercase font-bold rounded border ${
+                                    v.severity === 'critical' 
+                                      ? 'bg-rose-500/10 text-rose-500 border-rose-500/20' 
+                                      : 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20'
+                                  }`}>
+                                    {v.severity}
+                                  </span>
+                                  <span className="text-[9px] font-bold text-muted-foreground uppercase font-mono">
+                                    {v.type.replace(/_/g, ' ')}
+                                  </span>
+                                </div>
+                                <p className="font-semibold text-foreground leading-normal">{v.message}</p>
+                              </td>
+                              <td className="p-4 max-w-[200px]">
+                                <p className="font-bold text-foreground truncate">{v.source_node?.name || 'N/A'}</p>
+                                {v.source_node?.file_path && (
+                                  <p className="text-[9px] text-muted-foreground font-mono truncate">{v.source_node.file_path}</p>
+                                )}
+                              </td>
+                              <td className="p-4 max-w-[200px]">
+                                <p className="font-bold text-foreground truncate">{v.target_node?.name || 'N/A'}</p>
+                                {v.target_node?.file_path && (
+                                  <p className="text-[9px] text-muted-foreground font-mono truncate">{v.target_node.file_path}</p>
+                                )}
+                              </td>
+                              <td className="p-4 max-w-[280px]">
+                                <div className="p-3 border rounded-xl bg-muted/20 text-muted-foreground leading-normal font-medium text-[11px]">
+                                  {v.type === 'layer_violation' 
+                                    ? `Direct connection between layers. Abstract dependencies or introduce a mediator/Service.` 
+                                    : v.type === 'boundary_violation'
+                                    ? `Cross-domain leakage. Decouple domain packages by introducing REST/gRPC or events.`
+                                    : v.type === 'circular_dependency'
+                                    ? `Cycle loop detected. Break loop by exposing helper classes or abstractions.`
+                                    : `Clean interface violation. Enforce API routes to query service layers instead.`}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Right Column: Rules Management panel */}
+              <div className="xl:col-span-4 space-y-6">
+                <div className="border rounded-2xl bg-card shadow-sm overflow-hidden">
+                  <div className="p-4 border-b bg-muted/20">
+                    <h3 className="font-bold text-sm flex items-center gap-2">
+                      <Wrench className="h-4 w-4 text-primary" />
+                      Configure Intended Architecture
+                    </h3>
+                  </div>
+
+                  <div className="flex border-b border-border/50 bg-muted/10 p-1">
+                    {['layers', 'boundaries', 'patterns'].map((t) => (
+                      <button
+                        key={t}
+                        onClick={() => setActiveRuleTab(t as any)}
+                        className={`flex-1 py-1.5 text-[9px] uppercase tracking-wider font-bold rounded-lg transition-all ${
+                          activeRuleTab === t
+                            ? 'bg-background text-foreground shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="p-5 space-y-4">
+                    {editingRules && (
+                      <>
+                        {/* Tab Content: Layers */}
+                        {activeRuleTab === 'layers' && (
+                          <div className="space-y-4">
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase block mb-1">Architectural Layer Definitions</span>
+                            {editingRules.layers?.map((layer: any, index: number) => (
+                              <div key={index} className="p-3.5 border rounded-xl bg-muted/10 space-y-3 relative group">
+                                <button
+                                  onClick={() => {
+                                    const copy = { ...editingRules };
+                                    copy.layers.splice(index, 1);
+                                    setEditingRules(copy);
+                                  }}
+                                  className="absolute top-2.5 right-2.5 text-muted-foreground hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all"
+                                  title="Delete Layer"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                                
+                                <div>
+                                  <label className="text-[9px] font-bold text-muted-foreground uppercase block">Layer Name</label>
+                                  <input
+                                    type="text"
+                                    value={layer.name}
+                                    onChange={(e) => {
+                                      const copy = { ...editingRules };
+                                      copy.layers[index].name = e.target.value;
+                                      setEditingRules(copy);
+                                    }}
+                                    className="w-full bg-background border rounded-lg px-2.5 py-1.5 text-xs font-semibold mt-1 focus:outline-none focus:ring-1 focus:ring-primary"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="text-[9px] font-bold text-muted-foreground uppercase block">File Path Patterns</label>
+                                  <input
+                                    type="text"
+                                    value={layer.matching_patterns.join(', ')}
+                                    onChange={(e) => {
+                                      const copy = { ...editingRules };
+                                      copy.layers[index].matching_patterns = e.target.value.split(',').map(s => s.trim()).filter(s => s !== '');
+                                      setEditingRules(copy);
+                                    }}
+                                    placeholder="e.g. *api*, *controller*"
+                                    className="w-full bg-background border rounded-lg px-2.5 py-1.5 text-xs font-semibold mt-1 focus:outline-none focus:ring-1 focus:ring-primary"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="text-[9px] font-bold text-muted-foreground uppercase block mb-1.5 font-mono">Allowed Dependencies</label>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {editingRules.layers.map((other: any) => {
+                                      if (other.name === layer.name) return null;
+                                      const isChecked = layer.allowed_dependencies.includes(other.name);
+                                      return (
+                                        <button
+                                          key={other.name}
+                                          onClick={() => {
+                                            const copy = { ...editingRules };
+                                            const deps = copy.layers[index].allowed_dependencies;
+                                            if (isChecked) {
+                                              copy.layers[index].allowed_dependencies = deps.filter((d: string) => d !== other.name);
+                                            } else {
+                                              deps.push(other.name);
+                                            }
+                                            setEditingRules(copy);
+                                          }}
+                                          className={`px-2 py-1 text-[9px] font-bold border rounded-lg transition-all flex items-center gap-1 ${
+                                            isChecked 
+                                              ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30' 
+                                              : 'bg-background hover:bg-muted text-muted-foreground border-border'
+                                          }`}
+                                        >
+                                          {isChecked && <Check className="h-2.5 w-2.5" />}
+                                          {other.name}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                            
+                            <Button
+                              variant="outline"
+                              size="xs"
+                              className="w-full border-dashed text-[10px] font-bold uppercase tracking-wider"
+                              onClick={() => {
+                                const copy = { ...editingRules };
+                                copy.layers.push({
+                                  name: `NewLayer_${copy.layers.length + 1}`,
+                                  matching_patterns: [],
+                                  allowed_dependencies: []
+                                });
+                                setEditingRules(copy);
+                              }}
+                            >
+                              <Plus className="h-3 w-3 mr-1" /> Add Layer Rule
+                            </Button>
+                          </div>
+                        )}
+
+                        {/* Tab Content: Boundaries */}
+                        {activeRuleTab === 'boundaries' && (
+                          <div className="space-y-4">
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase block mb-1">Define isolated domains to prevent cross-domain coupling</span>
+                            {editingRules.boundaries?.map((boundary: any, index: number) => (
+                              <div key={index} className="p-3.5 border rounded-xl bg-muted/10 space-y-3 relative group">
+                                <button
+                                  onClick={() => {
+                                    const copy = { ...editingRules };
+                                    copy.boundaries.splice(index, 1);
+                                    setEditingRules(copy);
+                                  }}
+                                  className="absolute top-2.5 right-2.5 text-muted-foreground hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                                
+                                <div>
+                                  <label className="text-[9px] font-bold text-muted-foreground uppercase block">Domain Name</label>
+                                  <input
+                                    type="text"
+                                    value={boundary.name}
+                                    onChange={(e) => {
+                                      const copy = { ...editingRules };
+                                      copy.boundaries[index].name = e.target.value;
+                                      setEditingRules(copy);
+                                    }}
+                                    className="w-full bg-background border rounded-lg px-2.5 py-1.5 text-xs font-semibold mt-1 focus:outline-none"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="text-[9px] font-bold text-muted-foreground uppercase block">Path Patterns</label>
+                                  <input
+                                    type="text"
+                                    value={boundary.matching_patterns.join(', ')}
+                                    onChange={(e) => {
+                                      const copy = { ...editingRules };
+                                      copy.boundaries[index].matching_patterns = e.target.value.split(',').map(s => s.trim()).filter(s => s !== '');
+                                      setEditingRules(copy);
+                                    }}
+                                    placeholder="e.g. */auth/*, */billing/*"
+                                    className="w-full bg-background border rounded-lg px-2.5 py-1.5 text-xs font-semibold mt-1 focus:outline-none"
+                                  />
+                                </div>
+                              </div>
+                            ))}
+                            
+                            <Button
+                              variant="outline"
+                              size="xs"
+                              className="w-full border-dashed text-[10px] font-bold uppercase tracking-wider"
+                              onClick={() => {
+                                const copy = { ...editingRules };
+                                copy.boundaries.push({
+                                  name: `NewDomain_${copy.boundaries.length + 1}`,
+                                  matching_patterns: []
+                                });
+                                setEditingRules(copy);
+                              }}
+                            >
+                              <Plus className="h-3 w-3 mr-1" /> Add Domain Boundary
+                            </Button>
+                          </div>
+                        )}
+
+                        {/* Tab Content: Patterns */}
+                        {activeRuleTab === 'patterns' && (
+                          <div className="space-y-4">
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase block mb-1">Global design and architecture checks</span>
+                            {editingRules.patterns?.map((pattern: any, index: number) => (
+                              <div key={index} className="p-3.5 border rounded-xl bg-muted/10 space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <span className="font-bold text-xs text-foreground truncate uppercase font-mono">
+                                    {pattern.type.replace(/_/g, ' ')}
+                                  </span>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div>
+                                    <label className="text-[9px] font-bold text-muted-foreground uppercase block">Severity</label>
+                                    <select
+                                      value={pattern.severity}
+                                      onChange={(e) => {
+                                        const copy = { ...editingRules };
+                                        copy.patterns[index].severity = e.target.value;
+                                        setEditingRules(copy);
+                                      }}
+                                      className="w-full bg-background border rounded-lg px-2 py-1 text-[11px] font-semibold mt-1"
+                                    >
+                                      <option value="critical">Critical</option>
+                                      <option value="warning">Warning</option>
+                                      <option value="info">Info</option>
+                                    </select>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Save Buttons */}
+                        <div className="border-t pt-4 flex gap-3">
+                          <Button
+                            size="sm"
+                            className="flex-1 text-[10px] font-bold uppercase tracking-wider"
+                            disabled={savingRules}
+                            onClick={() => saveRules(editingRules)}
+                          >
+                            {savingRules ? 'Saving guardrails...' : 'Apply & Enforce Rules'}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-[10px] font-bold uppercase tracking-wider"
+                            onClick={() => setEditingRules(JSON.parse(JSON.stringify(rules)))}
+                          >
+                            Reset
+                          </Button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
