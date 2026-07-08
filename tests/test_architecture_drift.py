@@ -271,6 +271,12 @@ def test_architecture_drift():
         assert analysis["distributed_monolith_indicators"]["score"] > 0
         assert analysis["distributed_monolith_indicators"]["risk_level"] in ["low", "medium", "high"]
 
+        # Verify AI Architecture Reviewer
+        assert report["ai_review"] is not None
+        assert report["ai_review"].summary == "Repository Review"
+        assert len(report["ai_review"].findings) > 0
+        assert report["ai_review"].maintainability_improvement > 0
+
         # We expect a layer violation or a pattern violation (API -> DB table direct query)
         viol_types = [v.type for v in violations]
         assert "layer_violation" in viol_types or "pattern_violation" in viol_types or "custom_rule_violation" in viol_types
@@ -314,6 +320,9 @@ def test_architecture_drift():
     assert "compliance_score" in drift_report
     assert "violations" in drift_report
     assert "alerts" in drift_report
+    assert "ai_review" in drift_report
+    assert drift_report["ai_review"]["summary"] == "Repository Review"
+    assert drift_report["ai_review"]["maintainability_improvement"] > 0
 
     # GET /api/v1/repositories/{repo_id}/architecture/drift/timeline
     timeline_res = client.get(f"/api/v1/repositories/{repo_id}/architecture/drift/timeline")

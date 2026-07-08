@@ -49,6 +49,12 @@ class GovernanceAlert(BaseModel):
     message: str = Field(..., description="Alert details")
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
+class AIArchitectureReview(BaseModel):
+    summary: str = Field(..., description="Summary title of the review")
+    findings: List[str] = Field(default_factory=list, description="AI findings lists")
+    recommendations: List[str] = Field(default_factory=list, description="AI recommendation items")
+    maintainability_improvement: int = Field(..., description="Estimated maintainability improvement percentage")
+
 class ArchitectureDriftReportResponse(BaseModel):
     compliance_score: float = Field(..., description="Compliance score out of 100")
     violations: List[DriftViolation] = Field(default_factory=list)
@@ -58,6 +64,7 @@ class ArchitectureDriftReportResponse(BaseModel):
     patterns: List[PatternRule] = Field(default_factory=list)
     custom_rules: List[CustomRule] = Field(default_factory=list)
     microservice_boundary_analysis: Dict[str, Any] = Field(default_factory=dict, description="Microservice boundary smell report details")
+    ai_review: Optional[AIArchitectureReview] = Field(None, description="Automatically generated AI review comments")
 
 class DriftTimelinePoint(BaseModel):
     commit_sha: str = Field(..., description="Commit hash")
