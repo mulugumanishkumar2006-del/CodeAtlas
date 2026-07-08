@@ -33,6 +33,7 @@ import {
   Plus,
   Info,
   Settings,
+  X,
 } from 'lucide-react';
 
 
@@ -951,47 +952,76 @@ export default function ArchitectureExplorerPage() {
                         </thead>
                         <tbody className="divide-y">
                           {driftReport.violations.map((v: any, idx: number) => (
-                            <tr key={idx} className="hover:bg-muted/5 transition-all">
-                              <td className="p-4 space-y-1.5 max-w-[280px]">
-                                <div className="flex items-center gap-1.5">
-                                  <span className={`px-2 py-0.5 text-[8px] uppercase font-bold rounded border ${
-                                    v.severity === 'critical' 
-                                      ? 'bg-rose-500/10 text-rose-500 border-rose-500/20' 
-                                      : 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20'
-                                  }`}>
-                                    {v.severity}
-                                  </span>
-                                  <span className="text-[9px] font-bold text-muted-foreground uppercase font-mono">
-                                    {v.type.replace(/_/g, ' ')}
-                                  </span>
-                                </div>
-                                <p className="font-semibold text-foreground leading-normal">{v.message}</p>
-                              </td>
-                              <td className="p-4 max-w-[200px]">
-                                <p className="font-bold text-foreground truncate">{v.source_node?.name || 'N/A'}</p>
-                                {v.source_node?.file_path && (
-                                  <p className="text-[9px] text-muted-foreground font-mono truncate">{v.source_node.file_path}</p>
-                                )}
-                              </td>
-                              <td className="p-4 max-w-[200px]">
-                                <p className="font-bold text-foreground truncate">{v.target_node?.name || 'N/A'}</p>
-                                {v.target_node?.file_path && (
-                                  <p className="text-[9px] text-muted-foreground font-mono truncate">{v.target_node.file_path}</p>
-                                )}
-                              </td>
-                              <td className="p-4 max-w-[280px]">
-                                <div className="p-3 border rounded-xl bg-muted/20 text-muted-foreground leading-normal font-medium text-[11px]">
-                                  {v.type === 'layer_violation' 
-                                    ? `Direct connection between layers. Abstract dependencies or introduce a mediator/Service.` 
-                                    : v.type === 'boundary_violation'
-                                    ? `Cross-domain leakage. Decouple domain packages by introducing REST/gRPC or events.`
-                                    : v.type === 'circular_dependency'
-                                    ? `Cycle loop detected. Break loop by exposing helper classes or abstractions.`
-                                    : `Clean interface violation. Enforce API routes to query service layers instead.`}
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
+                             <tr key={idx} className="hover:bg-muted/5 transition-all">
+                               <td className="p-4 space-y-1.5 max-w-[280px]">
+                                 <div className="flex items-center gap-1.5 flex-wrap">
+                                   <span className={`px-2 py-0.5 text-[8px] uppercase font-bold rounded border ${
+                                     v.severity === 'critical' 
+                                       ? 'bg-rose-500/10 text-rose-500 border-rose-500/20' 
+                                       : 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20'
+                                   }`}>
+                                     {v.severity}
+                                   </span>
+                                   {v.severity_score && (
+                                     <span className="px-1.5 py-0.5 text-[8px] font-extrabold rounded border bg-purple-500/10 text-purple-600 border-purple-500/20 font-mono">
+                                       Score: {v.severity_score}
+                                     </span>
+                                   )}
+                                   {v.type === 'boundary_violation' && v.severity === 'critical' && (
+                                     <span className="px-1.5 py-0.5 text-[8px] font-extrabold rounded border bg-rose-600 text-white border-rose-700 animate-pulse font-mono">
+                                       Leakage
+                                     </span>
+                                   )}
+                                   <span className="text-[9px] font-bold text-muted-foreground uppercase font-mono">
+                                     {v.type.replace(/_/g, ' ')}
+                                   </span>
+                                 </div>
+                                 <p className="font-semibold text-foreground leading-normal">{v.message}</p>
+                                 {v.affected_modules && v.affected_modules.length > 0 && (
+                                   <div className="mt-2 flex flex-wrap items-center gap-1 bg-rose-500/5 border border-rose-500/15 p-2 rounded-xl text-[9px] font-mono">
+                                     <span className="text-muted-foreground uppercase text-[8px] font-black mr-1 block w-full">Cycle Path:</span>
+                                     {v.affected_modules.map((m: string, midx: number) => (
+                                       <React.Fragment key={midx}>
+                                         {midx > 0 && <span className="text-rose-400">➔</span>}
+                                         <span className="bg-rose-500/10 text-rose-700 dark:text-rose-300 px-1.5 py-0.5 rounded border border-rose-500/20 font-bold max-w-[120px] truncate" title={m}>
+                                           {m.split('/').pop()}
+                                         </span>
+                                       </React.Fragment>
+                                     ))}
+                                     <span className="text-rose-400">➔</span>
+                                     <span className="bg-rose-500/10 text-rose-700 dark:text-rose-300 px-1.5 py-0.5 rounded border border-rose-500/20 font-bold max-w-[120px] truncate" title={v.affected_modules[0]}>
+                                       {v.affected_modules[0].split('/').pop()}
+                                     </span>
+                                   </div>
+                                 )}
+                               </td>
+                               <td className="p-4 max-w-[200px]">
+                                 <p className="font-bold text-foreground truncate">{v.source_node?.name || 'N/A'}</p>
+                                 {v.source_node?.file_path && (
+                                   <p className="text-[9px] text-muted-foreground font-mono truncate">{v.source_node.file_path}</p>
+                                 )}
+                               </td>
+                               <td className="p-4 max-w-[200px]">
+                                 <p className="font-bold text-foreground truncate">{v.target_node?.name || 'N/A'}</p>
+                                 {v.target_node?.file_path && (
+                                   <p className="text-[9px] text-muted-foreground font-mono truncate">{v.target_node.file_path}</p>
+                                 )}
+                               </td>
+                               <td className="p-4 max-w-[280px]">
+                                 <div className="p-3 border rounded-xl bg-muted/20 text-muted-foreground leading-normal font-medium text-[11px] space-y-1">
+                                   <p>{v.suggested_fix || (
+                                     v.type === 'layer_violation' 
+                                       ? `Direct connection between layers. Abstract dependencies or introduce a mediator/Service.` 
+                                       : v.type === 'boundary_violation'
+                                       ? `Cross-domain leakage. Decouple domain packages by introducing REST/gRPC or events.`
+                                       : v.type === 'circular_dependency'
+                                       ? `Cycle loop detected. Break loop by exposing helper classes or abstractions.`
+                                       : `Clean interface violation. Enforce API routes to query service layers instead.`
+                                   )}</p>
+                                 </div>
+                               </td>
+                             </tr>
+                           ))}
                         </tbody>
                       </table>
                     </div>
@@ -1174,6 +1204,40 @@ export default function ArchitectureExplorerPage() {
                                     className="w-full bg-background border rounded-lg px-2.5 py-1.5 text-xs font-semibold mt-1 focus:outline-none"
                                   />
                                 </div>
+
+                                <div>
+                                  <label className="text-[9px] font-bold text-muted-foreground uppercase block mb-1">Forbidden Domain Dependencies</label>
+                                  <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                    {editingRules.boundaries.map((other: any) => {
+                                      if (other.name === boundary.name) return null;
+                                      const isForbidden = (boundary.forbidden_dependencies || []).includes(other.name);
+                                      return (
+                                        <button
+                                          key={other.name}
+                                          type="button"
+                                          onClick={() => {
+                                            const copy = { ...editingRules };
+                                            const currentForbidden = copy.boundaries[index].forbidden_dependencies || [];
+                                            if (isForbidden) {
+                                              copy.boundaries[index].forbidden_dependencies = currentForbidden.filter((n: string) => n !== other.name);
+                                            } else {
+                                              copy.boundaries[index].forbidden_dependencies = [...currentForbidden, other.name];
+                                            }
+                                            setEditingRules(copy);
+                                          }}
+                                          className={`flex items-center gap-1 px-2 py-1 rounded-full border text-[10px] font-bold transition-all ${
+                                            isForbidden
+                                              ? 'bg-rose-500/10 text-rose-500 border-rose-500/20'
+                                              : 'bg-background hover:bg-muted text-muted-foreground border-border'
+                                          }`}
+                                        >
+                                          {isForbidden && <X className="h-2.5 w-2.5" />}
+                                          {other.name}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
                               </div>
                             ))}
                             
@@ -1183,10 +1247,11 @@ export default function ArchitectureExplorerPage() {
                               className="w-full border-dashed text-[10px] font-bold uppercase tracking-wider"
                               onClick={() => {
                                 const copy = { ...editingRules };
-                                copy.boundaries.push({
-                                  name: `NewDomain_${copy.boundaries.length + 1}`,
-                                  matching_patterns: []
-                                });
+                                 copy.boundaries.push({
+                                   name: `NewDomain_${copy.boundaries.length + 1}`,
+                                   matching_patterns: [],
+                                   forbidden_dependencies: []
+                                 });
                                 setEditingRules(copy);
                               }}
                             >

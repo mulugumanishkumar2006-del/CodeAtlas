@@ -61,11 +61,13 @@ class DriftDetectionService:
             "boundaries": [
                 {
                     "name": "auth",
-                    "matching_patterns": ["*/auth/*", "*/user*"]
+                    "matching_patterns": ["*/auth/*", "*/user*"],
+                    "forbidden_dependencies": ["billing"]
                 },
                 {
                     "name": "billing",
-                    "matching_patterns": ["*/billing/*", "*/payment*"]
+                    "matching_patterns": ["*/billing/*", "*/payment*"],
+                    "forbidden_dependencies": []
                 }
             ],
             "patterns": [
@@ -195,31 +197,62 @@ class DriftDetectionService:
                             )
                         )
 
-            # B. Boundary Violation (Cross domain talk)
+            # B. Boundary Violation (Cross domain talk / Domain Leakage)
             if src_boundary and tgt_boundary:
                 if src_boundary != tgt_boundary:
-                    violations.append(
-                        DriftViolation(
-                            type="boundary_violation",
-                            severity="warning",
-                            message=f"Boundary Violation: Component in domain '{src_boundary}' ({src_name}) directly imports module in domain '{tgt_boundary}' ({tgt.name}).",
-                            source_node={
-                                "id": src.id,
-                                "name": src.name,
-                                "type": src.type,
-                                "boundary": src_boundary,
-                                "file_path": src_path
-                            },
-                            target_node={
-                                "id": tgt.id,
-                                "name": tgt.name,
-                                "type": tgt.type,
-                                "boundary": tgt_boundary,
-                                "file_path": (tgt.properties or {}).get("path", "") or (tgt.properties or {}).get("file_path", "")
-                            },
-                            file_path=src_path
+                    src_rule = next((b for b in boundaries_config if b.name == src_boundary), None)
+                    forbidden = src_rule.forbidden_dependencies if src_rule and src_rule.forbidden_dependencies else []
+                    
+                    if tgt_boundary in forbidden:
+                        violations.append(
+                            DriftViolation(
+                                type="boundary_violation",
+                                severity="critical",
+                                message=f"Domain Leakage: Domain '{src_boundary}' ({src_name}) directly depends on forbidden domain '{tgt_boundary}' ({tgt.name})!",
+                                source_node={
+                                    "id": src.id,
+                                    "name": src.name,
+                                    "type": src.type,
+                                    "boundary": src_boundary,
+                                    "file_path": src_path
+                                },
+                                target_node={
+                                    "id": tgt.id,
+                                    "name": tgt.name,
+                                    "type": tgt.type,
+                                    "boundary": tgt_boundary,
+                                    "file_path": (tgt.properties or {}).get("path", "") or (tgt.properties or {}).get("file_path", "")
+                                },
+                                file_path=src_path,
+                                suggested_fix=f"Refactor imports to remove dependencies from '{tgt_boundary}' into '{src_boundary}'. Decouple by extracting common abstractions, sending events, or querying via a generic public API module.",
+                                severity_score=85
+                            )
                         )
-                    )
+                    else:
+                        violations.append(
+                            DriftViolation(
+                                type="boundary_violation",
+                                severity="warning",
+                                message=f"Boundary Warning: Domain '{src_boundary}' ({src_name}) imports domain '{tgt_boundary}' ({tgt.name}). Ensure clean boundaries.",
+                                source_node={
+                                    "id": src.id,
+                                    "name": src.name,
+                                    "type": src.type,
+                                    "boundary": src_boundary,
+                                    "file_path": src_path
+                                },
+                                target_node={
+                                    "id": tgt.id,
+                                    "name": tgt.name,
+                                    "type": tgt.type,
+                                    "boundary": tgt_boundary,
+                                    "file_path": (tgt.properties or {}).get("path", "") or (tgt.properties or {}).get("file_path", "")
+                                },
+                                file_path=src_path,
+                                suggested_fix=f"Decouple domain packages where possible. Ensure dependency between '{src_boundary}' and '{tgt_boundary}' is intentional.",
+                                severity_score=40
+                            )
+                        )
 
             # C. Pattern Violation: no_direct_db_access_from_api
             is_no_db_pattern_enabled = any(p.type == "no_direct_db_access_from_api" for p in patterns_config)
@@ -308,6 +341,17 @@ class DriftDetectionService:
                     # Target node is the first node in loop
                     first_node = nodes_map.get(c_path[0])
                     
+                    affected = [nodes_map[nid].name for nid in c_path[:-1] if nid in nodes_map]
+                    suggested_fix = f"Break the dependency cycle between {', '.join(affected)} by introducing abstract interfaces, extracting shared models/logic to a common package, or using dependency injection."
+                    
+                    cycle_len = len(affected)
+                    if cycle_len == 2:
+                        severity_score = 65
+                    elif cycle_len == 3:
+                        severity_score = 85
+                    else:
+                        severity_score = 98
+                    
                     violations.append(
                         DriftViolation(
                             type="circular_dependency",
@@ -318,7 +362,10 @@ class DriftDetectionService:
                                 "name": first_node.name if first_node else "Unknown",
                                 "type": first_node.type if first_node else "module",
                             },
-                            file_path=(first_node.properties or {}).get("path", "") if first_node else ""
+                            file_path=(first_node.properties or {}).get("path", "") if first_node else "",
+                            affected_modules=affected,
+                            suggested_fix=suggested_fix,
+                            severity_score=severity_score
                         )
                     )
 

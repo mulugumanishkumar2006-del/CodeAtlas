@@ -83,7 +83,46 @@ def test_architecture_drift():
             properties={"path": "apps/backend/app/models/user.py"}
         )
 
-        db.add_all([api_node, service_node, db_node])
+        # For Circular dependency cycle: Auth -> User -> Notif -> Auth
+        auth_c = GraphNode(
+            id="auth_c",
+            repository_id=repo_id,
+            name="app/auth.py",
+            type="module",
+            properties={"path": "apps/backend/app/auth.py"}
+        )
+        user_c = GraphNode(
+            id="user_c",
+            repository_id=repo_id,
+            name="app/user.py",
+            type="module",
+            properties={"path": "apps/backend/app/user.py"}
+        )
+        notif_c = GraphNode(
+            id="notif_c",
+            repository_id=repo_id,
+            name="app/notification.py",
+            type="module",
+            properties={"path": "apps/backend/app/notification.py"}
+        )
+
+        # For Domain boundary leakage: Auth depending on Billing/Payment
+        auth_l = GraphNode(
+            id="auth_l",
+            repository_id=repo_id,
+            name="app/auth/login.py",
+            type="module",
+            properties={"path": "apps/backend/app/auth/login.py"}
+        )
+        billing_l = GraphNode(
+            id="billing_l",
+            repository_id=repo_id,
+            name="app/billing/charge.py",
+            type="module",
+            properties={"path": "apps/backend/app/billing/charge.py"}
+        )
+
+        db.add_all([api_node, service_node, db_node, auth_c, user_c, notif_c, auth_l, billing_l])
         db.commit()
 
         # Add Relationships:
@@ -112,7 +151,39 @@ def test_architecture_drift():
             type="DIRECT_QUERY"
         )
 
-        db.add_all([rel1, rel2, rel3])
+        # Circular cycle relationships: auth -> user -> notif -> auth
+        rel_c1 = GraphRelationship(
+            id="rel_c1",
+            repository_id=repo_id,
+            source_id="auth_c",
+            target_id="user_c",
+            type="IMPORT"
+        )
+        rel_c2 = GraphRelationship(
+            id="rel_c2",
+            repository_id=repo_id,
+            source_id="user_c",
+            target_id="notif_c",
+            type="IMPORT"
+        )
+        rel_c3 = GraphRelationship(
+            id="rel_c3",
+            repository_id=repo_id,
+            source_id="notif_c",
+            target_id="auth_c",
+            type="IMPORT"
+        )
+
+        # Boundary leakage relationship: auth_l (matches Domain auth) -> billing_l (matches Domain billing)
+        rel_l1 = GraphRelationship(
+            id="rel_l1",
+            repository_id=repo_id,
+            source_id="auth_l",
+            target_id="billing_l",
+            type="IMPORT"
+        )
+
+        db.add_all([rel1, rel2, rel3, rel_c1, rel_c2, rel_c3, rel_l1])
         db.commit()
 
     finally:
@@ -124,7 +195,11 @@ def test_architecture_drift():
         # Load default rules
         rules = drift_service.load_rules(repo_id)
         assert len(rules.get("layers", [])) == 4
-        assert len(rules.get("patterns", [])) == 2
+        assert len(rules.get("boundaries", [])) == 2
+        # Assert auth domain forbids billing dependency by default config fallback
+        auth_rule = next((b for b in rules["boundaries"] if b["name"] == "auth"), None)
+        assert auth_rule is not None
+        assert "billing" in auth_rule["forbidden_dependencies"]
 
         # Detect Drift
         report = drift_service.detect_drift(db_session, repo_id)
@@ -133,6 +208,22 @@ def test_architecture_drift():
         # Verify violations are caught
         violations = report["violations"]
         assert len(violations) > 0
+
+        # Find circular dependency violations
+        cycles = [v for v in violations if v.type == "circular_dependency"]
+        assert len(cycles) > 0
+        cycle_v = cycles[0]
+        assert "app/auth.py" in cycle_v.affected_modules or "app/user.py" in cycle_v.affected_modules
+        assert cycle_v.severity_score is not None
+        assert cycle_v.suggested_fix is not None
+
+        # Find boundary leakage violations
+        leaks = [v for v in violations if v.type == "boundary_violation" and v.severity == "critical"]
+        assert len(leaks) > 0
+        leak_v = leaks[0]
+        assert "Domain Leakage" in leak_v.message
+        assert leak_v.suggested_fix is not None
+        assert leak_v.severity_score == 85
 
         # We expect a layer violation or a pattern violation (API -> DB table direct query)
         viol_types = [v.type for v in violations]
