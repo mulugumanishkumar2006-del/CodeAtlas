@@ -13,6 +13,7 @@ from app.schemas.architecture import (
     PatternRule,
     DriftViolation,
     GovernanceAlert,
+    CustomRule,
 )
 
 class DriftDetectionService:
@@ -79,6 +80,41 @@ class DriftDetectionService:
                     "type": "no_circular_dependencies",
                     "severity": "critical"
                 }
+            ],
+            "custom_rules": [
+                {
+                    "id": "ui_no_repository",
+                    "name": "UI cannot access Repository",
+                    "source_matcher": "*ui*",
+                    "target_matcher": "*repository*",
+                    "type": "forbidden",
+                    "severity": "critical"
+                },
+                {
+                    "id": "controllers_no_database",
+                    "name": "Controllers cannot access Database",
+                    "source_matcher": "*controller*",
+                    "target_matcher": "*database*",
+                    "type": "forbidden",
+                    "severity": "critical"
+                },
+                {
+                    "id": "payment_no_auth",
+                    "name": "Payment cannot import Authentication",
+                    "source_matcher": "*payment*",
+                    "target_matcher": "*auth*",
+                    "type": "forbidden",
+                    "severity": "critical"
+                },
+                {
+                    "id": "only_services_call_external_api",
+                    "name": "Only Services can call External APIs",
+                    "source_matcher": "",
+                    "target_matcher": "*external_api*",
+                    "type": "only_allowed_from",
+                    "allowed_source_matcher": "*service*",
+                    "severity": "warning"
+                }
             ]
         }
 
@@ -120,6 +156,7 @@ class DriftDetectionService:
         layers_config = [LayerRule(**l) for l in rules.get("layers", [])]
         boundaries_config = [BoundaryRule(**b) for b in rules.get("boundaries", [])]
         patterns_config = [PatternRule(**p) for p in rules.get("patterns", [])]
+        custom_rules_config = [CustomRule(**c) for c in rules.get("custom_rules", [])]
 
         # 1. Fetch nodes and relationships from DB
         nodes = db.query(GraphNode).filter(GraphNode.repository_id == repo_id).all()
@@ -369,6 +406,185 @@ class DriftDetectionService:
                         )
                     )
 
+        # E. Custom Rules Engine
+        for rel in relationships:
+            src = nodes_map.get(rel.source_id)
+            tgt = nodes_map.get(rel.target_id)
+            if not src or not tgt:
+                continue
+            
+            src_name = src.name or ""
+            src_props = src.properties or {}
+            src_path = src_props.get("path", "") or src_props.get("file_path", "") or ""
+            
+            tgt_name = tgt.name or ""
+            tgt_props = tgt.properties or {}
+            tgt_path = tgt_props.get("path", "") or tgt_props.get("file_path", "") or ""
+
+            for rule in custom_rules_config:
+                if rule.type == "forbidden":
+                    if self._match_patterns(src_name, [rule.source_matcher]) or self._match_patterns(src_path, [rule.source_matcher]):
+                        if self._match_patterns(tgt_name, [rule.target_matcher]) or self._match_patterns(tgt_path, [rule.target_matcher]):
+                            violations.append(
+                                DriftViolation(
+                                    type="custom_rule_violation",
+                                    severity=rule.severity,
+                                    message=f"Custom Rule Breach: '{rule.name}' is violated. Node '{src_name}' matches '{rule.source_matcher}' and calls '{tgt_name}' which matches '{rule.target_matcher}'.",
+                                    source_node={
+                                        "id": src.id,
+                                        "name": src.name,
+                                        "type": src.type,
+                                        "file_path": src_path
+                                    },
+                                    target_node={
+                                        "id": tgt.id,
+                                        "name": tgt.name,
+                                        "type": tgt.type,
+                                        "file_path": tgt_path
+                                    },
+                                    file_path=src_path,
+                                    suggested_fix=f"Refactor dependencies to respect the custom rule constraint: '{rule.name}'. Ensure that components matching '{rule.source_matcher}' do not import from '{rule.target_matcher}' directly.",
+                                    severity_score=90 if rule.severity == "critical" else (60 if rule.severity == "warning" else 30)
+                                )
+                            )
+                elif rule.type == "only_allowed_from":
+                    if self._match_patterns(tgt_name, [rule.target_matcher]) or self._match_patterns(tgt_path, [rule.target_matcher]):
+                        # Target matched, check if source DOES NOT match allowed_source_matcher
+                        is_allowed = self._match_patterns(src_name, [rule.allowed_source_matcher]) or self._match_patterns(src_path, [rule.allowed_source_matcher])
+                        if not is_allowed:
+                            violations.append(
+                                DriftViolation(
+                                    type="custom_rule_violation",
+                                    severity=rule.severity,
+                                    message=f"Custom Rule Breach: '{rule.name}' is violated. Target '{tgt_name}' matches '{rule.target_matcher}', which is only allowed to be called from '{rule.allowed_source_matcher}', but was called by '{src_name}'.",
+                                    source_node={
+                                        "id": src.id,
+                                        "name": src.name,
+                                        "type": src.type,
+                                        "file_path": src_path
+                                    },
+                                    target_node={
+                                        "id": tgt.id,
+                                        "name": tgt.name,
+                                        "type": tgt.type,
+                                        "file_path": tgt_path
+                                    },
+                                    file_path=src_path,
+                                    suggested_fix=f"Respect custom rule: '{rule.name}'. Decouple this caller or route it through an intermediate component matching '{rule.allowed_source_matcher}'.",
+                                    severity_score=90 if rule.severity == "critical" else (60 if rule.severity == "warning" else 30)
+                                )
+                            )
+
+        # F. Microservice Boundary Analysis
+        tight_coupling = []
+        shared_databases = []
+        sync_communication = []
+        
+        domain_deps: Dict[str, Set[str]] = {}
+        cross_domain_calls = []
+        for rel in relationships:
+            s_node = nodes_map.get(rel.source_id)
+            t_node = nodes_map.get(rel.target_id)
+            if not s_node or not t_node:
+                continue
+            s_bound = node_to_boundary.get(s_node.id)
+            t_bound = node_to_boundary.get(t_node.id)
+            if s_bound and t_bound and s_bound != t_bound:
+                domain_deps.setdefault(s_bound, set()).add(t_bound)
+                if rel.type in ["CALL", "HTTP", "DIRECT_QUERY", "IMPORT"]:
+                    cross_domain_calls.append({
+                        "source": s_node.name,
+                        "source_domain": s_bound,
+                        "target": t_node.name,
+                        "target_domain": t_bound,
+                        "type": rel.type
+                    })
+
+        for bound, deps in domain_deps.items():
+            if len(deps) > 3:
+                tight_coupling.append({
+                    "boundary": bound,
+                    "cross_domain_dependencies": list(deps),
+                    "message": f"Domain '{bound}' exhibits tight coupling by directly importing or calling {len(deps)} other domains ({', '.join(deps)}). Consider refactoring to expose stable event brokers."
+                })
+
+        db_tables = [n for n in nodes if n.type == "database table" or node_to_layer.get(n.id) == "Database"]
+        for table in db_tables:
+            accessing_nodes = [rel.source_id for rel in relationships if rel.target_id == table.id]
+            accessing_domains = set()
+            accessing_modules = []
+            for nid in accessing_nodes:
+                n = nodes_map.get(nid)
+                if n:
+                    b = node_to_boundary.get(n.id)
+                    if b:
+                        accessing_domains.add(b)
+                        accessing_modules.append(n.name)
+            
+            if len(accessing_domains) >= 2:
+                shared_databases.append({
+                    "table_name": table.name,
+                    "domains_accessing": list(accessing_domains),
+                    "violating_modules": accessing_modules,
+                    "message": f"Database table/model '{table.name}' is shared directly between multiple distinct domain boundaries ({', '.join(accessing_domains)}). This violates the database-per-service pattern of microservices."
+                })
+
+        for call in cross_domain_calls:
+            sync_communication.append({
+                "source": call["source"],
+                "source_domain": call["source_domain"],
+                "target": call["target"],
+                "target_domain": call["target_domain"],
+                "message": f"Direct synchronous boundary call ({call['type']}) from '{call['source']}' (Domain: {call['source_domain']}) to '{call['target']}' (Domain: {call['target_domain']}). Introduces runtime temporal coupling."
+            })
+
+        smell_score = 0
+        reasons = []
+        if len(shared_databases) > 0:
+            smell_score += 35
+            reasons.append("Shared database tables exist across multiple microservice boundaries")
+        if len(sync_communication) > 0:
+            smell_score += 25
+            reasons.append("Direct synchronous inter-service calls bypass asynchronous queues")
+        if len(tight_coupling) > 0:
+            smell_score += 20
+            reasons.append("Domains exist with excessive external coupling (>3 cross-domain references)")
+        
+        cyclic_domains_detected = False
+        for v in violations:
+            if v.type == "circular_dependency" and v.affected_modules:
+                cycle_domains = set()
+                for m in v.affected_modules:
+                    node_obj = next((n for n in nodes if n.name == m), None)
+                    if node_obj:
+                        domain_name = node_to_boundary.get(node_obj.id)
+                        if domain_name:
+                            cycle_domains.add(domain_name)
+                if len(cycle_domains) >= 2:
+                    cyclic_domains_detected = True
+                    break
+        
+        if cyclic_domains_detected:
+            smell_score += 20
+            reasons.append("Circular dependency loops traverse multiple distinct domain boundaries")
+
+        risk_level = "low"
+        if smell_score >= 60:
+            risk_level = "high"
+        elif smell_score >= 30:
+            risk_level = "medium"
+
+        boundary_report = {
+            "tight_coupling": tight_coupling,
+            "shared_databases": shared_databases,
+            "excessive_sync_communication": sync_communication[:10],
+            "distributed_monolith_indicators": {
+                "risk_level": risk_level,
+                "score": min(smell_score, 100),
+                "reasons": reasons if reasons else ["No major microservice coupling or database sharing anomalies discovered."]
+            }
+        }
+
         # 4. Calculate Compliance Score
         critical_count = sum(1 for v in violations if v.severity == "critical")
         warning_count = sum(1 for v in violations if v.severity == "warning")
@@ -396,4 +612,6 @@ class DriftDetectionService:
             "layers": layers_config,
             "boundaries": boundaries_config,
             "patterns": patterns_config,
+            "custom_rules": custom_rules_config,
+            "microservice_boundary_analysis": boundary_report,
         }

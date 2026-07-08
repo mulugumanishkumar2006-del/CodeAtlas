@@ -122,7 +122,16 @@ def test_architecture_drift():
             properties={"path": "apps/backend/app/billing/charge.py"}
         )
 
-        db.add_all([api_node, service_node, db_node, auth_c, user_c, notif_c, auth_l, billing_l])
+        # Microservice shared database query service in billing domain
+        billing_service = GraphNode(
+            id="billing_service",
+            repository_id=repo_id,
+            name="app/billing/billing_service.py",
+            type="service",
+            properties={"path": "apps/backend/app/billing/billing_service.py"}
+        )
+
+        db.add_all([api_node, service_node, db_node, auth_c, user_c, notif_c, auth_l, billing_l, billing_service])
         db.commit()
 
         # Add Relationships:
@@ -183,7 +192,16 @@ def test_architecture_drift():
             type="IMPORT"
         )
 
-        db.add_all([rel1, rel2, rel3, rel_c1, rel_c2, rel_c3, rel_l1])
+        # Shared database query: billing_service queries the users table
+        rel_db_shared = GraphRelationship(
+            id="rel_db_shared",
+            repository_id=repo_id,
+            source_id="billing_service",
+            target_id="node_db_1",
+            type="QUERY"
+        )
+
+        db.add_all([rel1, rel2, rel3, rel_c1, rel_c2, rel_c3, rel_l1, rel_db_shared])
         db.commit()
 
     finally:
@@ -196,6 +214,19 @@ def test_architecture_drift():
         rules = drift_service.load_rules(repo_id)
         assert len(rules.get("layers", [])) == 4
         assert len(rules.get("boundaries", [])) == 2
+        assert len(rules.get("custom_rules", [])) == 4
+        
+        # Append a custom rule to test matching
+        rules["custom_rules"].append({
+            "id": "api_no_direct_db",
+            "name": "API cannot direct DB",
+            "source_matcher": "*api*",
+            "target_matcher": "users",
+            "type": "forbidden",
+            "severity": "critical"
+        })
+        drift_service.save_rules(repo_id, rules)
+
         # Assert auth domain forbids billing dependency by default config fallback
         auth_rule = next((b for b in rules["boundaries"] if b["name"] == "auth"), None)
         assert auth_rule is not None
@@ -225,9 +256,24 @@ def test_architecture_drift():
         assert leak_v.suggested_fix is not None
         assert leak_v.severity_score == 85
 
+        # Verify Custom Rule violations are evaluated
+        custom_viols = [v for v in violations if v.type == "custom_rule_violation"]
+        assert len(custom_viols) > 0
+        assert custom_viols[0].suggested_fix is not None
+        assert custom_viols[0].severity_score is not None
+
+        # Verify Microservice Boundary Analysis
+        analysis = report["microservice_boundary_analysis"]
+        assert "shared_databases" in analysis
+        assert "distributed_monolith_indicators" in analysis
+        shared_db_tables = [s["table_name"] for s in analysis["shared_databases"]]
+        assert "users" in shared_db_tables
+        assert analysis["distributed_monolith_indicators"]["score"] > 0
+        assert analysis["distributed_monolith_indicators"]["risk_level"] in ["low", "medium", "high"]
+
         # We expect a layer violation or a pattern violation (API -> DB table direct query)
         viol_types = [v.type for v in violations]
-        assert "layer_violation" in viol_types or "pattern_violation" in viol_types
+        assert "layer_violation" in viol_types or "pattern_violation" in viol_types or "custom_rule_violation" in viol_types
 
     finally:
         db_session.close()

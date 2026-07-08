@@ -17,13 +17,23 @@ class PatternRule(BaseModel):
     severity: str = Field("critical", description="Severity level: critical, warning, info")
     matching_patterns: Optional[List[str]] = Field(None, description="Optional custom patterns for matching naming conventions or boundaries")
 
+class CustomRule(BaseModel):
+    id: str = Field(..., description="Unique identifier for the custom rule")
+    name: str = Field(..., description="Descriptive name of the rule")
+    source_matcher: str = Field(..., description="Glob pattern or inclusion check for the source component name/path")
+    target_matcher: str = Field(..., description="Glob pattern or inclusion check for the target component name/path")
+    type: str = Field("forbidden", description="Rule constraint type: forbidden or only_allowed_from")
+    allowed_source_matcher: Optional[str] = Field(None, description="Glob pattern for allowed source components if type is only_allowed_from")
+    severity: str = Field("critical", description="Rule breach severity: critical, warning, info")
+
 class ArchitectureRulesSchema(BaseModel):
     layers: List[LayerRule] = Field(default_factory=list)
     boundaries: List[BoundaryRule] = Field(default_factory=list)
     patterns: List[PatternRule] = Field(default_factory=list)
+    custom_rules: List[CustomRule] = Field(default_factory=list)
 
 class DriftViolation(BaseModel):
-    type: str = Field(..., description="Violation type: layer_violation, boundary_violation, pattern_violation, circular_dependency")
+    type: str = Field(..., description="Violation type: layer_violation, boundary_violation, pattern_violation, circular_dependency, custom_rule_violation")
     severity: str = Field(..., description="Severity level: critical, warning, info")
     message: str = Field(..., description="Description of the violation")
     source_node: Optional[Dict[str, Any]] = Field(None, description="Detailed info about the source node causing the violation")
@@ -34,7 +44,7 @@ class DriftViolation(BaseModel):
     severity_score: Optional[int] = Field(None, description="Numerical severity score from 1-100")
 
 class GovernanceAlert(BaseModel):
-    type: str = Field(..., description="Alert type: layer_violation, boundary_violation, pattern_violation, circular_dependency")
+    type: str = Field(..., description="Alert type: layer_violation, boundary_violation, pattern_violation, circular_dependency, custom_rule_violation")
     severity: str = Field(..., description="Severity level: critical, warning, info")
     message: str = Field(..., description="Alert details")
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -46,3 +56,5 @@ class ArchitectureDriftReportResponse(BaseModel):
     layers: List[LayerRule] = Field(default_factory=list)
     boundaries: List[BoundaryRule] = Field(default_factory=list)
     patterns: List[PatternRule] = Field(default_factory=list)
+    custom_rules: List[CustomRule] = Field(default_factory=list)
+    microservice_boundary_analysis: Dict[str, Any] = Field(default_factory=dict, description="Microservice boundary smell report details")

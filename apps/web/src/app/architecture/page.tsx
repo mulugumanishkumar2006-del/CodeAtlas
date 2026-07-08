@@ -69,7 +69,7 @@ export default function ArchitectureExplorerPage() {
   const [editingRules, setEditingRules] = React.useState<any | null>(null);
   
   // Custom form edit states
-  const [activeRuleTab, setActiveRuleTab] = React.useState<'layers' | 'boundaries' | 'patterns'>('layers');
+  const [activeRuleTab, setActiveRuleTab] = React.useState<'layers' | 'boundaries' | 'patterns' | 'custom_rules'>('layers');
 
   const fetchDriftReport = React.useCallback(async (repoId: string) => {
     if (!token || !repoId) return;
@@ -1027,6 +1027,113 @@ export default function ArchitectureExplorerPage() {
                     </div>
                   )}
                 </div>
+
+                {/* Microservice Boundary Analysis Panel */}
+                {driftReport.microservice_boundary_analysis && (
+                  <div className="border rounded-2xl bg-card shadow-sm overflow-hidden space-y-6 p-6">
+                    <div>
+                      <h3 className="font-bold text-base flex items-center gap-2 text-foreground">
+                        <Network className="h-5 w-5 text-indigo-500" />
+                        Microservice Boundary Analysis
+                      </h3>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Detect tight service coupling, shared database tables, direct synchronous runtime dependency links, and distributed monolith risk metrics.
+                      </p>
+                    </div>
+
+                    {/* Distributed Monolith Smell indicator */}
+                    {driftReport.microservice_boundary_analysis.distributed_monolith_indicators && (
+                      <div className="border rounded-xl p-4 bg-muted/10 grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+                        <div className="md:col-span-4 flex flex-col items-center justify-center border-b md:border-b-0 md:border-r pb-4 md:pb-0 pr-0 md:pr-4">
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Distributed Monolith Risk</span>
+                          <div className={`mt-2 px-3 py-1.5 rounded-full text-xs font-black uppercase border tracking-wider text-center w-full max-w-[150px] ${
+                            driftReport.microservice_boundary_analysis.distributed_monolith_indicators.risk_level === 'high'
+                              ? 'bg-rose-500/10 text-rose-600 border-rose-500/20'
+                              : driftReport.microservice_boundary_analysis.distributed_monolith_indicators.risk_level === 'medium'
+                              ? 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20'
+                              : 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                          }`}>
+                            {driftReport.microservice_boundary_analysis.distributed_monolith_indicators.risk_level} Risk
+                          </div>
+                          <span className="text-[9px] text-muted-foreground mt-1.5 font-bold">Smell Index: {driftReport.microservice_boundary_analysis.distributed_monolith_indicators.score}/100</span>
+                        </div>
+                        <div className="md:col-span-8 space-y-2">
+                          <span className="text-[9px] font-extrabold text-muted-foreground uppercase tracking-wider block">Smell Indicators Discovered:</span>
+                          <ul className="space-y-1.5 text-xs text-muted-foreground font-medium pl-3.5 list-disc">
+                            {driftReport.microservice_boundary_analysis.distributed_monolith_indicators.reasons.map((r: string, rIdx: number) => (
+                              <li key={rIdx} className="leading-snug">{r}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
+                      {/* Shared Databases section */}
+                      <div className="border rounded-xl p-4.5 bg-card space-y-3">
+                        <div className="flex items-center gap-2 text-foreground font-bold text-xs uppercase tracking-wider border-b pb-2">
+                          <Database className="h-4 w-4 text-yellow-500" />
+                          Shared Databases ({driftReport.microservice_boundary_analysis.shared_databases.length})
+                        </div>
+                        {driftReport.microservice_boundary_analysis.shared_databases.length > 0 ? (
+                          <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-1">
+                            {driftReport.microservice_boundary_analysis.shared_databases.map((db: any, sIdx: number) => (
+                              <div key={sIdx} className="p-3 border border-yellow-500/20 bg-yellow-500/5 rounded-xl space-y-1.5">
+                                <p className="font-bold text-foreground text-xs font-mono">{db.table_name}</p>
+                                <div className="flex flex-wrap gap-1">
+                                  <span className="text-[8px] font-black text-muted-foreground uppercase mr-1">Shared by:</span>
+                                  {db.domains_accessing.map((dom: string) => (
+                                    <span key={dom} className="px-1.5 py-0.5 text-[8px] font-extrabold bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border border-yellow-500/25 rounded-md uppercase font-mono">
+                                      {dom}
+                                    </span>
+                                  ))}
+                                </div>
+                                <p className="text-[10px] text-muted-foreground leading-normal">{db.message}</p>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-muted-foreground py-6 text-center">No shared database couplings detected. Database isolation matches microservice standards.</p>
+                        )}
+                      </div>
+
+                      {/* Tight Coupling & Sync Calls section */}
+                      <div className="border rounded-xl p-4.5 bg-card space-y-3">
+                        <div className="flex items-center gap-2 text-foreground font-bold text-xs uppercase tracking-wider border-b pb-2">
+                          <Cpu className="h-4 w-4 text-indigo-500" />
+                          Tight Coupling & Sync Calls
+                        </div>
+                        <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-1">
+                          {driftReport.microservice_boundary_analysis.tight_coupling.length > 0 || driftReport.microservice_boundary_analysis.excessive_sync_communication.length > 0 ? (
+                            <>
+                              {driftReport.microservice_boundary_analysis.tight_coupling.map((tc: any, tIdx: number) => (
+                                <div key={`tc-${tIdx}`} className="p-3 border border-indigo-500/20 bg-indigo-500/5 rounded-xl space-y-1.5">
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-bold text-foreground text-xs uppercase font-mono">{tc.boundary}</span>
+                                    <span className="text-[8px] font-black bg-indigo-500/10 text-indigo-600 px-1.5 py-0.5 rounded border border-indigo-500/20">Tight Coupling</span>
+                                  </div>
+                                  <p className="text-[10px] text-muted-foreground leading-normal">{tc.message}</p>
+                                </div>
+                              ))}
+                              {driftReport.microservice_boundary_analysis.excessive_sync_communication.map((sc: any, sIdx: number) => (
+                                <div key={`sc-${sIdx}`} className="p-3 border border-pink-500/20 bg-pink-500/5 rounded-xl space-y-1">
+                                  <div className="flex items-center justify-between text-[8px] font-black text-pink-600 uppercase">
+                                    <span>Sync Call</span>
+                                    <span>{sc.source_domain} ➔ {sc.target_domain}</span>
+                                  </div>
+                                  <p className="font-bold text-foreground text-[10px] font-mono leading-tight">{sc.source} ➔ {sc.target}</p>
+                                  <p className="text-[9px] text-muted-foreground leading-normal">{sc.message}</p>
+                                </div>
+                              ))}
+                            </>
+                          ) : (
+                            <p className="text-[11px] text-muted-foreground py-6 text-center">No tightly coupled cross-domain dependencies or runtime synchronous calls identified.</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Right Column: Rules Management panel */}
@@ -1039,18 +1146,19 @@ export default function ArchitectureExplorerPage() {
                     </h3>
                   </div>
 
-                  <div className="flex border-b border-border/50 bg-muted/10 p-1">
-                    {['layers', 'boundaries', 'patterns'].map((t) => (
+                  <div className="flex border-b border-border/50 bg-muted/10 p-1 flex-wrap">
+                    {['layers', 'boundaries', 'patterns', 'custom_rules'].map((t) => (
                       <button
                         key={t}
+                        type="button"
                         onClick={() => setActiveRuleTab(t as any)}
-                        className={`flex-1 py-1.5 text-[9px] uppercase tracking-wider font-bold rounded-lg transition-all ${
+                        className={`flex-1 py-1.5 text-[9px] uppercase tracking-wider font-bold rounded-lg transition-all px-2 ${
                           activeRuleTab === t
                             ? 'bg-background text-foreground shadow-sm'
                             : 'text-muted-foreground hover:text-foreground'
                         }`}
                       >
-                        {t}
+                        {t === 'custom_rules' ? 'custom rules' : t}
                       </button>
                     ))}
                   </div>
@@ -1291,6 +1399,156 @@ export default function ArchitectureExplorerPage() {
                                 </div>
                               </div>
                             ))}
+                          </div>
+                        )}
+
+                        {/* Tab Content: Custom Rules */}
+                        {activeRuleTab === 'custom_rules' && (
+                          <div className="space-y-4">
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase block mb-1">Enforce bespoke dependency paths or exclusive architectural policies</span>
+                            {editingRules.custom_rules?.map((rule: any, index: number) => (
+                              <div key={index} className="p-3.5 border rounded-xl bg-muted/10 space-y-3 relative group">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const copy = { ...editingRules };
+                                    copy.custom_rules.splice(index, 1);
+                                    setEditingRules(copy);
+                                  }}
+                                  className="absolute top-2.5 right-2.5 text-muted-foreground hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all"
+                                  title="Delete Custom Rule"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                                
+                                <div>
+                                  <label className="text-[9px] font-bold text-muted-foreground uppercase block">Rule Description</label>
+                                  <input
+                                    type="text"
+                                    value={rule.name}
+                                    onChange={(e) => {
+                                      const copy = { ...editingRules };
+                                      copy.custom_rules[index].name = e.target.value;
+                                      setEditingRules(copy);
+                                    }}
+                                    className="w-full bg-background border rounded-lg px-2.5 py-1.5 text-xs font-semibold mt-1 focus:outline-none"
+                                    placeholder="e.g. UI cannot access Repository"
+                                  />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div>
+                                    <label className="text-[9px] font-bold text-muted-foreground uppercase block">Rule Type</label>
+                                    <select
+                                      value={rule.type}
+                                      onChange={(e) => {
+                                        const copy = { ...editingRules };
+                                        copy.custom_rules[index].type = e.target.value;
+                                        if (e.target.value === 'only_allowed_from' && !rule.allowed_source_matcher) {
+                                          copy.custom_rules[index].allowed_source_matcher = '';
+                                        }
+                                        setEditingRules(copy);
+                                      }}
+                                      className="w-full bg-background border rounded-lg px-2 py-1.5 text-[11px] font-semibold mt-1"
+                                    >
+                                      <option value="forbidden">Forbidden Connection</option>
+                                      <option value="only_allowed_from">Only Allowed From</option>
+                                    </select>
+                                  </div>
+
+                                  <div>
+                                    <label className="text-[9px] font-bold text-muted-foreground uppercase block">Severity</label>
+                                    <select
+                                      value={rule.severity}
+                                      onChange={(e) => {
+                                        const copy = { ...editingRules };
+                                        copy.custom_rules[index].severity = e.target.value;
+                                        setEditingRules(copy);
+                                      }}
+                                      className="w-full bg-background border rounded-lg px-2 py-1.5 text-[11px] font-semibold mt-1"
+                                    >
+                                      <option value="critical">Critical</option>
+                                      <option value="warning">Warning</option>
+                                      <option value="info">Info</option>
+                                    </select>
+                                  </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div>
+                                    <label className="text-[9px] font-bold text-muted-foreground uppercase block">Source Matcher</label>
+                                    <input
+                                      type="text"
+                                      value={rule.source_matcher}
+                                      onChange={(e) => {
+                                        const copy = { ...editingRules };
+                                        copy.custom_rules[index].source_matcher = e.target.value;
+                                        setEditingRules(copy);
+                                      }}
+                                      className="w-full bg-background border rounded-lg px-2.5 py-1.5 text-xs font-semibold mt-1 focus:outline-none"
+                                      placeholder="e.g. *ui*"
+                                      disabled={rule.type === 'only_allowed_from'}
+                                    />
+                                  </div>
+
+                                  <div>
+                                    <label className="text-[9px] font-bold text-muted-foreground uppercase block">Target Matcher</label>
+                                    <input
+                                      type="text"
+                                      value={rule.target_matcher}
+                                      onChange={(e) => {
+                                        const copy = { ...editingRules };
+                                        copy.custom_rules[index].target_matcher = e.target.value;
+                                        setEditingRules(copy);
+                                      }}
+                                      className="w-full bg-background border rounded-lg px-2.5 py-1.5 text-xs font-semibold mt-1 focus:outline-none"
+                                      placeholder="e.g. *repository*"
+                                    />
+                                  </div>
+                                </div>
+
+                                {rule.type === 'only_allowed_from' && (
+                                  <div>
+                                    <label className="text-[9px] font-bold text-muted-foreground uppercase block">Allowed Source Matcher</label>
+                                    <input
+                                      type="text"
+                                      value={rule.allowed_source_matcher || ''}
+                                      onChange={(e) => {
+                                        const copy = { ...editingRules };
+                                        copy.custom_rules[index].allowed_source_matcher = e.target.value;
+                                        setEditingRules(copy);
+                                      }}
+                                      className="w-full bg-background border rounded-lg px-2.5 py-1.5 text-xs font-semibold mt-1 focus:outline-none"
+                                      placeholder="e.g. *service*"
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                            
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="xs"
+                              className="w-full border-dashed text-[10px] font-bold uppercase tracking-wider"
+                              onClick={() => {
+                                const copy = { ...editingRules };
+                                if (!copy.custom_rules) {
+                                  copy.custom_rules = [];
+                                }
+                                copy.custom_rules.push({
+                                  id: `custom_rule_${Date.now()}`,
+                                  name: `New Custom Rule ${copy.custom_rules.length + 1}`,
+                                  source_matcher: '',
+                                  target_matcher: '',
+                                  type: 'forbidden',
+                                  severity: 'critical'
+                                });
+                                setEditingRules(copy);
+                              }}
+                            >
+                              <Plus className="h-3 w-3 mr-1" /> Add Custom Rule
+                            </Button>
                           </div>
                         )}
 
