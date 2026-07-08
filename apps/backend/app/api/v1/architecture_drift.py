@@ -11,6 +11,8 @@ from app.schemas.architecture import (
     ArchitectureDriftReportResponse,
     ArchitectureRulesSchema,
     DriftTimelinePoint,
+    PRArchitectureReviewResponse,
+    EnterprisePolicyReportResponse,
 )
 
 router = APIRouter()
@@ -102,4 +104,44 @@ def update_architecture_rules(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to save architectural rules: {str(e)}"
+        )
+
+@router.get(
+    "/repositories/{repo_id}/architecture/pr/review",
+    response_model=PRArchitectureReviewResponse,
+)
+def get_pr_architecture_review(
+    repo_id: str,
+    base_sha: str,
+    head_sha: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    validate_repository_access(repo_id, db, user)
+    try:
+        review = drift_service.analyze_pr_architecture(db, repo_id, base_sha, head_sha)
+        return review
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to analyze Pull Request architecture: {str(e)}"
+        )
+
+@router.get(
+    "/repositories/{repo_id}/architecture/policies",
+    response_model=EnterprisePolicyReportResponse,
+)
+def get_enterprise_policy_report(
+    repo_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    validate_repository_access(repo_id, db, user)
+    try:
+        report = drift_service.get_enterprise_policy_report(db, repo_id)
+        return report
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to load enterprise policies report: {str(e)}"
         )

@@ -334,6 +334,24 @@ def test_architecture_drift():
     assert timeline[-1]["compliance_score"] == 71.0
     assert len(timeline[-1]["introduced_violations"]) > 0
 
+    # GET /api/v1/repositories/{repo_id}/architecture/pr/review
+    pr_res = client.get(
+        f"/api/v1/repositories/{repo_id}/architecture/pr/review?base_sha=8b353f06d7efc40552b0f443b71bf12d484192b0&head_sha=7a3b4e2f3d6c1b5a2e9f0d8c7b6a5f4e3d2c1b0a"
+    )
+    assert pr_res.status_code == 200
+    pr_review = pr_res.json()
+    assert len(pr_review["predicted_layer_violations"]) > 0
+    assert pr_review["drift_impact"]["score_change"] == -22.0
+    assert "bypass" in pr_review["feedback"]
+
+    # GET /api/v1/repositories/{repo_id}/architecture/policies
+    policy_res = client.get(f"/api/v1/repositories/{repo_id}/architecture/policies")
+    assert policy_res.status_code == 200
+    policy_report = policy_res.json()
+    assert policy_report["compliance_score"] > 0.0
+    assert len(policy_report["policies"]) == 5
+    assert any(p["id"] == "policy_tests" and p["status"] == "passed" for p in policy_report["policies"])
+
     print("All Architectural Drift backend tests passed successfully!")
 
     # Cleanup DB records

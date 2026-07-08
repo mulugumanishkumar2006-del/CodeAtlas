@@ -69,6 +69,15 @@ export default function ArchitectureExplorerPage() {
   const [editingRules, setEditingRules] = React.useState<any | null>(null);
   const [timeline, setTimeline] = React.useState<any[]>([]);
   const [timelineLoading, setTimelineLoading] = React.useState<boolean>(false);
+
+  // Feature 11 & 12 States
+  const [complianceSubTab, setComplianceSubTab] = React.useState<'overview' | 'pr_simulator' | 'enterprise_policies'>('overview');
+  const [policyReport, setPolicyReport] = React.useState<any | null>(null);
+  const [policyLoading, setPolicyLoading] = React.useState<boolean>(false);
+  const [prBaseSha, setPrBaseSha] = React.useState<string>('8b353f06d7efc40552b0f443b71bf12d484192b0');
+  const [prHeadSha, setPrHeadSha] = React.useState<string>('7a3b4e2f3d6c1b5a2e9f0d8c7b6a5f4e3d2c1b0a');
+  const [prReview, setPrReview] = React.useState<any | null>(null);
+  const [prReviewLoading, setPrReviewLoading] = React.useState<boolean>(false);
   
   // Custom form edit states
   const [activeRuleTab, setActiveRuleTab] = React.useState<'layers' | 'boundaries' | 'patterns' | 'custom_rules'>('layers');
@@ -109,6 +118,42 @@ export default function ArchitectureExplorerPage() {
     }
   }, [token]);
 
+  const fetchPolicyReport = React.useCallback(async (repoId: string) => {
+    if (!token || !repoId) return;
+    setPolicyLoading(true);
+    try {
+      const res = await fetch(`/api/v1/repositories/${repoId}/architecture/policies`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPolicyReport(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch policies report", err);
+    } finally {
+      setPolicyLoading(false);
+    }
+  }, [token]);
+
+  const analyzePrArchitecture = async () => {
+    if (!token || !selectedRepoId || !prBaseSha || !prHeadSha) return;
+    setPrReviewLoading(true);
+    try {
+      const res = await fetch(`/api/v1/repositories/${selectedRepoId}/architecture/pr/review?base_sha=${prBaseSha}&head_sha=${prHeadSha}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPrReview(data);
+      }
+    } catch (err) {
+      console.error("Failed to analyze PR architecture", err);
+    } finally {
+      setPrReviewLoading(false);
+    }
+  };
+
   const fetchRules = React.useCallback(async (repoId: string) => {
     if (!token || !repoId) return;
     setRulesLoading(true);
@@ -147,6 +192,7 @@ export default function ArchitectureExplorerPage() {
         // Refresh drift report to recalculate scores with new rules
         fetchDriftReport(selectedRepoId);
         fetchTimeline(selectedRepoId);
+        fetchPolicyReport(selectedRepoId);
       }
     } catch (err) {
       console.error("Failed to save rules", err);
@@ -264,12 +310,13 @@ export default function ArchitectureExplorerPage() {
       fetchDriftReport(repoId);
       fetchRules(repoId);
       fetchTimeline(repoId);
+      fetchPolicyReport(repoId);
     } catch (err: any) {
       setError(err.message || 'Error occurred while loading architecture data.');
     } finally {
       setDataLoading(false);
     }
-  }, [token, fetchDriftReport, fetchRules, fetchTimeline]);
+  }, [token, fetchDriftReport, fetchRules, fetchTimeline, fetchPolicyReport]);
 
 
   React.useEffect(() => {
@@ -845,6 +892,40 @@ export default function ArchitectureExplorerPage() {
       {/* Tab Content: Compliance & Drift Dashboard */}
       {activeTab === 'compliance' && (
         <div className="space-y-6 animate-in fade-in-50 duration-200">
+          {/* Sub Tab selection bar */}
+          <div className="flex border-b border-border/20 gap-4 mb-4">
+            <button
+              onClick={() => setComplianceSubTab('overview')}
+              className={`pb-2 text-xs font-black uppercase tracking-wider transition-all border-b-2 ${
+                complianceSubTab === 'overview'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Overview Dashboard
+            </button>
+            <button
+              onClick={() => setComplianceSubTab('pr_simulator')}
+              className={`pb-2 text-xs font-black uppercase tracking-wider transition-all border-b-2 ${
+                complianceSubTab === 'pr_simulator'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              PR Review Simulator
+            </button>
+            <button
+              onClick={() => setComplianceSubTab('enterprise_policies')}
+              className={`pb-2 text-xs font-black uppercase tracking-wider transition-all border-b-2 ${
+                complianceSubTab === 'enterprise_policies'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Enterprise Governance
+            </button>
+          </div>
+
           {driftLoading || rulesLoading ? (
             <div className="flex flex-col items-center justify-center min-h-[40vh] space-y-4">
               <RefreshCw className="h-10 w-10 text-primary animate-spin" />
@@ -857,7 +938,9 @@ export default function ArchitectureExplorerPage() {
               <p className="text-xs">The drift detection service encountered an issue. Ensure your repository contains a valid build.</p>
             </div>
           ) : (
-            <div className="grid gap-6 grid-cols-1 xl:grid-cols-12 items-start">
+            <>
+              {complianceSubTab === 'overview' && (
+                <div className="grid gap-6 grid-cols-1 xl:grid-cols-12 items-start">
               {/* Left Column: Metrics & Active Violations */}
               <div className="xl:col-span-8 space-y-6">
                 
@@ -1856,6 +1939,249 @@ export default function ArchitectureExplorerPage() {
               </div>
             </div>
           )}
+
+          {complianceSubTab === 'pr_simulator' && (
+            <div className="space-y-6">
+              {/* Header card */}
+              <div className="border rounded-2xl bg-card p-6 shadow-sm space-y-4">
+                <div>
+                  <h3 className="font-bold text-base flex items-center gap-2">
+                    <GitBranch className="h-5 w-5 text-indigo-500" />
+                    Pull Request Architecture Review Simulator
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Analyze the architectural impact of a pending Pull Request. Predict new violations, dependency paths, and compliance score drift before merge.
+                  </p>
+                </div>
+
+                <div className="grid gap-4 grid-cols-1 md:grid-cols-3 max-w-4xl items-end">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase">Base Commit SHA</label>
+                    <input
+                      type="text"
+                      value={prBaseSha}
+                      onChange={(e) => setPrBaseSha(e.target.value)}
+                      placeholder="e.g. 8b353f06d7efc40552b0f443b71bf12d484192b0"
+                      className="w-full rounded-lg border bg-background px-3 py-2 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-primary shadow-sm"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase">Head Commit SHA</label>
+                    <input
+                      type="text"
+                      value={prHeadSha}
+                      onChange={(e) => setPrHeadSha(e.target.value)}
+                      placeholder="e.g. 7a3b4e2f3d6c1b5a2e9f0d8c7b6a5f4e3d2c1b0a"
+                      className="w-full rounded-lg border bg-background px-3 py-2 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-primary shadow-sm"
+                    />
+                  </div>
+                  <Button
+                    onClick={analyzePrArchitecture}
+                    disabled={prReviewLoading || !prBaseSha || !prHeadSha}
+                    className="w-full text-xs font-bold uppercase tracking-wider"
+                  >
+                    {prReviewLoading ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : <Play className="h-4 w-4 mr-2" />}
+                    Analyze Pull Request
+                  </Button>
+                </div>
+              </div>
+
+              {/* PR Review Results */}
+              {prReview && (
+                <div className="grid gap-6 grid-cols-1 xl:grid-cols-3 items-start animate-in fade-in-50 duration-200">
+                  {/* Left Column: Drift Impact Score card */}
+                  <div className="xl:col-span-1 border rounded-2xl bg-card p-6 shadow-sm space-y-6">
+                    <div className="border-b pb-3">
+                      <h4 className="font-extrabold text-sm text-foreground uppercase tracking-wider">Mergability Prediction</h4>
+                    </div>
+
+                    <div className="flex flex-col items-center justify-center space-y-4">
+                      {/* Mergability Badge */}
+                      <span className={`px-4 py-1.5 rounded-full text-xs font-black uppercase border tracking-wider animate-pulse ${
+                        prReview.drift_impact.status_impact.includes('Decline')
+                          ? 'bg-rose-500/10 text-rose-500 border-rose-500/20'
+                          : 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                      }`}>
+                        {prReview.drift_impact.status_impact.includes('Decline') ? 'Decline Merge' : 'Approve Merge'}
+                      </span>
+
+                      {/* Drift Score Comparison */}
+                      <div className="text-center space-y-1">
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase">Compliance Impact</p>
+                        <div className="flex items-baseline justify-center gap-2">
+                          <span className="text-2xl font-bold text-muted-foreground">{prReview.drift_impact.previous_compliance_score}%</span>
+                          <span className="text-sm font-semibold text-muted-foreground">➔</span>
+                          <span className={`text-4xl font-black ${
+                            prReview.drift_impact.score_change < 0 ? 'text-rose-500' : 'text-emerald-500'
+                          }`}>{prReview.drift_impact.new_compliance_score}%</span>
+                        </div>
+                        <span className={`text-xs font-bold font-mono px-2 py-0.5 rounded ${
+                          prReview.drift_impact.score_change < 0 ? 'bg-rose-500/10 text-rose-600' : 'bg-emerald-500/10 text-emerald-600'
+                        }`}>
+                          {prReview.drift_impact.score_change}% score shift
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Column: Regressions Details & AI Feedback */}
+                  <div className="xl:col-span-2 space-y-6">
+                    {/* Feedback review */}
+                    <div className="border rounded-2xl bg-indigo-500/5 border-indigo-500/20 p-6 space-y-3">
+                      <h4 className="font-bold text-sm flex items-center gap-2 text-foreground uppercase tracking-wider">
+                        <Brain className="h-4 w-4 text-indigo-500" />
+                        Pull Request Architectural Feedback
+                      </h4>
+                      <p className="text-xs text-muted-foreground font-medium leading-relaxed font-mono bg-background p-4 rounded-xl border border-indigo-500/10 italic">
+                        "{prReview.feedback}"
+                      </p>
+                    </div>
+
+                    {/* Predicted regressions lists */}
+                    <div className="border rounded-2xl bg-card shadow-sm p-6 space-y-4">
+                      <h4 className="font-bold text-sm text-foreground uppercase tracking-wider border-b pb-2">Regression Details</h4>
+                      
+                      <div className="space-y-4 divide-y">
+                        <div className="space-y-2 pt-3 first:pt-0">
+                          <span className="text-[10px] font-black text-rose-500 uppercase tracking-wider block">New Layer Violations:</span>
+                          {prReview.predicted_layer_violations.length > 0 ? (
+                            <ul className="list-disc pl-4 text-xs text-muted-foreground font-medium space-y-1">
+                              {prReview.predicted_layer_violations.map((v: string, idx: number) => (
+                                <li key={idx} className="leading-snug">{v}</li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">No new layer violations predicted.</p>
+                          )}
+                        </div>
+
+                        <div className="space-y-2 pt-3">
+                          <span className="text-[10px] font-black text-rose-500 uppercase tracking-wider block">New Circular Dependencies:</span>
+                          {prReview.predicted_circular_dependencies.length > 0 ? (
+                            <ul className="list-disc pl-4 text-xs text-muted-foreground font-medium space-y-1">
+                              {prReview.predicted_circular_dependencies.map((v: string, idx: number) => (
+                                <li key={idx} className="leading-snug">{v}</li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">No new circular dependencies predicted.</p>
+                          )}
+                        </div>
+
+                        <div className="space-y-2 pt-3">
+                          <span className="text-[10px] font-black text-indigo-500 uppercase tracking-wider block">New Dependencies Created:</span>
+                          {prReview.predicted_new_dependencies.length > 0 ? (
+                            <ul className="list-disc pl-4 text-xs text-muted-foreground font-mono space-y-1">
+                              {prReview.predicted_new_dependencies.map((d: string, idx: number) => (
+                                <li key={idx} className="leading-snug text-[11px] font-mono">{d}</li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">No new module dependencies introduced.</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {complianceSubTab === 'enterprise_policies' && policyReport && (
+            <div className="grid gap-6 grid-cols-1 xl:grid-cols-12 items-start animate-in fade-in-50 duration-200">
+              {/* Left Column: Overall policy card */}
+              <div className="xl:col-span-4 border rounded-2xl bg-card p-6 shadow-sm space-y-6">
+                <div>
+                  <h3 className="font-bold text-base flex items-center gap-2">
+                    <Award className="h-5 w-5 text-indigo-500" />
+                    Enterprise Governance
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Enforce organization-wide policies and generate compliance reports.
+                  </p>
+                </div>
+
+                <div className="flex flex-col items-center justify-center space-y-3">
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Policy Compliance</span>
+                  <div className="relative flex items-center justify-center">
+                    <svg className="w-32 h-32 transform -rotate-90">
+                      <circle
+                        cx="64"
+                        cy="64"
+                        r="48"
+                        className="text-muted/10"
+                        strokeWidth="8"
+                        stroke="currentColor"
+                        fill="transparent"
+                      />
+                      <circle
+                        cx="64"
+                        cy="64"
+                        r="48"
+                        className={
+                          policyReport.compliance_score >= 80
+                            ? 'text-emerald-500'
+                            : policyReport.compliance_score >= 60
+                            ? 'text-yellow-500'
+                            : 'text-rose-500'
+                        }
+                        strokeWidth="8"
+                        strokeDasharray="301.6"
+                        strokeDashoffset={301.6 - (301.6 * (policyReport.compliance_score ?? 100)) / 100}
+                        strokeLinecap="round"
+                        stroke="currentColor"
+                        fill="transparent"
+                      />
+                    </svg>
+                    <div className="absolute flex flex-col items-center justify-center">
+                      <span className="text-3xl font-black text-foreground">
+                        {policyReport.compliance_score}%
+                      </span>
+                      <span className="text-[9px] font-bold uppercase text-muted-foreground mt-0.5">
+                        {policyReport.status}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Policies Report Table */}
+              <div className="xl:col-span-8 border rounded-2xl bg-card shadow-sm p-6 space-y-4">
+                <div className="border-b pb-2">
+                  <h4 className="font-bold text-sm text-foreground uppercase tracking-wider">Active Policies Compliance Status</h4>
+                </div>
+
+                <div className="space-y-4">
+                  {policyReport.policies.map((p: any, idx: number) => (
+                    <div key={idx} className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-4 border rounded-xl bg-muted/5 hover:bg-muted/10 transition-all">
+                      <div className="space-y-1">
+                        <span className="text-xs font-bold text-foreground block">{p.name}</span>
+                        <span className="text-[11px] text-muted-foreground block">{p.details}</span>
+                      </div>
+                      
+                      <div className="flex items-center gap-3">
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase border font-mono ${
+                          p.status === 'passed'
+                            ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                            : 'bg-rose-500/10 text-rose-600 border-rose-500/20'
+                        }`}>
+                          {p.status}
+                        </span>
+                        
+                        {/* Policy toggle state */}
+                        <div className="w-9 h-5 bg-primary/20 dark:bg-primary/10 rounded-full p-0.5 cursor-pointer flex items-center justify-end">
+                          <div className="w-4 h-4 bg-primary rounded-full shadow-sm" />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </>
+      )}
         </div>
       )}
     </div>

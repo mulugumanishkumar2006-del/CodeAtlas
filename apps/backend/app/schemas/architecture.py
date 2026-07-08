@@ -75,3 +75,27 @@ class DriftTimelinePoint(BaseModel):
     release_tag: Optional[str] = Field(None, description="Associated release tag")
     status: str = Field(..., description="Overall health status: Healthy, Warning, Critical")
     introduced_violations: List[str] = Field(default_factory=list, description="List of violations introduced in this commit/release")
+
+class PRDriftImpact(BaseModel):
+    previous_compliance_score: float = Field(..., description="Previous compliance score")
+    new_compliance_score: float = Field(..., description="Predicted new compliance score")
+    score_change: float = Field(..., description="Score change")
+    status_impact: str = Field(..., description="Status impact (e.g. Approve, Decline)")
+
+class PRArchitectureReviewResponse(BaseModel):
+    predicted_new_dependencies: List[str] = Field(default_factory=list, description="List of predicted new dependencies")
+    predicted_layer_violations: List[str] = Field(default_factory=list, description="List of predicted new layer violations")
+    predicted_circular_dependencies: List[str] = Field(default_factory=list, description="List of predicted new circular dependencies")
+    drift_impact: PRDriftImpact = Field(..., description="Compliance drift score impact details")
+    feedback: str = Field(..., description="Automated architectural review feedback comments")
+
+class EnterprisePolicyItem(BaseModel):
+    id: str = Field(..., description="Policy unique identifier")
+    name: str = Field(..., description="Policy display name")
+    status: str = Field(..., description="Policy status: passed, failed")
+    details: str = Field(..., description="Details explanation")
+
+class EnterprisePolicyReportResponse(BaseModel):
+    compliance_score: float = Field(..., description="Enterprise policy compliance score (0-100)")
+    status: str = Field(..., description="Overall status: Healthy, Warning, Critical")
+    policies: List[EnterprisePolicyItem] = Field(default_factory=list, description="Policy check items report list")
