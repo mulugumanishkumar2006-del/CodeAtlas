@@ -77,6 +77,37 @@ codeatlas/
       pnpm --filter web run dev
       ```
 
+### 4. Code Quality & Formatting
+
+To ensure your code passes repository CI checks, run the formatters and linters locally before pushing:
+
+**JavaScript/TypeScript (Next.js):**
+```bash
+# Format JS/TS/JSON/CSS/MD files
+pnpm run format:js:fix
+
+# Check formatting status
+pnpm run format:js
+
+# Run ESLint linter
+pnpm run lint:js
+```
+
+**Python (FastAPI):**
+```bash
+# Format Python code with Black
+python -m black apps/backend
+
+# Check formatting status
+python -m black --check apps/backend
+
+# Run Ruff linter checks
+python -m ruff check apps/backend
+
+# Autofix fixable Ruff violations
+python -m ruff check --fix apps/backend
+```
+
 ---
 
 ## Running with Docker Compose
