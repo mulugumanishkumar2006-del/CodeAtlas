@@ -82,6 +82,7 @@ codeatlas/
 To ensure your code passes repository CI checks, run the formatters and linters locally before pushing:
 
 **JavaScript/TypeScript (Next.js):**
+
 ```bash
 # Format JS/TS/JSON/CSS/MD files
 pnpm run format:js:fix
@@ -94,6 +95,7 @@ pnpm run lint:js
 ```
 
 **Python (FastAPI):**
+
 ```bash
 # Format Python code with Black
 python -m black apps/backend

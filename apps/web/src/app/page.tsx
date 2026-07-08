@@ -1021,6 +1021,38 @@ export default function Home() {
                                                 fetchRepositories(true);
                         }, [token]);
 
+                        // Auto-poll status when repository is cloning or pending
+                        React.useEffect(() => {
+                                                if (!selectedRepoId || !token) return;
+                                                const currentRepo = repos.find(
+                                                                        (r) =>
+                                                                                                r.id ===
+                                                                                                selectedRepoId
+                                                );
+                                                if (!currentRepo) return;
+
+                                                if (
+                                                                        currentRepo.status ===
+                                                                                                'pending' ||
+                                                                        currentRepo.status ===
+                                                                                                'cloning'
+                                                ) {
+                                                                        const interval =
+                                                                                                setInterval(
+                                                                                                                        () => {
+                                                                                                                                                fetchRepositories(
+                                                                                                                                                                        false
+                                                                                                                                                );
+                                                                                                                        },
+                                                                                                                        3000
+                                                                                                );
+                                                                        return () =>
+                                                                                                clearInterval(
+                                                                                                                        interval
+                                                                                                );
+                                                }
+                        }, [selectedRepoId, repos, token, fetchRepositories]);
+
                         // 2. Fetch structural details for the selected repository
                         const fetchRepoData = React.useCallback(async () => {
                                                 if (!token || !selectedRepoId) return;
