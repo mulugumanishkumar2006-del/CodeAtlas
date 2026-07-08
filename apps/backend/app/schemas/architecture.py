@@ -58,3 +58,13 @@ class ArchitectureDriftReportResponse(BaseModel):
     patterns: List[PatternRule] = Field(default_factory=list)
     custom_rules: List[CustomRule] = Field(default_factory=list)
     microservice_boundary_analysis: Dict[str, Any] = Field(default_factory=dict, description="Microservice boundary smell report details")
+
+class DriftTimelinePoint(BaseModel):
+    commit_sha: str = Field(..., description="Commit hash")
+    committed_at: datetime = Field(..., description="Commit date")
+    message: str = Field(..., description="Commit message")
+    compliance_score: float = Field(..., description="Compliance score (0-100)")
+    violations_count: int = Field(..., description="Number of violations at this point")
+    release_tag: Optional[str] = Field(None, description="Associated release tag")
+    status: str = Field(..., description="Overall health status: Healthy, Warning, Critical")
+    introduced_violations: List[str] = Field(default_factory=list, description="List of violations introduced in this commit/release")

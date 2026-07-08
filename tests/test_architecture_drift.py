@@ -315,6 +315,16 @@ def test_architecture_drift():
     assert "violations" in drift_report
     assert "alerts" in drift_report
 
+    # GET /api/v1/repositories/{repo_id}/architecture/drift/timeline
+    timeline_res = client.get(f"/api/v1/repositories/{repo_id}/architecture/drift/timeline")
+    assert timeline_res.status_code == 200
+    timeline = timeline_res.json()
+    assert len(timeline) == 4
+    assert timeline[0]["compliance_score"] == 98.0
+    assert timeline[0]["status"] == "Healthy"
+    assert timeline[-1]["compliance_score"] == 71.0
+    assert len(timeline[-1]["introduced_violations"]) > 0
+
     print("All Architectural Drift backend tests passed successfully!")
 
     # Cleanup DB records

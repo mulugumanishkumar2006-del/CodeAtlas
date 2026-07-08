@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 from app.api.v1.auth import get_current_user
 from app.core.database import get_db
@@ -10,6 +10,7 @@ from app.services.drift_detection_service import DriftDetectionService
 from app.schemas.architecture import (
     ArchitectureDriftReportResponse,
     ArchitectureRulesSchema,
+    DriftTimelinePoint,
 )
 
 router = APIRouter()
@@ -43,6 +44,25 @@ def get_architecture_drift_report(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to calculate architectural drift: {str(e)}"
+        )
+
+@router.get(
+    "/repositories/{repo_id}/architecture/drift/timeline",
+    response_model=List[DriftTimelinePoint],
+)
+def get_architecture_drift_timeline(
+    repo_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    validate_repository_access(repo_id, db, user)
+    try:
+        timeline = drift_service.get_drift_timeline(db, repo_id)
+        return timeline
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to load architectural drift timeline: {str(e)}"
         )
 
 @router.get(

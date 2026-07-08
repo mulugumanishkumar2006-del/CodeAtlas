@@ -67,6 +67,8 @@ export default function ArchitectureExplorerPage() {
   const [rulesLoading, setRulesLoading] = React.useState<boolean>(false);
   const [savingRules, setSavingRules] = React.useState<boolean>(false);
   const [editingRules, setEditingRules] = React.useState<any | null>(null);
+  const [timeline, setTimeline] = React.useState<any[]>([]);
+  const [timelineLoading, setTimelineLoading] = React.useState<boolean>(false);
   
   // Custom form edit states
   const [activeRuleTab, setActiveRuleTab] = React.useState<'layers' | 'boundaries' | 'patterns' | 'custom_rules'>('layers');
@@ -86,6 +88,24 @@ export default function ArchitectureExplorerPage() {
       console.error("Failed to fetch drift report", err);
     } finally {
       setDriftLoading(false);
+    }
+  }, [token]);
+
+  const fetchTimeline = React.useCallback(async (repoId: string) => {
+    if (!token || !repoId) return;
+    setTimelineLoading(true);
+    try {
+      const res = await fetch(`/api/v1/repositories/${repoId}/architecture/drift/timeline`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setTimeline(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch drift timeline", err);
+    } finally {
+      setTimelineLoading(false);
     }
   }, [token]);
 
@@ -126,6 +146,7 @@ export default function ArchitectureExplorerPage() {
         setEditingRules(JSON.parse(JSON.stringify(data)));
         // Refresh drift report to recalculate scores with new rules
         fetchDriftReport(selectedRepoId);
+        fetchTimeline(selectedRepoId);
       }
     } catch (err) {
       console.error("Failed to save rules", err);
@@ -242,12 +263,13 @@ export default function ArchitectureExplorerPage() {
       // 5. Fetch architectural drift & rules
       fetchDriftReport(repoId);
       fetchRules(repoId);
+      fetchTimeline(repoId);
     } catch (err: any) {
       setError(err.message || 'Error occurred while loading architecture data.');
     } finally {
       setDataLoading(false);
     }
-  }, [token, fetchDriftReport, fetchRules]);
+  }, [token, fetchDriftReport, fetchRules, fetchTimeline]);
 
 
   React.useEffect(() => {
@@ -900,8 +922,127 @@ export default function ArchitectureExplorerPage() {
                       </p>
                       <span className="text-[9px] text-muted-foreground mt-1">Overall rating score</span>
                     </div>
+
+                    {/* Compliance Metrics Summary List */}
+                    <div className="col-span-2 border-t pt-4 mt-2 grid grid-cols-5 gap-2 text-center md:col-span-3">
+                      <div>
+                        <span className="text-[8px] font-black text-muted-foreground uppercase block">Layer Violations</span>
+                        <span className="text-xs font-extrabold text-foreground">{driftReport.violations.filter((v: any) => v.type === 'layer_violation').length}</span>
+                      </div>
+                      <div>
+                        <span className="text-[8px] font-black text-muted-foreground uppercase block">Circular Loops</span>
+                        <span className="text-xs font-extrabold text-foreground">{driftReport.violations.filter((v: any) => v.type === 'circular_dependency').length}</span>
+                      </div>
+                      <div>
+                        <span className="text-[8px] font-black text-muted-foreground uppercase block">Boundary Leaks</span>
+                        <span className="text-xs font-extrabold text-foreground">{driftReport.violations.filter((v: any) => v.type === 'boundary_violation').length}</span>
+                      </div>
+                      <div>
+                        <span className="text-[8px] font-black text-muted-foreground uppercase block">Custom Violations</span>
+                        <span className="text-xs font-extrabold text-foreground">{driftReport.violations.filter((v: any) => v.type === 'custom_rule_violation').length}</span>
+                      </div>
+                      <div>
+                        <span className="text-[8px] font-black text-muted-foreground uppercase block">Overall Status</span>
+                        <span className={`text-xs font-black uppercase ${
+                          driftReport.compliance_score >= 90
+                            ? 'text-emerald-500'
+                            : driftReport.compliance_score >= 70
+                            ? 'text-yellow-500'
+                            : 'text-rose-500'
+                        }`}>
+                          {driftReport.compliance_score >= 90
+                            ? 'Healthy'
+                            : driftReport.compliance_score >= 70
+                            ? 'Warning'
+                            : 'Critical'}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
+
+                {/* Drift Timeline Panel */}
+                {timeline && timeline.length > 0 && (
+                  <div className="border rounded-2xl bg-card shadow-sm overflow-hidden p-6 space-y-6">
+                    <div>
+                      <h3 className="font-bold text-base flex items-center gap-2 text-foreground">
+                        <GitBranch className="h-5 w-5 text-indigo-500" />
+                        Historical Architectural Drift Timeline
+                      </h3>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Track compliance score evolution across historical releases and see exactly which commits introduced structural drift.
+                      </p>
+                    </div>
+
+                    {/* Timeline visualization flow */}
+                    <div className="relative border-l-2 border-muted/80 pl-6 ml-4 space-y-6">
+                      {timeline.map((point: any, pIdx: number) => {
+                        const dateStr = new Date(point.committed_at).toLocaleDateString('en-US', {
+                          month: 'long',
+                          day: 'numeric',
+                          year: 'numeric'
+                        });
+                        return (
+                          <div key={pIdx} className="relative group">
+                            {/* Bullet marker */}
+                            <span className={`absolute -left-[31px] top-1 h-4 w-4 rounded-full border-2 bg-background flex items-center justify-center transition-all ${
+                              point.status === 'Healthy'
+                                ? 'border-emerald-500 group-hover:bg-emerald-500'
+                                : point.status === 'Warning'
+                                ? 'border-yellow-500 group-hover:bg-yellow-500'
+                                : 'border-rose-500 group-hover:bg-rose-500'
+                            }`} />
+
+                            <div className="space-y-1.5">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div className="flex items-center gap-2">
+                                  {point.release_tag && (
+                                    <span className="px-2 py-0.5 text-[9px] font-black uppercase rounded bg-primary/10 text-primary border border-primary/20">
+                                      {point.release_tag}
+                                    </span>
+                                  )}
+                                  <span className="text-xs font-bold text-foreground truncate max-w-[250px]">{point.message}</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-xs text-muted-foreground font-semibold">{dateStr}</span>
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black font-mono border ${
+                                    point.compliance_score >= 90
+                                      ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                                      : point.compliance_score >= 70
+                                      ? 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20'
+                                      : 'bg-rose-500/10 text-rose-600 border-rose-500/20'
+                                  }`}>
+                                    {point.compliance_score}%
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-mono">
+                                <span>Commit:</span>
+                                <span className="bg-muted px-1.5 py-0.5 rounded font-bold truncate max-w-[120px]">{point.commit_sha.slice(0, 8)}</span>
+                                <span className="mx-1">•</span>
+                                <span>Violations:</span>
+                                <span className="font-bold text-foreground">{point.violations_count}</span>
+                              </div>
+
+                              {/* Introduced violations details */}
+                              {point.introduced_violations && point.introduced_violations.length > 0 && (
+                                <div className="mt-2 p-2.5 rounded-lg border border-border/60 bg-muted/5 space-y-1">
+                                  <span className="text-[8px] font-black text-rose-500 uppercase tracking-wider block">Drift Introduced:</span>
+                                  <ul className="list-disc pl-4 text-[10px] text-muted-foreground font-medium space-y-0.5">
+                                    {point.introduced_violations.map((vi: string, vidx: number) => (
+                                      <li key={vidx} className="leading-snug">{vi}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 {/* Governance Alert List */}
                 {driftReport.alerts.length > 0 && (
