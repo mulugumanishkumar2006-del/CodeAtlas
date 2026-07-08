@@ -20,6 +20,8 @@ import {
   ArrowRight,
   Sparkles,
   User,
+  Award,
+  AlertCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -78,6 +80,7 @@ export default function RepositoryMemoryPage() {
   const [entityContext, setEntityContext] = React.useState<any | null>(null);
   const [entityLineage, setEntityLineage] = React.useState<any[]>([]);
   const [entityLoading, setEntityLoading] = React.useState<boolean>(false);
+  const [expandedAdrId, setExpandedAdrId] = React.useState<string | null>(null);
 
   // Versioning state
   const [snapshots, setSnapshots] = React.useState<any[]>([]);

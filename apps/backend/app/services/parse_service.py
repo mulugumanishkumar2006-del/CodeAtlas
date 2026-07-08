@@ -228,10 +228,18 @@ class ParseService:
             # Track node IDs added in this parsing transaction to avoid duplicate inserts
             added_node_ids = set()
 
+            def scope_id(nid: str) -> str:
+                if repo_id in nid:
+                    return nid
+                for prefix in ("file::", "symbol::", "module::", "folder::", "layer::"):
+                    if nid.startswith(prefix):
+                        return f"{prefix}{repo_id}::{nid[len(prefix):]}"
+                return f"{repo_id}::{nid}"
+
             # Pre-populate top-level architectural layer module nodes
             layers = ["API", "Service", "Repository", "Database"]
             for layer in layers:
-                layer_id = f"layer::{layer}"
+                layer_id = f"layer::{repo_id}::{layer}"
                 if layer_id not in added_node_ids:
                     db_graph_node = GraphNode(
                         id=layer_id,
@@ -266,7 +274,7 @@ class ParseService:
                     folder_paths.add("/".join(accum))
 
             for folder in folder_paths:
-                folder_id = f"folder::{folder}"
+                folder_id = scope_id(f"folder::{folder}")
                 if folder_id not in added_node_ids:
                     folder_name = folder.split("/")[-1]
                     canonical_type = map_to_ontology_type(GraphNodeType.FOLDER.value, folder_name)
@@ -402,16 +410,17 @@ class ParseService:
                     node_type = GraphNodeType.VARIABLE
 
                 canonical_type = map_to_ontology_type(node_type.value, node.name)
-                if node.id not in added_node_ids:
+                scoped_id = scope_id(node.id)
+                if scoped_id not in added_node_ids:
                     db_graph_node = GraphNode(
-                        id=node.id,
+                        id=scoped_id,
                         repository_id=repo_id,
                         type=canonical_type,
                         name=node.name,
                         properties={**(node.metadata or {}), "raw_type": node_type.value}
                     )
                     db.add(db_graph_node)
-                    added_node_ids.add(node.id)
+                    added_node_ids.add(scoped_id)
 
             # 5. Extract Service to API exposes (EXPOSES) and Database read/writes (READS, WRITES)
             api_nodes = []
@@ -433,8 +442,8 @@ class ParseService:
                     db.add(GraphRelationship(
                         id=str(uuid.uuid4()),
                         repository_id=repo_id,
-                        source_id=s_node.id,
-                        target_id=a_node.id,
+                        source_id=scope_id(s_node.id),
+                        target_id=scope_id(a_node.id),
                         type=GraphRelationshipType.EXPOSES.value,
                         properties={"label": f"exposes API endpoint {a_node.name}"}
                     ))
@@ -442,16 +451,16 @@ class ParseService:
                     db.add(GraphRelationship(
                         id=str(uuid.uuid4()),
                         repository_id=repo_id,
-                        source_id=s_node.id,
-                        target_id=d_node.id,
+                        source_id=scope_id(s_node.id),
+                        target_id=scope_id(d_node.id),
                         type=GraphRelationshipType.READS.value,
                         properties={"label": f"reads from database table {d_node.name}"}
                     ))
                     db.add(GraphRelationship(
                         id=str(uuid.uuid4()),
                         repository_id=repo_id,
-                        source_id=s_node.id,
-                        target_id=d_node.id,
+                        source_id=scope_id(s_node.id),
+                        target_id=scope_id(d_node.id),
                         type=GraphRelationshipType.WRITES.value,
                         properties={"label": f"writes to database table {d_node.name}"}
                     ))
@@ -545,8 +554,8 @@ class ParseService:
                 db_graph_rel = GraphRelationship(
                     id=str(uuid.uuid4()),
                     repository_id=repo_id,
-                    source_id=edge.source_id,
-                    target_id=edge.target_id,
+                    source_id=scope_id(edge.source_id),
+                    target_id=scope_id(edge.target_id),
                     type=rel_type.value,
                     properties={"label": edge.label, "line": edge.line, "file_path": edge.file_path}
                 )
@@ -569,8 +578,8 @@ class ParseService:
                             db_layer_rel = GraphRelationship(
                                 id=str(uuid.uuid4()),
                                 repository_id=repo_id,
-                                source_id=f"layer::{layer_A}",
-                                target_id=f"layer::{layer_B}",
+                                source_id=f"layer::{repo_id}::{layer_A}",
+                                target_id=f"layer::{repo_id}::{layer_B}",
                                 type=GraphRelationshipType.DEPENDS_ON.value,
                                 properties={"label": f"{layer_A} communication with {layer_B}"}
                             )
@@ -600,7 +609,7 @@ class ParseService:
                 
                 # Write recognized nodes to PostgreSQL
                 for ext_node in extra_nodes:
-                    node_id = ext_node["id"]
+                    node_id = scope_id(ext_node["id"])
                     if node_id not in added_node_ids:
                         existing_node = db.query(GraphNode).filter(GraphNode.id == node_id, GraphNode.repository_id == repo_id).first()
                         if not existing_node:
@@ -617,8 +626,8 @@ class ParseService:
                 
                 # Write recognized relationships to PostgreSQL
                 for ext_rel in extra_relationships:
-                    src_id = ext_rel["source_id"]
-                    tgt_id = ext_rel["target_id"]
+                    src_id = scope_id(ext_rel["source_id"])
+                    tgt_id = scope_id(ext_rel["target_id"])
                     
                     source_exists = (src_id in added_node_ids) or (db.query(GraphNode).filter(GraphNode.id == src_id, GraphNode.repository_id == repo_id).first() is not None)
                     target_exists = (tgt_id in added_node_ids) or (db.query(GraphNode).filter(GraphNode.id == tgt_id, GraphNode.repository_id == repo_id).first() is not None)
@@ -659,17 +668,18 @@ class ParseService:
 
                     # 3. Create Folder Nodes
                     for folder in folder_paths:
-                        folder_id = f"folder::{folder}"
+                        folder_id = scope_id(f"folder::{folder}")
                         folder_name = folder.split("/")[-1]
                         session.run(
                             "MERGE (n:Folder {id: $id, repository_id: $repo_id}) "
                             "SET n.name = $name, n.type = 'Folder' "
                             "SET n += $props",
-                            id=folder_id, repo_id=repo_id, name=folder_name, props={"path": folder}
+                        id=folder_id, repo_id=repo_id, name=folder_name, props={"path": folder}
                         )
 
                     # 4. Create GraphNodes from ast extraction
                     for node_id, node in graph.nodes.items():
+                        scoped_id = scope_id(node.id)
                         # Map type to label
                         label = "File"
                         kind_lower = node.kind.lower()
@@ -718,7 +728,7 @@ class ParseService:
                             f"MERGE (n:{labels_str} {{id: $id, repository_id: $repo_id}}) "
                             "SET n.name = $name, n.type = $type "
                             "SET n += $props",
-                            id=node.id, repo_id=repo_id, name=node.name, type=node.kind, props=flat_props
+                            id=scoped_id, repo_id=repo_id, name=node.name, type=node.kind, props=flat_props
                         )
 
                     # 5. Create Relationships
@@ -735,9 +745,9 @@ class ParseService:
                             rel_type = "USES"
 
                         session.run(
-                            f"MATCH (a {{id: $src, repository_id: $repo_id}}), (b {{id: $tgt}}) "
+                            f"MATCH (a {{id: $src, repository_id: $repo_id}}), (b {{id: $tgt, repository_id: $repo_id}}) "
                             f"MERGE (a)-[r:{rel_type}]->(b)",
-                            src=edge.source_id, tgt=edge.target_id, repo_id=repo_id
+                            src=scope_id(edge.source_id), tgt=scope_id(edge.target_id), repo_id=repo_id
                         )
 
                     # 6. Parse external dependencies/libs (requirements.txt or package.json)
@@ -844,13 +854,13 @@ class ParseService:
                             f"MERGE (n:{lbl} {{id: $id, repository_id: $repo_id}}) "
                             "SET n.name = $name, n.type = $type "
                             "SET n += $props",
-                            id=ext_node["id"], repo_id=repo_id, name=ext_node["name"], type=ext_node["type"], props=flat_props
+                            id=scope_id(ext_node["id"]), repo_id=repo_id, name=ext_node["name"], type=ext_node["type"], props=flat_props
                         )
                     for ext_rel in extra_relationships:
                         session.run(
                             f"MATCH (a {{id: $src, repository_id: $repo_id}}), (b {{id: $tgt, repository_id: $repo_id}}) "
                             f"MERGE (a)-[r:{ext_rel['type']}]->(b)",
-                            src=ext_rel["source_id"], tgt=ext_rel["target_id"], repo_id=repo_id
+                            src=scope_id(ext_rel["source_id"]), tgt=scope_id(ext_rel["target_id"]), repo_id=repo_id
                         )
 
             except Exception as neo_err:

@@ -317,16 +317,6 @@ export function TimeMachine({ repoId, token }: TimeMachineProps) {
     
     const fetchComponents = async () => {
       try {
-        const res = await fetch(`/api/v1/repositories/${repoId}/evolution/components?path=`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        // Let's pass the active commit SHA or snapshot ID.
-        // In the backend evolution/components, if path is empty, we returned:
-        // `query = query.filter(ComponentSnapshot.path == path)`. If path is empty string, it matches path == "".
-        // Let's modify our backend to support querying all components for a specific commit_snapshot_id.
-        // Let's see: `GET /repositories/{repo_id}/evolution/components?commit_sha={sha}`
-        // Let's define that in the API router. Let's make sure that's supported. We can query by `commit_sha`.
-        // Let's look at the component fetching path:
         const sha = commit.commit_sha;
         const res = await fetch(`/api/v1/repositories/${repoId}/evolution/components?commit_sha=${sha}`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -1186,6 +1176,13 @@ export function TimeMachine({ repoId, token }: TimeMachineProps) {
                   >
                     {timeline.map((c) => (
                       <option key={c.commit_sha} value={c.commit_sha}>
+                        {c.commit_sha.slice(0, 8)} - {c.message?.slice(0, 20)}...
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-2">
                 <h3 className="font-extrabold text-lg flex items-center gap-2">
                   <Boxes className="text-blue-600 h-5 w-5 animate-pulse" />

@@ -402,11 +402,11 @@ class DatabaseConnection:
 
     # Assert API depends on Service (api/auth.py calls services/auth.py)
     depends_edges = [r for r in graph_data["relationships"] if r["type"] == "DEPENDS_ON"]
-    api_depends_service = [r for r in depends_edges if "layer::API" in r["source_id"] and "layer::Service" in r["target_id"]]
+    api_depends_service = [r for r in depends_edges if "layer::" in r["source_id"] and "API" in r["source_id"] and "layer::" in r["target_id"] and "Service" in r["target_id"]]
     assert len(api_depends_service) > 0
 
     # Assert Service depends on Database (services/auth.py calls db/connection.py)
-    service_depends_db = [r for r in depends_edges if "layer::Service" in r["source_id"] and "layer::Database" in r["target_id"]]
+    service_depends_db = [r for r in depends_edges if "layer::" in r["source_id"] and "Service" in r["source_id"] and "layer::" in r["target_id"] and "Database" in r["target_id"]]
     assert len(service_depends_db) > 0
 
 
@@ -471,7 +471,7 @@ def orphan_function():
     dep_data = res.json()
     # file_x.py depends on file_y
     dep_targets = {d["target"]["id"] for d in dep_data["dependencies"]}
-    assert "module::app.file_y" in dep_targets
+    assert f"module::{repo_id}::app.file_y" in dep_targets
 
     # Query 2: Callers of start_service
     res = client.get(f"/api/v1/repositories/{repo_id}/query/callers?symbol_name=start_service")
@@ -487,14 +487,14 @@ def orphan_function():
     assert res.status_code == 200
     imports_data = res.json()
     imports_targets = {e["target_id"] for e in imports_data["edges"]}
-    assert "module::app.file_y" in imports_targets
+    assert f"module::{repo_id}::app.file_y" in imports_targets
 
     # Query 4: Downstream Impact starting from file_x.py
     res = client.get(f"/api/v1/repositories/{repo_id}/query/downstream?node_id={file_x_node['id']}")
     assert res.status_code == 200
     downstream_data = res.json()
     downstream_nodes = {n["id"] for n in downstream_data["nodes"]}
-    assert "module::app.file_y" in downstream_nodes
+    assert f"module::{repo_id}::app.file_y" in downstream_nodes
 
     # Query 5: Find Orphan Modules
     res = client.get(f"/api/v1/repositories/{repo_id}/query/orphans")
