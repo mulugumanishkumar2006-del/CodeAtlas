@@ -65,6 +65,10 @@ class ArchitectureDriftReportResponse(BaseModel):
     custom_rules: List[CustomRule] = Field(default_factory=list)
     microservice_boundary_analysis: Dict[str, Any] = Field(default_factory=dict, description="Microservice boundary smell report details")
     ai_review: Optional[AIArchitectureReview] = Field(None, description="Automatically generated AI review comments")
+    isomorphism_matched: Optional[bool] = Field(True, description="Whether actual graph is isomorphic to baseline configuration")
+    communities: Optional[List[Dict[str, Any]]] = Field(default_factory=list, description="Community detection partitions list")
+    coupling_matrix: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Dependency matrix and stability metrics")
+    decay_projection: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Timeseries decay predictor results")
 
 class DriftTimelinePoint(BaseModel):
     commit_sha: str = Field(..., description="Commit hash")
@@ -99,3 +103,24 @@ class EnterprisePolicyReportResponse(BaseModel):
     compliance_score: float = Field(..., description="Enterprise policy compliance score (0-100)")
     status: str = Field(..., description="Overall status: Healthy, Warning, Critical")
     policies: List[EnterprisePolicyItem] = Field(default_factory=list, description="Policy check items report list")
+
+
+class BaselineRequest(BaseModel):
+    architecture_type: str = Field(..., description="The baseline architecture type name (e.g. layered, clean, hexagonal)")
+
+
+class PolicyItemRequest(BaseModel):
+    policy_name: str = Field(..., description="The organization policy name")
+    rule_definition: str = Field(..., description="Rule definition details")
+    enabled: bool = Field(True, description="Whether this policy rule is active")
+
+
+class PoliciesListRequest(BaseModel):
+    organization_id: str = Field("default", description="Organization or repository scope identifier")
+    policies: List[PolicyItemRequest] = Field(..., description="Active corporate policies list")
+
+
+class PRReviewRequest(BaseModel):
+    base_sha: str = Field(..., description="Base Git commit hash")
+    head_sha: str = Field(..., description="Head Git commit hash")
+

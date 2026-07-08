@@ -19,6 +19,10 @@ from app.services.drift_detection_service import DriftDetectionService
 from app.core.config import settings
 
 def test_architecture_drift():
+    # Ensure database tables are created for tests
+    from app.core.database import engine, Base
+    Base.metadata.create_all(bind=engine)
+
     # 1. Setup mock repository ID
     repo_id = "test_architecture_drift_repo"
     drift_service = DriftDetectionService()
@@ -350,7 +354,63 @@ def test_architecture_drift():
     policy_report = policy_res.json()
     assert policy_report["compliance_score"] > 0.0
     assert len(policy_report["policies"]) == 5
-    assert any(p["id"] == "policy_tests" and p["status"] == "passed" for p in policy_report["policies"])
+
+    # 9. Test SQL-backed endpoints
+    from app.models.architecture import ArchitectureBaseline, ArchitectureViolation, GovernancePolicy, ComplianceHistory
+
+    # POST /api/v1/repositories/{repo_id}/architecture/baseline
+    baseline_res = client.post(
+        f"/api/v1/repositories/{repo_id}/architecture/baseline",
+        json={"architecture_type": "hexagonal"}
+    )
+    assert baseline_res.status_code == 200
+    assert baseline_res.json()["status"] == "success"
+
+    # POST /api/v1/repositories/{repo_id}/architecture/analyze
+    analyze_res = client.post(f"/api/v1/repositories/{repo_id}/architecture/analyze")
+    assert analyze_res.status_code == 200
+    assert "isomorphism_matched" in analyze_res.json()
+    assert "communities" in analyze_res.json()
+    assert "coupling_matrix" in analyze_res.json()
+
+    # GET /api/v1/repositories/{repo_id}/architecture/compliance
+    compliance_res = client.get(f"/api/v1/repositories/{repo_id}/architecture/compliance")
+    assert compliance_res.status_code == 200
+    assert "compliance_score" in compliance_res.json()
+    assert "total_violations" in compliance_res.json()
+
+    # GET /api/v1/repositories/{repo_id}/architecture/violations
+    violations_res = client.get(f"/api/v1/repositories/{repo_id}/architecture/violations")
+    assert violations_res.status_code == 200
+    assert isinstance(violations_res.json(), list)
+
+    # GET /api/v1/repositories/{repo_id}/architecture/governance
+    gov_res = client.get(f"/api/v1/repositories/{repo_id}/architecture/governance")
+    assert gov_res.status_code == 200
+    assert gov_res.json()["compliance_score"] > 0.0
+
+    # POST /api/v1/repositories/{repo_id}/architecture/policies
+    policies_res = client.post(
+        f"/api/v1/repositories/{repo_id}/architecture/policies",
+        json={
+            "organization_id": "default",
+            "policies": [
+                {"policy_name": "Test Policy", "rule_definition": "no_cycles", "enabled": False}
+            ]
+        }
+    )
+    assert policies_res.status_code == 200
+
+    # POST /api/v1/repositories/{repo_id}/pull-request/review
+    pr_post_res = client.post(
+        f"/api/v1/repositories/{repo_id}/pull-request/review",
+        json={
+            "base_sha": "8b353f06d7efc40552b0f443b71bf12d484192b0",
+            "head_sha": "7a3b4e2f3d6c1b5a2e9f0d8c7b6a5f4e3d2c1b0a"
+        }
+    )
+    assert pr_post_res.status_code == 200
+    assert "drift_impact" in pr_post_res.json()
 
     print("All Architectural Drift backend tests passed successfully!")
 
@@ -359,6 +419,11 @@ def test_architecture_drift():
     try:
         db_cleanup.query(GraphRelationship).filter(GraphRelationship.repository_id == repo_id).delete()
         db_cleanup.query(GraphNode).filter(GraphNode.repository_id == repo_id).delete()
+        db_cleanup.query(ArchitectureBaseline).filter(ArchitectureBaseline.repo_id == repo_id).delete()
+        db_cleanup.query(ArchitectureViolation).filter(ArchitectureViolation.repo_id == repo_id).delete()
+        db_cleanup.query(ComplianceHistory).filter(ComplianceHistory.repo_id == repo_id).delete()
+        db_cleanup.query(GovernancePolicy).delete()
+        
         repo_rec = db_cleanup.query(Repository).filter(Repository.id == repo_id).first()
         if repo_rec:
             db_cleanup.delete(repo_rec)

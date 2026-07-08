@@ -15,4 +15,6 @@ from app.models.graph_relationship import GraphRelationship
 from app.models.memory_models import RepositoryMemory, ArchitectureDecision, MemorySnapshot
 from app.models.evolution import CommitSnapshot, ComponentSnapshot
 from app.models.tech_debt import TechnicalDebtReport, HealthScore, RiskForecast
+from app.models.architecture import ArchitectureBaseline, ArchitectureViolation, GovernancePolicy, ComplianceHistory
+
 

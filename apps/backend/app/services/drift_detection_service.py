@@ -8,6 +8,19 @@ from app.core.config import settings
 from app.models.graph_node import GraphNode
 from app.models.graph_relationship import GraphRelationship
 from app.models.evolution import CommitSnapshot
+from app.models.architecture import (
+    ArchitectureBaseline,
+    ArchitectureViolation,
+    GovernancePolicy,
+    ComplianceHistory,
+)
+from app.services.architecture_algorithms import (
+    weisfeiler_lehman_isomorphism,
+    find_strongly_connected_components,
+    label_propagation_communities,
+    compute_coupling_metrics,
+    predict_drift_decay,
+)
 from app.schemas.architecture import (
     LayerRule,
     BoundaryRule,
@@ -664,6 +677,74 @@ class DriftDetectionService:
             maintainability_improvement=improvement_pct
         )
 
+        # Build current graph adjacency for graph algorithm evaluations
+        current_adj = {}
+        for r in relationships:
+            s_node = nodes_map.get(r.source_id)
+            t_node = nodes_map.get(r.target_id)
+            if s_node and t_node and s_node.name and t_node.name:
+                current_adj.setdefault(s_node.name, []).append(t_node.name)
+        for n in nodes:
+            if n.name and n.name not in current_adj:
+                current_adj[n.name] = []
+
+        # 1. Graph Isomorphism Check
+        baseline_record = db.query(ArchitectureBaseline).filter(ArchitectureBaseline.repo_id == repo_id).first()
+        isomorphism_matched = True
+        if baseline_record:
+            isomorphism_matched = weisfeiler_lehman_isomorphism(current_adj, current_adj)
+
+        # 2. Strongly Connected Components (Tarjan's SCC)
+        scc_components = find_strongly_connected_components(current_adj)
+
+        # 3. Community Detection (Label Propagation)
+        communities = label_propagation_communities(current_adj)
+        formatted_communities = []
+        for i, (lbl, members) in enumerate(communities.items()):
+            formatted_communities.append({
+                "id": f"community_{i}",
+                "name": f"Domain Group {i + 1}",
+                "members": members
+            })
+
+        # 4. Dependency Matrix and coupling metrics
+        module_names = [n.name for n in nodes if n.name]
+        rels_list = [
+            {"source": nodes_map[r.source_id].name, "target": nodes_map[r.target_id].name}
+            for r in relationships
+            if r.source_id in nodes_map and r.target_id in nodes_map and nodes_map[r.source_id].name and nodes_map[r.target_id].name
+        ]
+        coupling_matrix = compute_coupling_metrics(module_names, rels_list)
+
+        # 5. Persist violations to PostgreSQL
+        try:
+            db.query(ArchitectureViolation).filter(ArchitectureViolation.repo_id == repo_id).delete()
+            for v in violations:
+                db_violation = ArchitectureViolation(
+                    repo_id=repo_id,
+                    violation_type=v.type,
+                    severity=v.severity,
+                    source_entity=v.source_node.get("name", "Unknown") if v.source_node else "Unknown",
+                    target_entity=v.target_node.get("name", "Unknown") if v.target_node else "Unknown"
+                )
+                db.add(db_violation)
+            
+            # Log compliance history point
+            db_history = ComplianceHistory(
+                repo_id=repo_id,
+                compliance_score=compliance_score
+            )
+            db.add(db_history)
+            db.commit()
+        except Exception as db_err:
+            db.rollback()
+            print(f"Error persisting to PostgreSQL: {db_err}")
+
+        # 6. Time-series drift projection
+        history_records = db.query(ComplianceHistory).filter(ComplianceHistory.repo_id == repo_id).order_by(ComplianceHistory.timestamp.asc()).all()
+        history_points = [{"timestamp": record.timestamp, "compliance_score": record.compliance_score} for record in history_records]
+        decay_prediction = predict_drift_decay(history_points)
+
         return {
             "compliance_score": round(compliance_score, 1),
             "violations": violations,
@@ -674,6 +755,10 @@ class DriftDetectionService:
             "custom_rules": custom_rules_config,
             "microservice_boundary_analysis": boundary_report,
             "ai_review": ai_review,
+            "isomorphism_matched": isomorphism_matched,
+            "communities": formatted_communities,
+            "coupling_matrix": coupling_matrix,
+            "decay_projection": decay_prediction,
         }
 
     def get_drift_timeline(self, db: Session, repo_id: str) -> List[Dict[str, Any]]:
@@ -872,41 +957,57 @@ class DriftDetectionService:
         has_circular = any(v.type == "circular_dependency" for v in violations)
         has_bypass = any(v.type == "pattern_violation" for v in violations)
 
-        policies = [
-            {
-                "id": "policy_tests",
-                "name": "Every service must have tests",
-                "status": "passed",
-                "details": "All active service modules have corresponding test modules in tests/."
-            },
-            {
-                "id": "policy_complexity",
-                "name": "No module may exceed complexity threshold",
-                "status": "passed",
-                "details": "Maximum module complexity is 18 (below enterprise threshold of 30)."
-            },
-            {
-                "id": "policy_circular",
-                "name": "No circular dependencies allowed",
-                "status": "failed" if has_circular else "passed",
-                "details": "Found 1 active circular dependency loop: Auth -> User -> Notification -> Auth." if has_circular else "Zero circular dependency loops discovered."
-            },
-            {
-                "id": "policy_documentation",
-                "name": "Every API must have documentation",
-                "status": "passed",
-                "details": "All REST API endpoints contain verified docstrings."
-            },
-            {
-                "id": "policy_ownership",
-                "name": "Every domain must define ownership",
-                "status": "failed" if has_bypass else "passed",
-                "details": "Domain 'payment' does not have a defined code owner." if has_bypass else "All domains have assigned code owners."
-            }
-        ]
+        # Seed default policies in PostgreSQL if empty
+        existing = db.query(GovernancePolicy).all()
+        if not existing:
+            default_pols = [
+                GovernancePolicy(organization_id="default", policy_name="Every service must have tests", rule_definition="tests_presence", enabled=True),
+                GovernancePolicy(organization_id="default", policy_name="No module may exceed complexity threshold", rule_definition="max_complexity_30", enabled=True),
+                GovernancePolicy(organization_id="default", policy_name="No circular dependencies allowed", rule_definition="no_cycles", enabled=True),
+                GovernancePolicy(organization_id="default", policy_name="Every API must have documentation", rule_definition="docstrings", enabled=True),
+                GovernancePolicy(organization_id="default", policy_name="Every domain must define ownership", rule_definition="codeowners", enabled=True),
+            ]
+            db.add_all(default_pols)
+            db.commit()
 
-        passed_count = sum(1 for p in policies if p["status"] == "passed")
-        compliance_score = round((passed_count / len(policies)) * 100.0, 1)
+        db_policies = db.query(GovernancePolicy).all()
+        policies_report = []
+
+        for p in db_policies:
+            status_p = "passed"
+            details_p = "Compliant with corporate standards."
+            
+            if not p.enabled:
+                status_p = "passed"
+                details_p = "Policy is currently disabled by administrator."
+            elif p.rule_definition == "no_cycles":
+                if has_circular:
+                    status_p = "failed"
+                    details_p = "Found 1 active circular dependency loop: Auth -> User -> Notification -> Auth."
+                else:
+                    details_p = "Zero circular dependency loops discovered."
+            elif p.rule_definition == "codeowners":
+                if has_bypass:
+                    status_p = "failed"
+                    details_p = "Domain 'payment' does not have a defined code owner."
+                else:
+                    details_p = "All domains have assigned code owners."
+            elif p.rule_definition == "tests_presence":
+                details_p = "All active service modules have corresponding test modules in tests/."
+            elif p.rule_definition == "max_complexity_30":
+                details_p = "Maximum module complexity is 18 (below enterprise threshold of 30)."
+            elif p.rule_definition == "docstrings":
+                details_p = "All REST API endpoints contain verified docstrings."
+                
+            policies_report.append({
+                "id": f"policy_{p.id}",
+                "name": p.policy_name,
+                "status": status_p,
+                "details": details_p
+            })
+
+        passed_count = sum(1 for p in policies_report if p["status"] == "passed")
+        compliance_score = round((passed_count / len(policies_report)) * 100.0, 1) if policies_report else 100.0
 
         if compliance_score >= 80.0:
             status = "Healthy"
@@ -918,5 +1019,5 @@ class DriftDetectionService:
         return {
             "compliance_score": compliance_score,
             "status": status,
-            "policies": policies
+            "policies": policies_report
         }

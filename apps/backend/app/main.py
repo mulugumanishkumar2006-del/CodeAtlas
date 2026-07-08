@@ -22,6 +22,9 @@ app = FastAPI(
 @app.on_event("startup")
 def startup_event():
     neo4j_client.connect()
+    # Create database tables dynamically if not present
+    from app.core.database import engine, Base
+    Base.metadata.create_all(bind=engine)
 
 
 @app.on_event("shutdown")

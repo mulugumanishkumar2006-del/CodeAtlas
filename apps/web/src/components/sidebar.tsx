@@ -10,11 +10,11 @@ const navigation = [
   { name: 'Overview', href: '/', icon: LayoutDashboard },
   { name: 'Architecture', href: '/architecture', icon: Layers },
   { name: 'Knowledge', href: '/knowledge', icon: BookOpen },
-  { name: 'Repository Memory', href: '/memory', icon: Brain },
   { name: 'Time Machine', href: '/time-machine', icon: Clock },
-  { name: '⭐ Technical Debt', href: '/tech-debt', icon: Flame },
-  { name: 'Repository Health', href: '/health', icon: HeartPulse },
-  { name: 'Insights', href: '/analytics', icon: BarChart3 },
+  { name: 'Technical Debt', href: '/tech-debt', icon: Flame },
+  { name: '⭐ Architecture Governance', href: '/architecture?tab=governance', icon: ShieldAlert },
+  { name: '  • Compliance', href: '/architecture?tab=compliance', icon: ShieldAlert },
+  { name: '  • Policies', href: '/architecture?tab=policies', icon: Settings },
 ];
 
 interface SidebarProps {

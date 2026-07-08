@@ -4,6 +4,7 @@ import * as React from 'react';
 import { useAuth } from '@/context/auth-context';
 import { ArchitectureVisualizer } from '@/components/architecture-visualizer';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 import {
   Layers,
@@ -78,9 +79,26 @@ export default function ArchitectureExplorerPage() {
   const [prHeadSha, setPrHeadSha] = React.useState<string>('7a3b4e2f3d6c1b5a2e9f0d8c7b6a5f4e3d2c1b0a');
   const [prReview, setPrReview] = React.useState<any | null>(null);
   const [prReviewLoading, setPrReviewLoading] = React.useState<boolean>(false);
+  const [baselineType, setBaselineType] = React.useState<string>('layered');
+  const [savingBaseline, setSavingBaseline] = React.useState<boolean>(false);
+  const [updatingPolicies, setUpdatingPolicies] = React.useState<boolean>(false);
   
   // Custom form edit states
   const [activeRuleTab, setActiveRuleTab] = React.useState<'layers' | 'boundaries' | 'patterns' | 'custom_rules'>('layers');
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get('tab');
+      if (tab === 'governance' || tab === 'compliance') {
+        setActiveTab('compliance');
+        setComplianceSubTab('overview');
+      } else if (tab === 'policies') {
+        setActiveTab('compliance');
+        setComplianceSubTab('enterprise_policies');
+      }
+    }
+  }, []);
 
   const fetchDriftReport = React.useCallback(async (repoId: string) => {
     if (!token || !repoId) return;
@@ -151,6 +169,72 @@ export default function ArchitectureExplorerPage() {
       console.error("Failed to analyze PR architecture", err);
     } finally {
       setPrReviewLoading(false);
+    }
+  };
+
+  const saveBaseline = async (type: string) => {
+    if (!token || !selectedRepoId) return;
+    setSavingBaseline(true);
+    try {
+      const res = await fetch(`/api/v1/repositories/${selectedRepoId}/architecture/baseline`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ architecture_type: type })
+      });
+      if (res.ok) {
+        alert(`Baseline successfully set to ${type}!`);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSavingBaseline(false);
+    }
+  };
+
+  const togglePolicy = async (policyId: string, enabled: boolean) => {
+    if (!token || !selectedRepoId || !policyReport) return;
+    setUpdatingPolicies(true);
+    
+    const ruleMapping: Record<string, string> = {
+      "Every service must have tests": "tests_presence",
+      "No module may exceed complexity threshold": "max_complexity_30",
+      "No circular dependencies allowed": "no_cycles",
+      "Every API must have documentation": "docstrings",
+      "Every domain must define ownership": "codeowners"
+    };
+
+    const updatedPolicies = policyReport.policies.map((p: any) => {
+      const isTarget = p.id === policyId;
+      return {
+        policy_name: p.name,
+        rule_definition: ruleMapping[p.name] || "custom",
+        enabled: isTarget ? enabled : (!p.details.includes("disabled"))
+      };
+    });
+
+    try {
+      const res = await fetch(`/api/v1/repositories/${selectedRepoId}/architecture/policies`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          organization_id: "default",
+          policies: updatedPolicies
+        })
+      });
+      if (res.ok) {
+        fetchPolicyReport(selectedRepoId);
+        fetchDriftReport(selectedRepoId);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setUpdatingPolicies(false);
     }
   };
 
@@ -1115,6 +1199,50 @@ export default function ArchitectureExplorerPage() {
                   </div>
                 )}
 
+                {/* Component Instability Heatmap */}
+                {driftReport.coupling_matrix && (
+                  <div className="border rounded-2xl bg-card shadow-sm p-6 space-y-4">
+                    <div className="border-b pb-2 flex items-center justify-between">
+                      <div>
+                        <h3 className="font-bold text-sm uppercase tracking-wider flex items-center gap-2 text-foreground">
+                          <Layers className="h-4 w-4 text-violet-500" />
+                          Component Instability Heatmap
+                        </h3>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          Visualizes module Instability. Higher score indicates coupling hotspots.
+                        </p>
+                      </div>
+                      <div className="flex gap-2 text-[8px] font-black uppercase">
+                        <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">Stable (&lt;0.4)</span>
+                        <span className="px-1.5 py-0.5 rounded bg-yellow-500/10 text-yellow-600 border border-yellow-500/20">Medium</span>
+                        <span className="px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-600 border border-rose-500/20">Unstable (&gt;0.7)</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                      {Object.entries(driftReport.coupling_matrix).map(([mod, metrics]: [string, any]) => {
+                        const score = Math.round(metrics.instability * 100);
+                        const colorClass = metrics.instability > 0.7 
+                          ? 'bg-rose-500/5 text-rose-600 border-rose-500/20' 
+                          : metrics.instability > 0.4
+                          ? 'bg-yellow-500/5 text-yellow-600 border-yellow-500/20'
+                          : 'bg-emerald-500/5 text-emerald-600 border-emerald-500/20';
+                        return (
+                          <div key={mod} className={`p-3.5 border rounded-xl space-y-2 flex flex-col justify-between hover:scale-[1.02] transition-transform ${colorClass}`}>
+                            <span className="text-[10px] font-black font-mono truncate block" title={mod}>
+                              {mod.split('/').pop()?.split('.').shift()}
+                            </span>
+                            <div className="flex justify-between items-baseline text-[9px] font-mono font-bold">
+                              <span>Instability:</span>
+                              <span className="text-xs font-black">{score}%</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {/* Drift Timeline Panel */}
                 {timeline && timeline.length > 0 && (
                   <div className="border rounded-2xl bg-card shadow-sm overflow-hidden p-6 space-y-6">
@@ -1499,6 +1627,42 @@ export default function ArchitectureExplorerPage() {
 
               {/* Right Column: Rules Management panel */}
               <div className="xl:col-span-4 space-y-6">
+                {/* Architecture Rules: Baseline Configuration */}
+                <div className="border rounded-2xl bg-card shadow-sm p-5 space-y-4">
+                  <div className="border-b pb-2">
+                    <h3 className="font-bold text-sm flex items-center gap-2">
+                      <Settings className="h-4 w-4 text-primary" />
+                      Architecture Baseline
+                    </h3>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      Define the target architecture baseline format for this repository snapshots.
+                    </p>
+                  </div>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-[9px] font-bold text-muted-foreground uppercase block mb-1">Baseline Type</label>
+                      <select
+                        value={baselineType}
+                        onChange={(e) => setBaselineType(e.target.value)}
+                        className="w-full bg-background border rounded-lg px-2.5 py-1.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-primary shadow-sm"
+                      >
+                        <option value="layered">Layered (API / Service / Repository)</option>
+                        <option value="clean">Clean Architecture (Domain / Use Cases / Gateways / Infrastructure)</option>
+                        <option value="hexagonal">Hexagonal (Ports & Adapters)</option>
+                        <option value="microservices">Microservices Boundaries Only</option>
+                      </select>
+                    </div>
+                    <Button
+                      size="sm"
+                      className="w-full text-[10px] font-bold uppercase tracking-wider"
+                      disabled={savingBaseline}
+                      onClick={() => saveBaseline(baselineType)}
+                    >
+                      {savingBaseline ? 'Saving...' : 'Set Active Baseline'}
+                    </Button>
+                  </div>
+                </div>
+
                 <div className="border rounded-2xl bg-card shadow-sm overflow-hidden">
                   <div className="p-4 border-b bg-muted/20">
                     <h3 className="font-bold text-sm flex items-center gap-2">
@@ -2170,9 +2334,21 @@ export default function ArchitectureExplorerPage() {
                         </span>
                         
                         {/* Policy toggle state */}
-                        <div className="w-9 h-5 bg-primary/20 dark:bg-primary/10 rounded-full p-0.5 cursor-pointer flex items-center justify-end">
-                          <div className="w-4 h-4 bg-primary rounded-full shadow-sm" />
-                        </div>
+                        <button 
+                          onClick={() => {
+                            const currentEnabled = !p.details.toLowerCase().includes("disabled");
+                            togglePolicy(p.id, !currentEnabled);
+                          }}
+                          disabled={updatingPolicies}
+                          className={cn(
+                            "w-10 h-6 rounded-full p-0.5 cursor-pointer flex items-center transition-all focus:outline-none focus:ring-1 focus:ring-primary",
+                            !p.details.toLowerCase().includes("disabled")
+                              ? "bg-primary justify-end"
+                              : "bg-muted border border-border justify-start"
+                          )}
+                        >
+                          <div className="w-4.5 h-4.5 bg-background rounded-full shadow-sm" />
+                        </button>
                       </div>
                     </div>
                   ))}
