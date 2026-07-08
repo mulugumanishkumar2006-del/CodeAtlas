@@ -10,8 +10,6 @@ from app.repositories.job import job_repository
 from app.repositories.repository import repository_repository
 
 # Import new evolution tasks to register with Celery
-from app.workers.evolution_task import analyze_repository_timeline_task
-
 
 
 @celery_app.task(name="app.workers.tasks.clone_repository_task")

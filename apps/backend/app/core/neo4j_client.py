@@ -1,5 +1,7 @@
 import os
-from neo4j import GraphDatabase, Driver
+
+from neo4j import Driver, GraphDatabase
+
 
 class Neo4jClient:
     def __init__(self):
@@ -11,7 +13,9 @@ class Neo4jClient:
 
     def connect(self):
         try:
-            self.driver = GraphDatabase.driver(self.url, auth=(self.user, self.password))
+            self.driver = GraphDatabase.driver(
+                self.url, auth=(self.user, self.password)
+            )
             # Test connectivity
             self.driver.verify_connectivity()
             print(f"Connected to Neo4j database at {self.url} successfully!")
@@ -27,5 +31,6 @@ class Neo4jClient:
         if not self.driver:
             self.connect()
         return self.driver.session() if self.driver else None
+
 
 neo4j_client = Neo4jClient()

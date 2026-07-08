@@ -1,26 +1,28 @@
-from fastapi import APIRouter, Depends, status, HTTPException
-from sqlalchemy.orm import Session
-from typing import List, Dict, Any
 import datetime
+from typing import List
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
 
 from app.api.v1.auth import get_current_user
 from app.core.database import get_db
-from app.models.user import User
-from app.models.repository import Repository
 from app.models.file import File
-from app.models.tech_debt import TechnicalDebtReport, HealthScore, RiskForecast
+from app.models.repository import Repository
+from app.models.tech_debt import HealthScore, RiskForecast, TechnicalDebtReport
+from app.models.user import User
 from app.schemas.tech_debt import (
-    TechDebtReportResponse,
+    ForecastSnapshotResponse,
     HeatmapNodeResponse,
     HotspotDetectionResponse,
     RefactoringRecommendationResponse,
+    RepositoryRiskScorecard,
+    TechDebtReportResponse,
     TimelineSnapshotResponse,
-    ForecastSnapshotResponse,
-    RepositoryRiskScorecard
 )
 from app.services.tech_debt_service import TechDebtService
 
 router = APIRouter()
+
 
 def validate_repository_access(repo_id: str, db: Session, user: User) -> Repository:
     repo = db.query(Repository).filter(Repository.id == repo_id).first()
@@ -37,6 +39,7 @@ def validate_repository_access(repo_id: str, db: Session, user: User) -> Reposit
         )
     return repo
 
+
 @router.post(
     "/repositories/{repo_id}/technical-debt/analyze",
     response_model=TechDebtReportResponse,
@@ -45,21 +48,29 @@ def analyze_repository_tech_debt(
     repo_id: str,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
-    service: TechDebtService = Depends(lambda: TechDebtService())
+    service: TechDebtService = Depends(lambda: TechDebtService()),
 ):
     validate_repository_access(repo_id, db, user)
     try:
         report = service.calculate_repository_tech_debt(db=db, repo_id=repo_id)
-        
+
         # Save analysis data to PostgreSQL tables
         db_report = TechnicalDebtReport(
             repo_id=repo_id,
             module="root",
             debt_score=report["summary"]["average_debt_score"],
-            risk_level="CRITICAL" if report["summary"]["average_debt_score"] > 80 else "HIGH" if report["summary"]["average_debt_score"] > 60 else "WARNING"
+            risk_level=(
+                "CRITICAL"
+                if report["summary"]["average_debt_score"] > 80
+                else (
+                    "HIGH"
+                    if report["summary"]["average_debt_score"] > 60
+                    else "WARNING"
+                )
+            ),
         )
         db.add(db_report)
-        
+
         db_health = HealthScore(
             repo_id=repo_id,
             architecture=report["scorecard"]["architecture"],
@@ -67,10 +78,10 @@ def analyze_repository_tech_debt(
             testing=report["scorecard"]["testing"],
             documentation=report["scorecard"]["documentation"],
             performance=report["scorecard"]["performance"],
-            overall=report["scorecard"]["overall_health"]
+            overall=report["scorecard"]["overall_health"],
         )
         db.add(db_health)
-        
+
         # Clear old forecasts and write new ones
         db.query(RiskForecast).filter(RiskForecast.repo_id == repo_id).delete()
         for snap in report["forecast"]:
@@ -81,25 +92,29 @@ def analyze_repository_tech_debt(
                 days = 90
             elif "180" in snap["label"]:
                 days = 180
-            pred_date = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=days)
+            pred_date = datetime.datetime.now(
+                datetime.timezone.utc
+            ) + datetime.timedelta(days=days)
             db_forecast = RiskForecast(
                 repo_id=repo_id,
                 prediction_date=pred_date,
                 predicted_debt=snap["score"],
-                confidence=0.9 if days > 0 else 1.0
+                confidence=0.9 if days > 0 else 1.0,
             )
             db.add(db_forecast)
-            
+
         db.commit()
         return report
     except Exception as e:
         db.rollback()
         import traceback
+
         traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Analysis calculation failed: {str(e)}"
+            detail=f"Analysis calculation failed: {str(e)}",
         )
+
 
 @router.get(
     "/repositories/{repo_id}/technical-debt",
@@ -109,16 +124,16 @@ def get_repository_tech_debt(
     repo_id: str,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
-    service: TechDebtService = Depends(lambda: TechDebtService())
+    service: TechDebtService = Depends(lambda: TechDebtService()),
 ):
     validate_repository_access(repo_id, db, user)
     try:
         return service.calculate_repository_tech_debt(db=db, repo_id=repo_id)
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
         )
+
 
 @router.get(
     "/repositories/{repo_id}/tech-debt",
@@ -128,9 +143,10 @@ def get_repository_tech_debt_alias(
     repo_id: str,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
-    service: TechDebtService = Depends(lambda: TechDebtService())
+    service: TechDebtService = Depends(lambda: TechDebtService()),
 ):
     return get_repository_tech_debt(repo_id, db, user, service)
+
 
 @router.get(
     "/repositories/{repo_id}/technical-debt/heatmap",
@@ -140,7 +156,7 @@ def get_repository_heatmap(
     repo_id: str,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
-    service: TechDebtService = Depends(lambda: TechDebtService())
+    service: TechDebtService = Depends(lambda: TechDebtService()),
 ):
     validate_repository_access(repo_id, db, user)
     try:
@@ -148,9 +164,9 @@ def get_repository_heatmap(
         return report["heatmap"]
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
         )
+
 
 @router.get(
     "/repositories/{repo_id}/technical-debt/hotspots",
@@ -160,7 +176,7 @@ def get_repository_hotspots(
     repo_id: str,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
-    service: TechDebtService = Depends(lambda: TechDebtService())
+    service: TechDebtService = Depends(lambda: TechDebtService()),
 ):
     validate_repository_access(repo_id, db, user)
     try:
@@ -168,9 +184,9 @@ def get_repository_hotspots(
         return report["hotspots"]
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
         )
+
 
 @router.get(
     "/repositories/{repo_id}/technical-debt/recommendations",
@@ -180,7 +196,7 @@ def get_repository_recommendations(
     repo_id: str,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
-    service: TechDebtService = Depends(lambda: TechDebtService())
+    service: TechDebtService = Depends(lambda: TechDebtService()),
 ):
     validate_repository_access(repo_id, db, user)
     try:
@@ -188,9 +204,9 @@ def get_repository_recommendations(
         return report["recommendations"]
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
         )
+
 
 @router.get(
     "/repositories/{repo_id}/technical-debt/history",
@@ -200,7 +216,7 @@ def get_repository_history(
     repo_id: str,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
-    service: TechDebtService = Depends(lambda: TechDebtService())
+    service: TechDebtService = Depends(lambda: TechDebtService()),
 ):
     validate_repository_access(repo_id, db, user)
     try:
@@ -208,9 +224,9 @@ def get_repository_history(
         return report["timeline"]
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
         )
+
 
 @router.get(
     "/repositories/{repo_id}/technical-debt/forecast",
@@ -220,7 +236,7 @@ def get_repository_forecast(
     repo_id: str,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
-    service: TechDebtService = Depends(lambda: TechDebtService())
+    service: TechDebtService = Depends(lambda: TechDebtService()),
 ):
     validate_repository_access(repo_id, db, user)
     try:
@@ -228,9 +244,9 @@ def get_repository_forecast(
         return report["forecast"]
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
         )
+
 
 @router.get(
     "/repositories/{repo_id}/health",
@@ -240,7 +256,7 @@ def get_repository_health(
     repo_id: str,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
-    service: TechDebtService = Depends(lambda: TechDebtService())
+    service: TechDebtService = Depends(lambda: TechDebtService()),
 ):
     validate_repository_access(repo_id, db, user)
     try:
@@ -248,6 +264,5 @@ def get_repository_health(
         return report["scorecard"]
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
         )

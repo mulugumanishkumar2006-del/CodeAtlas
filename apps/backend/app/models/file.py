@@ -20,6 +20,12 @@ class File(Base):
     total_lines = Column(Integer, nullable=False)
 
     repository = relationship("Repository", back_populates="files")
-    symbols = relationship("Symbol", back_populates="file", cascade="all, delete-orphan")
-    imports = relationship("Import", back_populates="file", cascade="all, delete-orphan")
-    metrics = relationship("Metric", back_populates="file", uselist=False, cascade="all, delete-orphan")
+    symbols = relationship(
+        "Symbol", back_populates="file", cascade="all, delete-orphan"
+    )
+    imports = relationship(
+        "Import", back_populates="file", cascade="all, delete-orphan"
+    )
+    metrics = relationship(
+        "Metric", back_populates="file", uselist=False, cascade="all, delete-orphan"
+    )

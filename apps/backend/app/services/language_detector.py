@@ -72,7 +72,9 @@ class LanguageDetector:
     # Public API
     # ------------------------------------------------------------------
 
-    def detect(self, file_path: str, extension: Optional[str] = None) -> LanguageDetection:
+    def detect(
+        self, file_path: str, extension: Optional[str] = None
+    ) -> LanguageDetection:
         """
         Detect the language of the file at *file_path*.
 

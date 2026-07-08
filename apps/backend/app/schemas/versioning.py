@@ -1,5 +1,7 @@
+from typing import Dict, List
+
 from pydantic import BaseModel
-from typing import List, Dict
+
 
 class MemorySnapshotResponse(BaseModel):
     id: str
@@ -7,10 +9,12 @@ class MemorySnapshotResponse(BaseModel):
     timestamp: str
     statistics: Dict[str, int]
 
+
 class DeltaValue(BaseModel):
     base: int
     head: int
     delta: int
+
 
 class MemoryComparisonResponse(BaseModel):
     base_snapshot_id: str

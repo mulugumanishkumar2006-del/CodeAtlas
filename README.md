@@ -52,30 +52,30 @@ codeatlas/
 
 1. Change directory to `apps/backend/`.
 2. Create and activate a python virtual environment:
-   ```bash
-   python -m venv .venv
-   .venv\Scripts\activate  # Windows
-   source .venv/bin/activate  # macOS/Linux
-   ```
+      ```bash
+      python -m venv .venv
+      .venv\Scripts\activate  # Windows
+      source .venv/bin/activate  # macOS/Linux
+      ```
 3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+      ```bash
+      pip install -r requirements.txt
+      ```
 4. Start FastAPI server:
-   ```bash
-   uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
-   ```
+      ```bash
+      uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+      ```
 
 ### 3. Frontend Setup
 
 1. Install JS/TS dependencies from root:
-   ```bash
-   pnpm install
-   ```
+      ```bash
+      pnpm install
+      ```
 2. Start Next.js development server:
-   ```bash
-   pnpm --filter web run dev
-   ```
+      ```bash
+      pnpm --filter web run dev
+      ```
 
 ---
 

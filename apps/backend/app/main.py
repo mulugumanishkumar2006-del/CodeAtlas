@@ -2,14 +2,22 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # pyrefly: ignore [missing-import]
-from app.api.v1 import auth, health, repositories, graph, evolution, tech_debt, architecture_drift
-from app.models import base_models
+from app.api.v1 import (
+    architecture_drift,
+    auth,
+    evolution,
+    graph,
+    health,
+    repositories,
+    tech_debt,
+)
+
 # pyrefly: ignore [missing-import]
 from app.core.config import settings
+
 # pyrefly: ignore [missing-import]
 from app.core.logging import setup_logging
 from app.core.neo4j_client import neo4j_client
-
 
 setup_logging()
 
@@ -23,13 +31,15 @@ app = FastAPI(
 def startup_event():
     neo4j_client.connect()
     # Create database tables dynamically if not present
-    from app.core.database import engine, Base
+    from app.core.database import Base, engine
+
     Base.metadata.create_all(bind=engine)
 
 
 @app.on_event("shutdown")
 def shutdown_event():
     neo4j_client.close()
+
 
 # CORS configuration
 app.add_middleware(
@@ -46,16 +56,9 @@ app.include_router(auth.router, prefix=settings.API_V1_STR, tags=["auth"])
 app.include_router(
     repositories.router, prefix=settings.API_V1_STR, tags=["repositories"]
 )
-app.include_router(
-    graph.router, prefix=settings.API_V1_STR, tags=["graph"]
-)
-app.include_router(
-    evolution.router, prefix=settings.API_V1_STR, tags=["evolution"]
-)
-app.include_router(
-    tech_debt.router, prefix=settings.API_V1_STR, tags=["tech_debt"]
-)
+app.include_router(graph.router, prefix=settings.API_V1_STR, tags=["graph"])
+app.include_router(evolution.router, prefix=settings.API_V1_STR, tags=["evolution"])
+app.include_router(tech_debt.router, prefix=settings.API_V1_STR, tags=["tech_debt"])
 app.include_router(
     architecture_drift.router, prefix=settings.API_V1_STR, tags=["architecture_drift"]
 )
-

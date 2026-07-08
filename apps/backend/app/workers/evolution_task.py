@@ -1,57 +1,127 @@
+import logging
+import math
 import os
 import uuid
-import math
-import logging
 from datetime import datetime, timezone
-from typing import List, Dict, Any, Set
 
 from app.core.celery_app import celery_app
 from app.core.config import settings
 from app.core.database import SessionLocal
+from app.models.evolution import CommitSnapshot, ComponentSnapshot
 from app.repositories.job import job_repository
 from app.repositories.repository import repository_repository
-
-from app.utils.git import get_commit_history, get_current_ref, checkout_commit, restore_ref
-from app.services.scanner import RepositoryScanner
+from app.services.architecture_detector import ArchitectureDetector
+from app.services.ast_service import TreeSitterAST
 from app.services.language_detector import LanguageDetector
-from app.services.ast_service import TreeSitterAST, ASTResult
-from app.services.symbol_extractor import SymbolExtractor, ExtractionResult
-from app.services.relationship_builder import RelationshipBuilder
 from app.services.metadata_engine import MetadataEngine
-
-from app.models.evolution import CommitSnapshot, ComponentSnapshot
+from app.services.relationship_builder import RelationshipBuilder
+from app.services.scanner import RepositoryScanner
+from app.services.symbol_extractor import SymbolExtractor
+from app.utils.git import (
+    checkout_commit,
+    get_commit_history,
+    get_current_ref,
+    restore_ref,
+)
 
 logger = logging.getLogger(__name__)
 
 # Standard domain rules used for in-memory grouping
 DOMAIN_RULES = {
     "Authentication & Security": {
-        "keywords": ["auth", "login", "jwt", "token", "session", "register", "user", "credential", "identity", "permission", "role", "secure", "hash"],
-        "description": "Handles identity verification, secure access tokens, user registration, credentials, and session access control."
+        "keywords": [
+            "auth",
+            "login",
+            "jwt",
+            "token",
+            "session",
+            "register",
+            "user",
+            "credential",
+            "identity",
+            "permission",
+            "role",
+            "secure",
+            "hash",
+        ],
+        "description": "Handles identity verification, secure access tokens, user registration, credentials, and session access control.",
     },
     "Billing & Payment": {
-        "keywords": ["bill", "pay", "stripe", "invoice", "price", "checkout", "card", "subscription", "transaction", "payment"],
-        "description": "Orchestrates customer subscriptions, billing plans, invoices, and payment gateway interactions."
+        "keywords": [
+            "bill",
+            "pay",
+            "stripe",
+            "invoice",
+            "price",
+            "checkout",
+            "card",
+            "subscription",
+            "transaction",
+            "payment",
+        ],
+        "description": "Orchestrates customer subscriptions, billing plans, invoices, and payment gateway interactions.",
     },
     "Database & Storage": {
-        "keywords": ["database", "db", "postgres", "mysql", "sqlite", "mongo", "table", "model", "sql", "repository", "dao"],
-        "description": "Manages persistent schemas, database connections, class entities, and low-level ORM transactions."
+        "keywords": [
+            "database",
+            "db",
+            "postgres",
+            "mysql",
+            "sqlite",
+            "mongo",
+            "table",
+            "model",
+            "sql",
+            "repository",
+            "dao",
+        ],
+        "description": "Manages persistent schemas, database connections, class entities, and low-level ORM transactions.",
     },
     "Analytics & Monitoring": {
-        "keywords": ["metric", "log", "analytics", "monitor", "prometheus", "grafana", "telemetry", "tracing", "datadog", "stats"],
-        "description": "Tracks service health metrics, user engagement analytics, diagnostic audit trails, and telemetry dashboards."
+        "keywords": [
+            "metric",
+            "log",
+            "analytics",
+            "monitor",
+            "prometheus",
+            "grafana",
+            "telemetry",
+            "tracing",
+            "datadog",
+            "stats",
+        ],
+        "description": "Tracks service health metrics, user engagement analytics, diagnostic audit trails, and telemetry dashboards.",
     },
     "Notifications & Messaging": {
-        "keywords": ["email", "mail", "sms", "notify", "notification", "slack", "message", "send", "alert"],
-        "description": "Dispatches external transactional emails, SMS triggers, Slack alerts, and push notifications."
+        "keywords": [
+            "email",
+            "mail",
+            "sms",
+            "notify",
+            "notification",
+            "slack",
+            "message",
+            "send",
+            "alert",
+        ],
+        "description": "Dispatches external transactional emails, SMS triggers, Slack alerts, and push notifications.",
     },
     "Background Tasks & Queues": {
-        "keywords": ["celery", "task", "worker", "job", "queue", "consumer", "cron", "schedule", "async"],
-        "description": "Processes scheduled cron jobs, queue triggers, and background asynchronous task workers."
-    }
+        "keywords": [
+            "celery",
+            "task",
+            "worker",
+            "job",
+            "queue",
+            "consumer",
+            "cron",
+            "schedule",
+            "async",
+        ],
+        "description": "Processes scheduled cron jobs, queue triggers, and background asynchronous task workers.",
+    },
 }
 
-from app.services.architecture_detector import ArchitectureDetector
 
 def detect_in_memory_cycles(graph) -> int:
     adj = {}
@@ -59,35 +129,37 @@ def detect_in_memory_cycles(graph) -> int:
         if edge.source_id not in adj:
             adj[edge.source_id] = []
         adj[edge.source_id].append(edge.target_id)
-        
+
     visited = {}
     cycles = 0
-    
+
     def dfs(node_id, path):
         visited[node_id] = 1  # visiting
         path.add(node_id)
-        
+
         for neighbor in adj.get(node_id, []):
             if neighbor in path:
                 nonlocal cycles
                 cycles += 1
             elif neighbor not in visited:
                 dfs(neighbor, path)
-                
+
         path.remove(node_id)
         visited[node_id] = 2  # fully visited
 
     for node_id in graph.nodes:
         if node_id not in visited:
             dfs(node_id, set())
-            
+
     return cycles
 
 
-def calculate_tech_debt(complexity_total: int, code_lines: int, doc_coverage: float, coupling_score: float) -> float:
+def calculate_tech_debt(
+    complexity_total: int, code_lines: int, doc_coverage: float, coupling_score: float
+) -> float:
     """Computes technical debt score out of 100 based on density, docs gap, and coupling."""
     # Complexity Density: complexity per line of code. Normalized to max 1.0
-    complexity_density = (complexity_total / max(code_lines, 1))
+    complexity_density = complexity_total / max(code_lines, 1)
     density = min(1.0, complexity_density)
 
     # Documentation Gap: 1.0 minus coverage
@@ -99,7 +171,9 @@ def calculate_tech_debt(complexity_total: int, code_lines: int, doc_coverage: fl
 
 
 @celery_app.task(name="app.workers.evolution_task.analyze_repository_timeline_task")
-def analyze_repository_timeline_task(repo_id: str, job_id: str, num_checkpoints: int = 10) -> bool:
+def analyze_repository_timeline_task(
+    repo_id: str, job_id: str, num_checkpoints: int = 10
+) -> bool:
     db = SessionLocal()
     repo_dir = os.path.join(settings.CLONED_REPOS_DIR, repo_id)
 
@@ -116,7 +190,9 @@ def analyze_repository_timeline_task(repo_id: str, job_id: str, num_checkpoints:
 
         if not os.path.exists(repo_dir):
             job.status = "failed"
-            job.logs += f"Error: Repository checkout directory {repo_dir} does not exist."
+            job.logs += (
+                f"Error: Repository checkout directory {repo_dir} does not exist."
+            )
             job.finished_at = datetime.now(timezone.utc)
             job_repository.save(db, job)
             return False
@@ -140,11 +216,16 @@ def analyze_repository_timeline_task(repo_id: str, job_id: str, num_checkpoints:
         if num_commits <= num_checkpoints:
             sampled_commits = commits
         else:
-            indices = [int(i * (num_commits - 1) / (num_checkpoints - 1)) for i in range(num_checkpoints)]
+            indices = [
+                int(i * (num_commits - 1) / (num_checkpoints - 1))
+                for i in range(num_checkpoints)
+            ]
             indices = sorted(list(set(indices)))  # deduplicate
             sampled_commits = [commits[idx] for idx in indices]
 
-        job.logs += f"Selected {len(sampled_commits)} checkpoints for detailed analysis.\n"
+        job.logs += (
+            f"Selected {len(sampled_commits)} checkpoints for detailed analysis.\n"
+        )
         job_repository.save(db, job)
 
         # 3. Store original ref to restore at the end
@@ -153,7 +234,9 @@ def analyze_repository_timeline_task(repo_id: str, job_id: str, num_checkpoints:
         job_repository.save(db, job)
 
         # Clear existing snapshots for this repository to allow full rebuild
-        db.query(CommitSnapshot).filter(CommitSnapshot.repository_id == repo_id).delete()
+        db.query(CommitSnapshot).filter(
+            CommitSnapshot.repository_id == repo_id
+        ).delete()
         db.commit()
 
         # Instantiate analysis services
@@ -192,11 +275,18 @@ def analyze_repository_timeline_task(repo_id: str, job_id: str, num_checkpoints:
 
                 # 4.1 Process each scanned file
                 for scanned_file in scan_result.files:
-                    detection = detector.detect(scanned_file.absolute_path, extension=scanned_file.extension)
+                    detection = detector.detect(
+                        scanned_file.absolute_path, extension=scanned_file.extension
+                    )
                     lang = detection.language
 
                     try:
-                        with open(scanned_file.absolute_path, "r", encoding="utf-8", errors="ignore") as f:
+                        with open(
+                            scanned_file.absolute_path,
+                            "r",
+                            encoding="utf-8",
+                            errors="ignore",
+                        ) as f:
                             source_content = f.read()
                     except Exception:
                         source_content = ""
@@ -206,9 +296,13 @@ def analyze_repository_timeline_task(repo_id: str, job_id: str, num_checkpoints:
 
                     if ast_gen.supports(lang):
                         if scanned_file.extension == ".tsx":
-                            ast_result = ast_gen.parse_tsx_file(scanned_file.absolute_path, source=source_content)
+                            ast_result = ast_gen.parse_tsx_file(
+                                scanned_file.absolute_path, source=source_content
+                            )
                         else:
-                            ast_result = ast_gen.parse_file(scanned_file.absolute_path, lang, source=source_content)
+                            ast_result = ast_gen.parse_file(
+                                scanned_file.absolute_path, lang, source=source_content
+                            )
 
                         if ast_result and not ast_result.error:
                             extraction_result = extractor.extract(ast_result)
@@ -236,7 +330,9 @@ def analyze_repository_timeline_task(repo_id: str, job_id: str, num_checkpoints:
 
                     # Languages line count breakdown
                     lang_name = lang.value
-                    languages_lines[lang_name] = languages_lines.get(lang_name, 0) + file_meta.lines.code
+                    languages_lines[lang_name] = (
+                        languages_lines.get(lang_name, 0) + file_meta.lines.code
+                    )
 
                     # Cache file metadata
                     file_stats[scanned_file.relative_path] = {
@@ -248,12 +344,16 @@ def analyze_repository_timeline_task(repo_id: str, job_id: str, num_checkpoints:
                         "total_lines": file_meta.lines.total,
                         "doc_coverage": file_meta.documentation.coverage_percent,
                         "doc_symbols": file_meta.documentation.documented_symbols,
-                        "total_documentable": file_meta.documentation.total_documentable
+                        "total_documentable": file_meta.documentation.total_documentable,
                     }
 
                 # Global stats calculations
-                total_documentable = sum(m.documentation.total_documentable for m in file_metas)
-                total_documented = sum(m.documentation.documented_symbols for m in file_metas)
+                total_documentable = sum(
+                    m.documentation.total_documentable for m in file_metas
+                )
+                total_documented = sum(
+                    m.documentation.documented_symbols for m in file_metas
+                )
                 global_doc_coverage = total_documented / max(total_documentable, 1)
                 complexity_avg_global = complexity_tot / max(total_files, 1)
 
@@ -269,7 +369,11 @@ def analyze_repository_timeline_task(repo_id: str, job_id: str, num_checkpoints:
                     best_domain = None
                     max_matches = 0
                     for dom, config in DOMAIN_RULES.items():
-                        matches = sum(1 for kw in config["keywords"] if kw in name_lower or kw in path_lower)
+                        matches = sum(
+                            1
+                            for kw in config["keywords"]
+                            if kw in name_lower or kw in path_lower
+                        )
                         if matches > max_matches:
                             max_matches = matches
                             best_domain = dom
@@ -286,10 +390,16 @@ def analyze_repository_timeline_task(repo_id: str, job_id: str, num_checkpoints:
                     neighbors[edge.source_id].add(edge.target_id)
                     neighbors[edge.target_id].add(edge.source_id)
 
-                unclassified = [n for n in graph.nodes.values() if n.id not in node_domains]
+                unclassified = [
+                    n for n in graph.nodes.values() if n.id not in node_domains
+                ]
                 for _ in range(2):
                     for n in unclassified:
-                        adj_doms = [node_domains[neigh] for neigh in neighbors.get(n.id, []) if neigh in node_domains]
+                        adj_doms = [
+                            node_domains[neigh]
+                            for neigh in neighbors.get(n.id, [])
+                            if neigh in node_domains
+                        ]
                         if adj_doms:
                             most_common = max(set(adj_doms), key=adj_doms.count)
                             node_domains[n.id] = most_common
@@ -304,7 +414,9 @@ def analyze_repository_timeline_task(repo_id: str, job_id: str, num_checkpoints:
                         domain_files[dom].add(node.file_path)
 
                 # Add fallback "Core System" for files not classified
-                core_files = set(file_stats.keys()) - {f for files in domain_files.values() for f in files}
+                core_files = set(file_stats.keys()) - {
+                    f for files in domain_files.values() for f in files
+                }
                 if core_files:
                     domain_files["Core System"] = core_files
 
@@ -325,7 +437,7 @@ def analyze_repository_timeline_task(repo_id: str, job_id: str, num_checkpoints:
                                 "total_lines": 0,
                                 "file_count": 0,
                                 "doc_symbols": 0,
-                                "total_documentable": 0
+                                "total_documentable": 0,
                             }
                         fs = folder_stats[folder_path]
                         fs["complexity_total"] += f_stat["complexity_total"]
@@ -347,7 +459,13 @@ def analyze_repository_timeline_task(repo_id: str, job_id: str, num_checkpoints:
                     if src_node and tgt_node:
                         src_file = src_node.file_path
                         tgt_file = tgt_node.file_path
-                        if src_file and tgt_file and src_file != tgt_file and src_file in file_stats and tgt_file in file_stats:
+                        if (
+                            src_file
+                            and tgt_file
+                            and src_file != tgt_file
+                            and src_file in file_stats
+                            and tgt_file in file_stats
+                        ):
                             file_deps[src_file].add(tgt_file)
                             file_devs[tgt_file].add(src_file)
 
@@ -356,8 +474,16 @@ def analyze_repository_timeline_task(repo_id: str, job_id: str, num_checkpoints:
                 folder_devs = {fol: set() for fol in folder_stats.keys()}
                 for src_file, tgts in file_deps.items():
                     for tgt_file in tgts:
-                        src_folders = [f for f in folder_stats.keys() if src_file.startswith(f + "/")]
-                        tgt_folders = [f for f in folder_stats.keys() if tgt_file.startswith(f + "/")]
+                        src_folders = [
+                            f
+                            for f in folder_stats.keys()
+                            if src_file.startswith(f + "/")
+                        ]
+                        tgt_folders = [
+                            f
+                            for f in folder_stats.keys()
+                            if tgt_file.startswith(f + "/")
+                        ]
                         for sf in src_folders:
                             for tf in tgt_folders:
                                 if sf != tf:
@@ -368,9 +494,13 @@ def analyze_repository_timeline_task(repo_id: str, job_id: str, num_checkpoints:
                 domain_deps = {d: set() for d in domain_files.keys()}
                 domain_devs = {d: set() for d in domain_files.keys()}
                 for src_file, tgts in file_deps.items():
-                    src_doms = [d for d, files in domain_files.items() if src_file in files]
+                    src_doms = [
+                        d for d, files in domain_files.items() if src_file in files
+                    ]
                     for tgt_file in tgts:
-                        tgt_doms = [d for d, files in domain_files.items() if tgt_file in files]
+                        tgt_doms = [
+                            d for d, files in domain_files.items() if tgt_file in files
+                        ]
                         for sd in src_doms:
                             for td in tgt_doms:
                                 if sd != td:
@@ -398,7 +528,7 @@ def analyze_repository_timeline_task(repo_id: str, job_id: str, num_checkpoints:
                         id=n.id,
                         name=n.name,
                         type=n.kind,
-                        properties={"path": n.file_path, "file_path": n.file_path}
+                        properties={"path": n.file_path, "file_path": n.file_path},
                     )
                     for n in graph.nodes.values()
                 ]
@@ -407,25 +537,35 @@ def analyze_repository_timeline_task(repo_id: str, job_id: str, num_checkpoints:
                         source_id=e.source_id,
                         target_id=e.target_id,
                         type=e.kind.value if hasattr(e.kind, "value") else str(e.kind),
-                        properties={}
+                        properties={},
                     )
                     for e in graph.edges
                 ]
-                
+
                 patterns = []
                 try:
                     patterns.append(detector.detect_mvc(mock_nodes, mock_rels))
                     patterns.append(detector.detect_layered(mock_nodes, mock_rels))
                     patterns.append(detector.detect_clean(mock_nodes, mock_rels))
-                    patterns.append(detector.detect_repository_pattern(mock_nodes, mock_rels))
+                    patterns.append(
+                        detector.detect_repository_pattern(mock_nodes, mock_rels)
+                    )
                     patterns.append(detector.detect_cqrs(mock_nodes, mock_rels))
                     patterns.append(detector.detect_event_driven(mock_nodes, mock_rels))
-                    patterns.append(detector.detect_microservices(mock_nodes, mock_rels))
-                    patterns.append(detector.detect_modular_monolith(mock_nodes, mock_rels))
+                    patterns.append(
+                        detector.detect_microservices(mock_nodes, mock_rels)
+                    )
+                    patterns.append(
+                        detector.detect_modular_monolith(mock_nodes, mock_rels)
+                    )
                 except Exception as ex:
-                    logger.error(f"Error running ArchitectureDetector in timeline task: {ex}")
+                    logger.error(
+                        f"Error running ArchitectureDetector in timeline task: {ex}"
+                    )
 
-                detected_patterns = [p for p in patterns if p.get("confidence", 0.0) > 0.1]
+                detected_patterns = [
+                    p for p in patterns if p.get("confidence", 0.0) > 0.1
+                ]
 
                 # Cycles detection
                 cycles_count = detect_in_memory_cycles(graph)
@@ -435,27 +575,60 @@ def analyze_repository_timeline_task(repo_id: str, job_id: str, num_checkpoints:
                 loc_per_cc = code_lines_tot / max(complexity_tot, 1)
                 comp_health = min(max((loc_per_cc - 3.0) / 17.0, 0.0), 1.0) * 35.0
                 cycle_health = max(15.0 - (cycles_count * 3.0), 0.0)
-                
+
                 # Coupling average of domains
                 domain_couplings = []
                 for dom, files in domain_files.items():
                     deps = len(domain_deps.get(dom, []))
                     devs = len(domain_devs.get(dom, []))
                     domain_couplings.append(deps / max(deps + devs, 1))
-                avg_coupling = sum(domain_couplings) / max(len(domain_couplings), 1) if domain_couplings else 0.0
+                avg_coupling = (
+                    sum(domain_couplings) / max(len(domain_couplings), 1)
+                    if domain_couplings
+                    else 0.0
+                )
                 coupling_health = (1.0 - avg_coupling) * 15.0
 
-                health_score = round(min(max(doc_health + comp_health + cycle_health + coupling_health, 0.0), 100.0), 2)
+                health_score = round(
+                    min(
+                        max(
+                            doc_health + comp_health + cycle_health + coupling_health,
+                            0.0,
+                        ),
+                        100.0,
+                    ),
+                    2,
+                )
 
                 # Features 3 & 4: Complexity Timeline Metrics
-                total_functions = sum(len(ex.functions) + len(ex.methods) for ex in extractions.values())
-                average_function_size = round(code_lines_tot / max(total_functions, 1), 2)
-                cohesion_score = round(max(0.1, min(1.0, 1.0 - (len(graph.edges) / max(len(graph.nodes) * 4.0, 1.0)))), 2)
-                
+                total_functions = sum(
+                    len(ex.functions) + len(ex.methods) for ex in extractions.values()
+                )
+                average_function_size = round(
+                    code_lines_tot / max(total_functions, 1), 2
+                )
+                cohesion_score = round(
+                    max(
+                        0.1,
+                        min(
+                            1.0,
+                            1.0 - (len(graph.edges) / max(len(graph.nodes) * 4.0, 1.0)),
+                        ),
+                    ),
+                    2,
+                )
+
                 vol_val = max(code_lines_tot * 10.0, 1.0)
                 avg_cc = complexity_tot / max(total_files, 1.0)
-                mi_raw = 171.0 - 5.2 * math.log(vol_val) - 0.23 * avg_cc - 16.2 * math.log(max(average_function_size, 1.0))
-                maintainability_index = round(max(0.0, min(100.0, mi_raw * 100.0 / 171.0)), 2)
+                mi_raw = (
+                    171.0
+                    - 5.2 * math.log(vol_val)
+                    - 0.23 * avg_cc
+                    - 16.2 * math.log(max(average_function_size, 1.0))
+                )
+                maintainability_index = round(
+                    max(0.0, min(100.0, mi_raw * 100.0 / 171.0)), 2
+                )
 
                 commit_snap_id = str(uuid.uuid4())
                 db_commit_snap = CommitSnapshot(
@@ -490,18 +663,26 @@ def analyze_repository_timeline_task(repo_id: str, job_id: str, num_checkpoints:
                 for dom, files in domain_files.items():
                     dom_comp_lines = sum(file_stats[f]["code_lines"] for f in files)
                     dom_comm_lines = sum(file_stats[f]["comment_lines"] for f in files)
-                    dom_total_lines = sum(file_stats[f]["total_lines"] for f in files)
-                    dom_complexity = sum(file_stats[f]["complexity_total"] for f in files)
-                    dom_max_comp = max((file_stats[f]["complexity_max"] for f in files), default=0)
-                    
+                    _dom_total_lines = sum(file_stats[f]["total_lines"] for f in files)
+                    dom_complexity = sum(
+                        file_stats[f]["complexity_total"] for f in files
+                    )
+                    dom_max_comp = max(
+                        (file_stats[f]["complexity_max"] for f in files), default=0
+                    )
+
                     dom_doc_syms = sum(file_stats[f]["doc_symbols"] for f in files)
-                    dom_doc_able = sum(file_stats[f]["total_documentable"] for f in files)
+                    dom_doc_able = sum(
+                        file_stats[f]["total_documentable"] for f in files
+                    )
                     dom_doc_coverage = dom_doc_syms / max(dom_doc_able, 1)
 
                     deps = len(domain_deps.get(dom, []))
                     devs = len(domain_devs.get(dom, []))
                     coupling = deps / max(deps + devs, 1)
-                    tech_debt = calculate_tech_debt(dom_complexity, dom_comp_lines, dom_doc_coverage, coupling)
+                    tech_debt = calculate_tech_debt(
+                        dom_complexity, dom_comp_lines, dom_doc_coverage, coupling
+                    )
 
                     db_comp = ComponentSnapshot(
                         id=str(uuid.uuid4()),
@@ -510,7 +691,9 @@ def analyze_repository_timeline_task(repo_id: str, job_id: str, num_checkpoints:
                         type="domain",
                         name=dom,
                         complexity_total=dom_complexity,
-                        complexity_average=round(dom_complexity / max(len(files), 1), 2),
+                        complexity_average=round(
+                            dom_complexity / max(len(files), 1), 2
+                        ),
                         complexity_max=dom_max_comp,
                         code_lines=dom_comp_lines,
                         comment_lines=dom_comm_lines,
@@ -523,11 +706,18 @@ def analyze_repository_timeline_task(repo_id: str, job_id: str, num_checkpoints:
 
                 # 4.7.2 Save Folder Snapshots
                 for fol, stats in folder_stats.items():
-                    fol_doc_cov = stats["doc_symbols"] / max(stats["total_documentable"], 1)
+                    fol_doc_cov = stats["doc_symbols"] / max(
+                        stats["total_documentable"], 1
+                    )
                     deps = len(folder_deps.get(fol, []))
                     devs = len(folder_devs.get(fol, []))
                     coupling = deps / max(deps + devs, 1)
-                    tech_debt = calculate_tech_debt(stats["complexity_total"], stats["code_lines"], fol_doc_cov, coupling)
+                    tech_debt = calculate_tech_debt(
+                        stats["complexity_total"],
+                        stats["code_lines"],
+                        fol_doc_cov,
+                        coupling,
+                    )
 
                     db_comp = ComponentSnapshot(
                         id=str(uuid.uuid4()),
@@ -536,7 +726,9 @@ def analyze_repository_timeline_task(repo_id: str, job_id: str, num_checkpoints:
                         type="folder",
                         name=fol.split("/")[-1],
                         complexity_total=stats["complexity_total"],
-                        complexity_average=round(stats["complexity_total"] / max(stats["file_count"], 1), 2),
+                        complexity_average=round(
+                            stats["complexity_total"] / max(stats["file_count"], 1), 2
+                        ),
                         complexity_max=stats["complexity_max"],
                         code_lines=stats["code_lines"],
                         comment_lines=stats["comment_lines"],
@@ -552,12 +744,19 @@ def analyze_repository_timeline_task(repo_id: str, job_id: str, num_checkpoints:
                     # Only save source files that contain actual code lines or are of code extension
                     if stats["total_lines"] == 0:
                         continue
-                    
-                    f_doc_cov = stats["doc_symbols"] / max(stats["total_documentable"], 1)
+
+                    f_doc_cov = stats["doc_symbols"] / max(
+                        stats["total_documentable"], 1
+                    )
                     deps = len(file_deps.get(f_path, []))
                     devs = len(file_devs.get(f_path, []))
                     coupling = deps / max(deps + devs, 1)
-                    tech_debt = calculate_tech_debt(stats["complexity_total"], stats["code_lines"], f_doc_cov, coupling)
+                    tech_debt = calculate_tech_debt(
+                        stats["complexity_total"],
+                        stats["code_lines"],
+                        f_doc_cov,
+                        coupling,
+                    )
 
                     db_comp = ComponentSnapshot(
                         id=str(uuid.uuid4()),
@@ -585,7 +784,9 @@ def analyze_repository_timeline_task(repo_id: str, job_id: str, num_checkpoints:
             except Exception as commit_err:
                 db.rollback()
                 logger.error(f"Error parsing commit {sha}: {str(commit_err)}")
-                job.logs += f"Warning: Failed to parse commit {sha}: {str(commit_err)}\n"
+                job.logs += (
+                    f"Warning: Failed to parse commit {sha}: {str(commit_err)}\n"
+                )
                 job_repository.save(db, job)
 
         # 5. Restore original repository branch state
@@ -612,7 +813,9 @@ def analyze_repository_timeline_task(repo_id: str, job_id: str, num_checkpoints:
             if repo_dir and original_ref:
                 restore_ref(repo_dir, original_ref)
         except Exception as restore_err:
-            logger.error(f"Failed to restore original branch during recovery: {restore_err}")
+            logger.error(
+                f"Failed to restore original branch during recovery: {restore_err}"
+            )
         return False
     finally:
         db.close()

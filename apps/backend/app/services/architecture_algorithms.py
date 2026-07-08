@@ -2,7 +2,9 @@ import datetime
 import random
 
 
-def weisfeiler_lehman_isomorphism(graph1: dict, graph2: dict, max_iter: int = 5) -> bool:
+def weisfeiler_lehman_isomorphism(
+    graph1: dict, graph2: dict, max_iter: int = 5
+) -> bool:
     """Weisfeiler-Lehman (1-WL) graph isomorphism test."""
     if len(graph1) != len(graph2):
         return False
@@ -13,17 +15,23 @@ def weisfeiler_lehman_isomorphism(graph1: dict, graph2: dict, max_iter: int = 5)
     for _ in range(max_iter):
         next_colors1 = {}
         for node, neighbors in graph1.items():
-            neighbor_colors = sorted([colors1[nbr] for nbr in neighbors if nbr in colors1])
+            neighbor_colors = sorted(
+                [colors1[nbr] for nbr in neighbors if nbr in colors1]
+            )
             signature = f"{colors1[node]}-" + ",".join(neighbor_colors)
             next_colors1[node] = hash(signature)
 
         next_colors2 = {}
         for node, neighbors in graph2.items():
-            neighbor_colors = sorted([colors2[nbr] for nbr in neighbors if nbr in colors2])
+            neighbor_colors = sorted(
+                [colors2[nbr] for nbr in neighbors if nbr in colors2]
+            )
             signature = f"{colors2[node]}-" + ",".join(neighbor_colors)
             next_colors2[node] = hash(signature)
 
-        all_colors = sorted(list(set(list(next_colors1.values()) + list(next_colors2.values()))))
+        all_colors = sorted(
+            list(set(list(next_colors1.values()) + list(next_colors2.values())))
+        )
         color_map = {c: i for i, c in enumerate(all_colors)}
 
         colors1 = {n: str(color_map[c]) for n, c in next_colors1.items()}
@@ -135,7 +143,7 @@ def compute_coupling_metrics(nodes: list, relationships: list) -> dict:
         metrics[n] = {
             "afferent_coupling": ca[n],
             "efferent_coupling": ce[n],
-            "instability": round(instability, 2)
+            "instability": round(instability, 2),
         }
     return metrics
 
@@ -154,7 +162,7 @@ def predict_drift_decay(timeline_points: list) -> dict:
     sum_xx = sum(x_i * x_i for x_i in x)
     sum_xy = sum(x_i * y_i for x_i, y_i in zip(x, y))
 
-    denom = (n * sum_xx - sum_x * sum_x)
+    denom = n * sum_xx - sum_x * sum_x
     if denom == 0:
         return {"trend": "stable", "decay_date": None}
 
@@ -173,5 +181,5 @@ def predict_drift_decay(timeline_points: list) -> dict:
     return {
         "trend": "degrading",
         "decay_date": decay_date.isoformat(),
-        "slope": round(slope * 24 * 3600, 2)
+        "slope": round(slope * 24 * 3600, 2),
     }

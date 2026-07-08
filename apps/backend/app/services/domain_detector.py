@@ -1,45 +1,121 @@
+from typing import Any, Dict, List, Set
+
 from sqlalchemy.orm import Session
+
 from app.models.graph_node import GraphNode
 from app.models.graph_relationship import GraphRelationship
-from typing import List, Dict, Any, Set
+
 
 class DomainDetector:
     """
     Groups code and infrastructure nodes into logical business domains
     using a hybrid approach:
     1. Keyword-based matching on folder/file/class names.
-    2. Transitive graph propagation to cluster connected nodes (e.g. mapping a Repository 
+    2. Transitive graph propagation to cluster connected nodes (e.g. mapping a Repository
        or Cache to the Domain layer of the service calling it).
     """
+
     def detect_domains(self, db: Session, repo_id: str) -> List[Dict[str, Any]]:
         nodes = db.query(GraphNode).filter(GraphNode.repository_id == repo_id).all()
-        relationships = db.query(GraphRelationship).filter(GraphRelationship.repository_id == repo_id).all()
+        relationships = (
+            db.query(GraphRelationship)
+            .filter(GraphRelationship.repository_id == repo_id)
+            .all()
+        )
 
         domain_rules = {
             "Authentication & Security": {
-                "keywords": ["auth", "login", "jwt", "token", "session", "register", "user", "credential", "identity", "permission", "role", "secure", "hash"],
-                "description": "Handles identity verification, secure access tokens, user registration, credentials, and session access control."
+                "keywords": [
+                    "auth",
+                    "login",
+                    "jwt",
+                    "token",
+                    "session",
+                    "register",
+                    "user",
+                    "credential",
+                    "identity",
+                    "permission",
+                    "role",
+                    "secure",
+                    "hash",
+                ],
+                "description": "Handles identity verification, secure access tokens, user registration, credentials, and session access control.",
             },
             "Billing & Payment": {
-                "keywords": ["bill", "pay", "stripe", "invoice", "price", "checkout", "card", "subscription", "transaction", "payment"],
-                "description": "Orchestrates customer subscriptions, billing plans, invoices, and payment gateway interactions."
+                "keywords": [
+                    "bill",
+                    "pay",
+                    "stripe",
+                    "invoice",
+                    "price",
+                    "checkout",
+                    "card",
+                    "subscription",
+                    "transaction",
+                    "payment",
+                ],
+                "description": "Orchestrates customer subscriptions, billing plans, invoices, and payment gateway interactions.",
             },
             "Database & Storage": {
-                "keywords": ["database", "db", "postgres", "mysql", "sqlite", "mongo", "table", "model", "sql", "repository", "dao"],
-                "description": "Manages persistent schemas, database connections, class entities, and low-level ORM transactions."
+                "keywords": [
+                    "database",
+                    "db",
+                    "postgres",
+                    "mysql",
+                    "sqlite",
+                    "mongo",
+                    "table",
+                    "model",
+                    "sql",
+                    "repository",
+                    "dao",
+                ],
+                "description": "Manages persistent schemas, database connections, class entities, and low-level ORM transactions.",
             },
             "Analytics & Monitoring": {
-                "keywords": ["metric", "log", "analytics", "monitor", "prometheus", "grafana", "telemetry", "tracing", "datadog", "stats"],
-                "description": "Tracks service health metrics, user engagement analytics, diagnostic audit trails, and telemetry dashboards."
+                "keywords": [
+                    "metric",
+                    "log",
+                    "analytics",
+                    "monitor",
+                    "prometheus",
+                    "grafana",
+                    "telemetry",
+                    "tracing",
+                    "datadog",
+                    "stats",
+                ],
+                "description": "Tracks service health metrics, user engagement analytics, diagnostic audit trails, and telemetry dashboards.",
             },
             "Notifications & Messaging": {
-                "keywords": ["email", "mail", "sms", "notify", "notification", "slack", "message", "send", "alert"],
-                "description": "Dispatches external transactional emails, SMS triggers, Slack alerts, and push notifications."
+                "keywords": [
+                    "email",
+                    "mail",
+                    "sms",
+                    "notify",
+                    "notification",
+                    "slack",
+                    "message",
+                    "send",
+                    "alert",
+                ],
+                "description": "Dispatches external transactional emails, SMS triggers, Slack alerts, and push notifications.",
             },
             "Background Tasks & Queues": {
-                "keywords": ["celery", "task", "worker", "job", "queue", "consumer", "cron", "schedule", "async"],
-                "description": "Processes scheduled cron jobs, queue triggers, and background asynchronous task workers."
-            }
+                "keywords": [
+                    "celery",
+                    "task",
+                    "worker",
+                    "job",
+                    "queue",
+                    "consumer",
+                    "cron",
+                    "schedule",
+                    "async",
+                ],
+                "description": "Processes scheduled cron jobs, queue triggers, and background asynchronous task workers.",
+            },
         }
 
         # 1. Primary classification by keywords
@@ -47,17 +123,23 @@ class DomainDetector:
 
         for n in nodes:
             name_lower = n.name.lower()
-            path_lower = (n.properties or {}).get("path", "").lower() or (n.properties or {}).get("file_path", "").lower()
-            
+            path_lower = (n.properties or {}).get("path", "").lower() or (
+                n.properties or {}
+            ).get("file_path", "").lower()
+
             best_domain = None
             max_matches = 0
-            
+
             for dom, config in domain_rules.items():
-                matches = sum(1 for kw in config["keywords"] if kw in name_lower or kw in path_lower)
+                matches = sum(
+                    1
+                    for kw in config["keywords"]
+                    if kw in name_lower or kw in path_lower
+                )
                 if matches > max_matches:
                     max_matches = matches
                     best_domain = dom
-                    
+
             if best_domain and max_matches > 0:
                 node_domains[n.id] = best_domain
 
@@ -99,17 +181,21 @@ class DomainDetector:
         clusters = []
         for dom, config in domain_rules.items():
             if domain_groups[dom]:
-                clusters.append({
-                    "name": dom,
-                    "description": config["description"],
-                    "node_ids": domain_groups[dom]
-                })
+                clusters.append(
+                    {
+                        "name": dom,
+                        "description": config["description"],
+                        "node_ids": domain_groups[dom],
+                    }
+                )
 
         if domain_groups["Core System"]:
-            clusters.append({
-                "name": "Core System",
-                "description": "Houses central configuration variables, runtime routers, and common application infrastructure.",
-                "node_ids": domain_groups["Core System"]
-            })
+            clusters.append(
+                {
+                    "name": "Core System",
+                    "description": "Houses central configuration variables, runtime routers, and common application infrastructure.",
+                    "node_ids": domain_groups["Core System"],
+                }
+            )
 
         return clusters

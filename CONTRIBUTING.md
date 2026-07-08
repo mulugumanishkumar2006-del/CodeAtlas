@@ -44,11 +44,11 @@ When database models are modified in `apps/backend/app/models/`:
 
 1. **Auto-Generate a Migration**:
    From `apps/backend/`, run:
-   ```bash
-   ..\..\.venv\Scripts\alembic revision --autogenerate -m "description of changes"
-   ```
+      ```bash
+      ..\..\.venv\Scripts\alembic revision --autogenerate -m "description of changes"
+      ```
 2. **Apply Migrations**:
    To apply migrations to your local Postgres database, run:
-   ```bash
-   ..\..\.venv\Scripts\alembic upgrade head
-   ```
+      ```bash
+      ..\..\.venv\Scripts\alembic upgrade head
+      ```

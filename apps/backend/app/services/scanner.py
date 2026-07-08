@@ -76,7 +76,9 @@ class RepositoryScanner:
         self,
         ignored_dirs: Optional[Set[str]] = None,
     ) -> None:
-        self._ignored_dirs = ignored_dirs if ignored_dirs is not None else DEFAULT_IGNORED_DIRS
+        self._ignored_dirs = (
+            ignored_dirs if ignored_dirs is not None else DEFAULT_IGNORED_DIRS
+        )
 
     # ------------------------------------------------------------------
     # Public API

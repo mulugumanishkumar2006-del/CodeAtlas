@@ -1,5 +1,7 @@
+from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
+
 
 class MemorySource(BaseModel):
     id: str
@@ -8,10 +10,12 @@ class MemorySource(BaseModel):
     details: Optional[str] = None
     properties: Optional[Dict[str, Any]] = None
 
+
 class MemoryQueryResponse(BaseModel):
     query: str
     answer: str
     sources: List[MemorySource]
+
 
 class MemoryStatisticsResponse(BaseModel):
     repository_id: str
@@ -22,6 +26,7 @@ class MemoryStatisticsResponse(BaseModel):
     knowledge_confidence: str
     recently_learned_concepts: List[str]
     unlinked_documentation: List[str]
+
 
 class ChatRequest(BaseModel):
     message: str

@@ -12,9 +12,9 @@ Returns the operational health status of the application backend.
 
 ```json
 {
-  "status": "healthy",
-  "environment": "local",
-  "project_name": "CodeAtlas API"
+                        "status": "healthy",
+                        "environment": "local",
+                        "project_name": "CodeAtlas API"
 }
 ```
 
@@ -39,7 +39,7 @@ Exchanges a GitHub authorization code for a signed JWT access token.
 
 ```json
 {
-  "code": "GITHUB_AUTHORIZATION_CODE"
+                        "code": "GITHUB_AUTHORIZATION_CODE"
 }
 ```
 
@@ -47,8 +47,8 @@ Exchanges a GitHub authorization code for a signed JWT access token.
 
 ```json
 {
-  "access_token": "eyJhbGciOiJIUzI1NiIsIn...",
-  "token_type": "bearer"
+                        "access_token": "eyJhbGciOiJIUzI1NiIsIn...",
+                        "token_type": "bearer"
 }
 ```
 
@@ -66,11 +66,11 @@ Retrieves information about the currently logged-in user context.
 
 ```json
 {
-  "id": "12345",
-  "username": "github_username",
-  "name": "User Name",
-  "email": "user@example.com",
-  "avatar_url": "https://avatars.githubusercontent.com/u/12345"
+                        "id": "12345",
+                        "username": "github_username",
+                        "name": "User Name",
+                        "email": "user@example.com",
+                        "avatar_url": "https://avatars.githubusercontent.com/u/12345"
 }
 ```
 
@@ -90,9 +90,9 @@ Registers a repository for background cloning.
 
 ```json
 {
-  "name": "my-project",
-  "full_name": "username/my-project",
-  "clone_url": "https://github.com/username/my-project.git"
+                        "name": "my-project",
+                        "full_name": "username/my-project",
+                        "clone_url": "https://github.com/username/my-project.git"
 }
 ```
 
@@ -100,11 +100,11 @@ Registers a repository for background cloning.
 
 ```json
 {
-  "id": "c1f7b764-a6f9-4674-8848-038d10b7f8be",
-  "name": "my-project",
-  "full_name": "username/my-project",
-  "clone_url": "https://github.com/username/my-project.git",
-  "status": "pending"
+                        "id": "c1f7b764-a6f9-4674-8848-038d10b7f8be",
+                        "name": "my-project",
+                        "full_name": "username/my-project",
+                        "clone_url": "https://github.com/username/my-project.git",
+                        "status": "pending"
 }
 ```
 

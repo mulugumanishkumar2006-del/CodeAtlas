@@ -1,5 +1,6 @@
-from sqlalchemy import Column, DateTime, ForeignKey, String, Integer, Boolean, Float
+from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String
 from sqlalchemy.sql import func
+
 from app.core.database import Base
 
 
@@ -7,7 +8,9 @@ class ArchitectureBaseline(Base):
     __tablename__ = "architecture_baselines"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    repo_id = Column(String, ForeignKey("repositories.id", ondelete="CASCADE"), nullable=False)
+    repo_id = Column(
+        String, ForeignKey("repositories.id", ondelete="CASCADE"), nullable=False
+    )
     architecture_type = Column(String, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -16,7 +19,9 @@ class ArchitectureViolation(Base):
     __tablename__ = "architecture_violations"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    repo_id = Column(String, ForeignKey("repositories.id", ondelete="CASCADE"), nullable=False)
+    repo_id = Column(
+        String, ForeignKey("repositories.id", ondelete="CASCADE"), nullable=False
+    )
     violation_type = Column(String, nullable=False)
     severity = Column(String, nullable=False)
     source_entity = Column(String, nullable=False)
@@ -38,6 +43,8 @@ class ComplianceHistory(Base):
     __tablename__ = "compliance_history"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    repo_id = Column(String, ForeignKey("repositories.id", ondelete="CASCADE"), nullable=False)
+    repo_id = Column(
+        String, ForeignKey("repositories.id", ondelete="CASCADE"), nullable=False
+    )
     compliance_score = Column(Float, nullable=False)
     timestamp = Column(DateTime(timezone=True), server_default=func.now())

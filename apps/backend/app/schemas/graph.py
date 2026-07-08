@@ -1,5 +1,7 @@
+from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
+
 from app.models.graph_enums import GraphNodeType, GraphRelationshipType
 
 

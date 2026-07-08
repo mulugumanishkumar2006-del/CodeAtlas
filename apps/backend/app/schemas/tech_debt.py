@@ -1,5 +1,7 @@
+from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
+
 
 class HeatmapNodeResponse(BaseModel):
     name: str
@@ -12,7 +14,7 @@ class HeatmapNodeResponse(BaseModel):
     coverage: float = 0.0
     changes: int = 0
     is_cyclic: bool = False
-    
+
     # Feature 1 — Technical Debt Scanner fields
     cognitive_complexity: int = 0
     has_long_methods: bool = False
@@ -23,8 +25,9 @@ class HeatmapNodeResponse(BaseModel):
     has_deep_inheritance: bool = False
     has_excessive_nesting: bool = False
     has_high_coupling: bool = False
-    
+
     children: Optional[List["HeatmapNodeResponse"]] = None
+
 
 # Feature 4 — AI Debt Analyzer (Module Level)
 class RemediationActionResponse(BaseModel):
@@ -34,18 +37,20 @@ class RemediationActionResponse(BaseModel):
     action: str
     estimated_effort: str
     expected_improvement: str
-    
+
     # AI Analyzer Details
     why_debt_exists: str
     why_debt_increased: str
     causing_dependencies: List[str]
     how_to_reduce: str
 
+
 class TechDebtSummaryResponse(BaseModel):
     average_debt_score: float
     high_risk_components_count: int
     circular_dependencies_count: int
     average_doc_coverage: float
+
 
 # Feature 2 — Repository Risk Scorecard
 class RepositoryRiskScorecard(BaseModel):
@@ -58,6 +63,7 @@ class RepositoryRiskScorecard(BaseModel):
     technical_debt: float
     overall_health: float
 
+
 # Feature 4 — AI Debt Analyzer (Repository Level)
 class RepositoryAIDebtAnalysis(BaseModel):
     why_debt_exists: str
@@ -66,11 +72,13 @@ class RepositoryAIDebtAnalysis(BaseModel):
     how_to_reduce: str
     expected_improvement: str
 
+
 # Feature 5 — Debt Timeline
 class TimelineSnapshotResponse(BaseModel):
     year: str
     score: float
     status: str  # "HEALTHY", "WARNING", "HIGH_RISK", "CRITICAL"
+
 
 # Feature 6 — Hotspot Detection
 class HotspotDetectionResponse(BaseModel):
@@ -85,6 +93,7 @@ class HotspotDetectionResponse(BaseModel):
     most_modified_component: str
     most_modified_component_changes: int
 
+
 # Feature 7 — Refactoring Recommendations
 class RefactoringRecommendationResponse(BaseModel):
     category: str  # "Split service", "Extract module", "Introduce interface", "Reduce coupling", "Remove dead code", "Simplify dependency chain"
@@ -94,6 +103,7 @@ class RefactoringRecommendationResponse(BaseModel):
     risks: str
     estimated_effort: str
     expected_improvement: str
+
 
 # Feature 8 — Repository Health Dashboard Trend Data
 class HealthDashboardTrendResponse(BaseModel):
@@ -105,17 +115,20 @@ class HealthDashboardTrendResponse(BaseModel):
     dependency_growth: List[int]
     trend_labels: List[str]
 
+
 # Feature 9 — Technical Debt Forecast
 class ForecastSnapshotResponse(BaseModel):
     label: str  # "Current", "30 days", "90 days", "180 days"
     score: float
     estimated_maintenance_cost: str
 
+
 # Feature 10 — AI Risk Explanations
 class RiskExplanationResponse(BaseModel):
     module_name: str
     risk_level: str  # "CRITICAL", "HIGH", "WARNING", "HEALTHY"
     reasons: List[str]
+
 
 # Feature 11 — Cost of Delay Calculator
 class CostOfDelayResponse(BaseModel):
@@ -124,6 +137,7 @@ class CostOfDelayResponse(BaseModel):
     refactoring_effort: str
     long_term_maintenance_cost: str
 
+
 # Feature 12 — Executive Dashboard
 class ExecutiveDashboardResponse(BaseModel):
     overall_health: float
@@ -131,6 +145,7 @@ class ExecutiveDashboardResponse(BaseModel):
     team_debt_distribution: Dict[str, float]
     sprint_debt_trend: List[float]
     high_priority_fixes: List[Dict[str, Any]]
+
 
 class TechDebtReportResponse(BaseModel):
     summary: TechDebtSummaryResponse

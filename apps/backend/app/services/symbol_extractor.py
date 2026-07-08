@@ -21,10 +21,10 @@ from typing import List, Optional
 from app.services.ast_service import ASTNode, ASTResult, Position
 from app.services.language_detector import Language
 
-
 # ──────────────────────────────────────────────────────────────────────
 # Symbol types
 # ──────────────────────────────────────────────────────────────────────
+
 
 class SymbolKind(str, Enum):
     CLASS = "class"
@@ -42,27 +42,30 @@ class SymbolKind(str, Enum):
 # Data models
 # ──────────────────────────────────────────────────────────────────────
 
+
 @dataclass(frozen=True)
 class Symbol:
     """A single extracted code symbol."""
+
     kind: SymbolKind
     name: str
     position: Position
     language: Language
-    parent_name: Optional[str] = None     # e.g. class name for methods
+    parent_name: Optional[str] = None  # e.g. class name for methods
     parameters: List[str] = field(default_factory=list)
     return_type: Optional[str] = None
     decorators: List[str] = field(default_factory=list)
-    bases: List[str] = field(default_factory=list)       # superclasses / extended interfaces
+    bases: List[str] = field(default_factory=list)  # superclasses / extended interfaces
     is_async: bool = False
     is_exported: bool = False
     docstring: Optional[str] = None
-    text: Optional[str] = None            # raw source text (truncated)
+    text: Optional[str] = None  # raw source text (truncated)
 
 
 @dataclass
 class ExtractionResult:
     """Aggregated extraction output for a single file."""
+
     file_path: str
     language: Language
     symbols: List[Symbol] = field(default_factory=list)
@@ -117,6 +120,7 @@ class ExtractionResult:
 # Helper to safely read node text
 # ──────────────────────────────────────────────────────────────────────
 
+
 def _node_text(node: ASTNode) -> str:
     """Return the source text of a node, or '' if unavailable."""
     return node.text.strip() if node.text else ""
@@ -144,6 +148,7 @@ def _collect_names(node: ASTNode, node_type: str) -> List[str]:
 # Python extractor
 # ──────────────────────────────────────────────────────────────────────
 
+
 class _PythonExtractor:
     """Extract symbols from a Python tree-sitter AST."""
 
@@ -161,13 +166,16 @@ class _PythonExtractor:
         for child in node.children:
             if child.type == "class_definition":
                 self._extract_class(child, symbols)
-            elif child.type in ("function_definition", "async_function_definition"):  # noqa: SIM114
+            elif child.type in (
+                "function_definition",
+                "async_function_definition",
+            ):  # noqa: SIM114
                 self._extract_function(child, symbols, parent_class)
             elif child.type == "decorated_definition":
                 self._extract_decorated(child, symbols, parent_class)
             elif child.type == "expression_statement":
                 self._extract_variable(child, symbols, parent_class)
-            elif child.type in ("assignment", ):
+            elif child.type in ("assignment",):
                 self._extract_assignment(child, symbols, parent_class)
 
     # ---- classes --------------------------------------------------------
@@ -183,21 +191,22 @@ class _PythonExtractor:
         bases: List[str] = []
         arg_list = _find_child(node, "argument_list")
         if arg_list:
-            bases = [_node_text(c) for c in arg_list.children
-                     if c.is_named and c.text]
+            bases = [_node_text(c) for c in arg_list.children if c.is_named and c.text]
 
         # Docstring
         docstring = self._get_docstring(node)
 
-        symbols.append(Symbol(
-            kind=SymbolKind.CLASS,
-            name=name,
-            position=node.position,
-            language=Language.PYTHON,
-            decorators=decorators,
-            bases=bases,
-            docstring=docstring,
-        ))
+        symbols.append(
+            Symbol(
+                kind=SymbolKind.CLASS,
+                name=name,
+                position=node.position,
+                language=Language.PYTHON,
+                decorators=decorators,
+                bases=bases,
+                docstring=docstring,
+            )
+        )
 
         # Walk class body for methods and class-level variables
         body = _find_child(node, "block")
@@ -225,18 +234,20 @@ class _PythonExtractor:
 
         kind = SymbolKind.METHOD if parent_class else SymbolKind.FUNCTION
 
-        symbols.append(Symbol(
-            kind=kind,
-            name=name,
-            position=node.position,
-            language=Language.PYTHON,
-            parent_name=parent_class,
-            parameters=params,
-            return_type=return_type,
-            decorators=decorators,
-            is_async=is_async,
-            docstring=docstring,
-        ))
+        symbols.append(
+            Symbol(
+                kind=kind,
+                name=name,
+                position=node.position,
+                language=Language.PYTHON,
+                parent_name=parent_class,
+                parameters=params,
+                return_type=return_type,
+                decorators=decorators,
+                is_async=is_async,
+                docstring=docstring,
+            )
+        )
 
     # ---- decorated definitions -----------------------------------------
 
@@ -251,13 +262,15 @@ class _PythonExtractor:
             dec_text = _node_text(dec)
             if dec_text.startswith("@"):
                 dec_text = dec_text[1:]
-            symbols.append(Symbol(
-                kind=SymbolKind.DECORATOR,
-                name=dec_text,
-                position=dec.position,
-                language=Language.PYTHON,
-                parent_name=parent_class,
-            ))
+            symbols.append(
+                Symbol(
+                    kind=SymbolKind.DECORATOR,
+                    name=dec_text,
+                    position=dec.position,
+                    language=Language.PYTHON,
+                    parent_name=parent_class,
+                )
+            )
 
         # Then extract the actual definition
         inner = _find_child(node, "class_definition")
@@ -302,14 +315,16 @@ class _PythonExtractor:
         ann = _find_child(node, "type")
         return_type = _node_text(ann) if ann else None
 
-        symbols.append(Symbol(
-            kind=kind,
-            name=name,
-            position=node.position,
-            language=Language.PYTHON,
-            parent_name=parent_class,
-            return_type=return_type,
-        ))
+        symbols.append(
+            Symbol(
+                kind=kind,
+                name=name,
+                position=node.position,
+                language=Language.PYTHON,
+                parent_name=parent_class,
+                return_type=return_type,
+            )
+        )
 
     # ---- helpers -------------------------------------------------------
 
@@ -331,9 +346,14 @@ class _PythonExtractor:
             return []
         result = []
         for c in params_node.children:
-            if c.type in ("identifier", "typed_parameter", "default_parameter",
-                          "typed_default_parameter", "list_splat_pattern",
-                          "dictionary_splat_pattern"):
+            if c.type in (
+                "identifier",
+                "typed_parameter",
+                "default_parameter",
+                "typed_default_parameter",
+                "list_splat_pattern",
+                "dictionary_splat_pattern",
+            ):
                 name = _node_text(c).split(":")[0].split("=")[0].strip()
                 if name and name not in ("self", "cls", "(", ")", ","):
                     result.append(name)
@@ -368,6 +388,7 @@ class _PythonExtractor:
 # JavaScript / TypeScript extractor
 # ──────────────────────────────────────────────────────────────────────
 
+
 class _JSExtractor:
     """Extract symbols from JavaScript / TypeScript tree-sitter ASTs."""
 
@@ -394,7 +415,10 @@ class _JSExtractor:
 
             if child.type == "class_declaration":
                 self._extract_class(child, symbols, exported)
-            elif child.type in ("function_declaration", "generator_function_declaration"):
+            elif child.type in (
+                "function_declaration",
+                "generator_function_declaration",
+            ):
                 self._extract_function(child, symbols, parent_class, exported)
             elif child.type in ("method_definition",):
                 self._extract_method(child, symbols, parent_class)
@@ -418,7 +442,9 @@ class _JSExtractor:
 
     # ---- classes --------------------------------------------------------
 
-    def _extract_class(self, node: ASTNode, symbols: List[Symbol], exported: bool) -> None:
+    def _extract_class(
+        self, node: ASTNode, symbols: List[Symbol], exported: bool
+    ) -> None:
         name_node = _find_child(node, "type_identifier", "identifier")
         name = _node_text(name_node) if name_node else "<anonymous>"
 
@@ -433,15 +459,17 @@ class _JSExtractor:
         # Decorators
         decorators = self._get_decorators(node)
 
-        symbols.append(Symbol(
-            kind=SymbolKind.CLASS,
-            name=name,
-            position=node.position,
-            language=self._lang,
-            bases=bases,
-            decorators=decorators,
-            is_exported=exported,
-        ))
+        symbols.append(
+            Symbol(
+                kind=SymbolKind.CLASS,
+                name=name,
+                position=node.position,
+                language=self._lang,
+                bases=bases,
+                decorators=decorators,
+                is_exported=exported,
+            )
+        )
 
         # Walk body for methods
         body = _find_child(node, "class_body")
@@ -459,22 +487,25 @@ class _JSExtractor:
     ) -> None:
         name_node = _find_child(node, "identifier")
         name = _node_text(name_node) if name_node else "<anonymous>"
-        is_async = any(c.type == "async" or (c.text and c.text == "async")
-                       for c in node.children)
+        is_async = any(
+            c.type == "async" or (c.text and c.text == "async") for c in node.children
+        )
         params = self._get_params(node)
         ret = self._get_return_type(node)
 
-        symbols.append(Symbol(
-            kind=SymbolKind.FUNCTION,
-            name=name,
-            position=node.position,
-            language=self._lang,
-            parent_name=parent_class,
-            parameters=params,
-            return_type=ret,
-            is_async=is_async,
-            is_exported=exported,
-        ))
+        symbols.append(
+            Symbol(
+                kind=SymbolKind.FUNCTION,
+                name=name,
+                position=node.position,
+                language=self._lang,
+                parent_name=parent_class,
+                parameters=params,
+                return_type=ret,
+                is_async=is_async,
+                is_exported=exported,
+            )
+        )
 
     # ---- methods --------------------------------------------------------
 
@@ -484,8 +515,9 @@ class _JSExtractor:
         symbols: List[Symbol],
         parent_class: Optional[str],
     ) -> None:
-        name_node = _find_child(node, "property_identifier", "identifier",
-                                "computed_property_name")
+        name_node = _find_child(
+            node, "property_identifier", "identifier", "computed_property_name"
+        )
         name = _node_text(name_node) if name_node else "<anonymous>"
         is_async = any(c.text == "async" for c in node.children if c.text)
         params = self._get_params(node)
@@ -494,17 +526,19 @@ class _JSExtractor:
         # Decorators
         decorators = self._get_decorators(node)
 
-        symbols.append(Symbol(
-            kind=SymbolKind.METHOD,
-            name=name,
-            position=node.position,
-            language=self._lang,
-            parent_name=parent_class,
-            parameters=params,
-            return_type=ret,
-            decorators=decorators,
-            is_async=is_async,
-        ))
+        symbols.append(
+            Symbol(
+                kind=SymbolKind.METHOD,
+                name=name,
+                position=node.position,
+                language=self._lang,
+                parent_name=parent_class,
+                parameters=params,
+                return_type=ret,
+                decorators=decorators,
+                is_async=is_async,
+            )
+        )
 
     # ---- variables / constants ------------------------------------------
 
@@ -526,42 +560,50 @@ class _JSExtractor:
             name = _node_text(name_node)
 
             # Check if the value is an arrow function or function expression
-            value = _find_child(decl, "arrow_function", "function_expression",
-                                "async_arrow_function")
+            value = _find_child(
+                decl, "arrow_function", "function_expression", "async_arrow_function"
+            )
             if value:
                 is_async = value.type == "async_arrow_function" or any(
-                    c.text == "async" for c in value.children if c.text)
+                    c.text == "async" for c in value.children if c.text
+                )
                 params = self._get_params(value)
                 ret = self._get_return_type(value)
-                symbols.append(Symbol(
-                    kind=SymbolKind.FUNCTION,
-                    name=name,
-                    position=node.position,
-                    language=self._lang,
-                    parent_name=parent_class,
-                    parameters=params,
-                    return_type=ret,
-                    is_async=is_async,
-                    is_exported=exported,
-                ))
+                symbols.append(
+                    Symbol(
+                        kind=SymbolKind.FUNCTION,
+                        name=name,
+                        position=node.position,
+                        language=self._lang,
+                        parent_name=parent_class,
+                        parameters=params,
+                        return_type=ret,
+                        is_async=is_async,
+                        is_exported=exported,
+                    )
+                )
             else:
                 # Type annotation
                 ann = _find_child(decl, "type_annotation")
                 ret_type = _node_text(ann).lstrip(":").strip() if ann else None
 
-                symbols.append(Symbol(
-                    kind=SymbolKind.CONSTANT if is_const else SymbolKind.VARIABLE,
-                    name=name,
-                    position=node.position,
-                    language=self._lang,
-                    parent_name=parent_class,
-                    return_type=ret_type,
-                    is_exported=exported,
-                ))
+                symbols.append(
+                    Symbol(
+                        kind=SymbolKind.CONSTANT if is_const else SymbolKind.VARIABLE,
+                        name=name,
+                        position=node.position,
+                        language=self._lang,
+                        parent_name=parent_class,
+                        return_type=ret_type,
+                        is_exported=exported,
+                    )
+                )
 
     # ---- interfaces (TS) ------------------------------------------------
 
-    def _extract_interface(self, node: ASTNode, symbols: List[Symbol], exported: bool) -> None:
+    def _extract_interface(
+        self, node: ASTNode, symbols: List[Symbol], exported: bool
+    ) -> None:
         name_node = _find_child(node, "type_identifier", "identifier")
         name = _node_text(name_node) if name_node else "<anonymous>"
 
@@ -572,42 +614,52 @@ class _JSExtractor:
                 if ident.type in ("type_identifier", "identifier") and ident.text:
                     bases.append(_node_text(ident))
 
-        symbols.append(Symbol(
-            kind=SymbolKind.INTERFACE,
-            name=name,
-            position=node.position,
-            language=self._lang,
-            bases=bases,
-            is_exported=exported,
-        ))
+        symbols.append(
+            Symbol(
+                kind=SymbolKind.INTERFACE,
+                name=name,
+                position=node.position,
+                language=self._lang,
+                bases=bases,
+                is_exported=exported,
+            )
+        )
 
     # ---- enums (TS) -----------------------------------------------------
 
-    def _extract_enum(self, node: ASTNode, symbols: List[Symbol], exported: bool) -> None:
+    def _extract_enum(
+        self, node: ASTNode, symbols: List[Symbol], exported: bool
+    ) -> None:
         name_node = _find_child(node, "identifier")
         name = _node_text(name_node) if name_node else "<anonymous>"
 
-        symbols.append(Symbol(
-            kind=SymbolKind.ENUM,
-            name=name,
-            position=node.position,
-            language=self._lang,
-            is_exported=exported,
-        ))
+        symbols.append(
+            Symbol(
+                kind=SymbolKind.ENUM,
+                name=name,
+                position=node.position,
+                language=self._lang,
+                is_exported=exported,
+            )
+        )
 
     # ---- type aliases (TS) — treated as annotations --------------------
 
-    def _extract_type_alias(self, node: ASTNode, symbols: List[Symbol], exported: bool) -> None:
+    def _extract_type_alias(
+        self, node: ASTNode, symbols: List[Symbol], exported: bool
+    ) -> None:
         name_node = _find_child(node, "type_identifier", "identifier")
         name = _node_text(name_node) if name_node else "<anonymous>"
 
-        symbols.append(Symbol(
-            kind=SymbolKind.ANNOTATION,
-            name=name,
-            position=node.position,
-            language=self._lang,
-            is_exported=exported,
-        ))
+        symbols.append(
+            Symbol(
+                kind=SymbolKind.ANNOTATION,
+                name=name,
+                position=node.position,
+                language=self._lang,
+                is_exported=exported,
+            )
+        )
 
     # ---- helpers --------------------------------------------------------
 
@@ -618,9 +670,13 @@ class _JSExtractor:
             return []
         result = []
         for c in params_node.children:
-            if c.type in ("identifier", "required_parameter",
-                          "optional_parameter", "rest_pattern",
-                          "assignment_pattern"):
+            if c.type in (
+                "identifier",
+                "required_parameter",
+                "optional_parameter",
+                "rest_pattern",
+                "assignment_pattern",
+            ):
                 name = _node_text(c).split(":")[0].split("=")[0].strip()
                 if name and name not in ("(", ")", ","):
                     result.append(name)
@@ -647,6 +703,7 @@ class _JSExtractor:
 # ──────────────────────────────────────────────────────────────────────
 # Symbol Extractor (main entry point)
 # ──────────────────────────────────────────────────────────────────────
+
 
 class SymbolExtractor:
     """

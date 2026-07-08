@@ -1,7 +1,7 @@
-import subprocess
 import logging
+import subprocess
 from datetime import datetime, timezone
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,9 @@ def get_commit_history(repo_dir: str) -> List[Dict[str, Any]]:
         ]
     """
     # %H - commit hash, %an - author name, %ae - author email, %at - author date (unix timestamp), %s - subject
-    output = run_git_command(repo_dir, ["log", "--pretty=format:%H|%an|%ae|%at|%s", "--reverse"])
+    output = run_git_command(
+        repo_dir, ["log", "--pretty=format:%H|%an|%ae|%at|%s", "--reverse"]
+    )
     commits = []
     if not output:
         return commits
@@ -55,13 +57,15 @@ def get_commit_history(repo_dir: str) -> List[Dict[str, Any]]:
         except ValueError:
             committed_at = datetime.now(timezone.utc)
 
-        commits.append({
-            "sha": sha,
-            "author_name": name,
-            "author_email": email,
-            "committed_at": committed_at,
-            "message": message,
-        })
+        commits.append(
+            {
+                "sha": sha,
+                "author_name": name,
+                "author_email": email,
+                "committed_at": committed_at,
+                "message": message,
+            }
+        )
     return commits
 
 

@@ -15,13 +15,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
-from tree_sitter import Language, Parser
-import tree_sitter_python
 import tree_sitter_javascript
+import tree_sitter_python
 import tree_sitter_typescript
+from tree_sitter import Language, Parser
 
 from app.services.language_detector import Language as AppLanguage
-
 
 # ──────────────────────────────────────────────────────────────────────
 # Language setup
@@ -43,9 +42,11 @@ _LANG_MAP: Dict[AppLanguage, Language] = {
 # Data models
 # ──────────────────────────────────────────────────────────────────────
 
+
 @dataclass(frozen=True)
 class Position:
     """A start/end location in the source file (0-indexed rows & columns)."""
+
     start_row: int
     start_col: int
     end_row: int
@@ -63,10 +64,11 @@ class ASTNode:
     Mirrors tree-sitter's node structure with serialisable Python types
     so the tree can be stored, serialised to JSON, or walked later.
     """
-    type: str                           # Grammar node type
-    position: Position                  # Source location
-    text: Optional[str] = None          # Source text (leaf nodes / small nodes)
-    is_named: bool = True               # Named vs anonymous grammar nodes
+
+    type: str  # Grammar node type
+    position: Position  # Source location
+    text: Optional[str] = None  # Source text (leaf nodes / small nodes)
+    is_named: bool = True  # Named vs anonymous grammar nodes
     children: List["ASTNode"] = field(default_factory=list)
     child_count: int = 0
 
@@ -85,7 +87,10 @@ class ASTNode:
         d: dict = {
             "type": self.type,
             "position": {
-                "start": {"row": self.position.start_row, "col": self.position.start_col},
+                "start": {
+                    "row": self.position.start_row,
+                    "col": self.position.start_col,
+                },
                 "end": {"row": self.position.end_row, "col": self.position.end_col},
             },
             "is_named": self.is_named,
@@ -101,6 +106,7 @@ class ASTNode:
 @dataclass
 class ASTResult:
     """Top-level result of parsing a file into an AST."""
+
     file_path: str
     language: AppLanguage
     root: Optional[ASTNode] = None
@@ -249,15 +255,14 @@ class TreeSitterAST:
     def _convert_node(self, ts_node, source_bytes: bytes) -> ASTNode:
         """Recursively convert a tree-sitter node to our ASTNode model."""
         children = [
-            self._convert_node(child, source_bytes)
-            for child in ts_node.children
+            self._convert_node(child, source_bytes) for child in ts_node.children
         ]
 
         # Only store text for small / leaf nodes
         text: Optional[str] = None
         byte_len = ts_node.end_byte - ts_node.start_byte
         if byte_len <= _MAX_TEXT_BYTES:
-            text = source_bytes[ts_node.start_byte: ts_node.end_byte].decode(
+            text = source_bytes[ts_node.start_byte : ts_node.end_byte].decode(
                 "utf-8", errors="replace"
             )
 

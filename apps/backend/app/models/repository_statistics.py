@@ -1,4 +1,4 @@
-from sqlalchemy import Column, ForeignKey, Integer, Float, String, JSON
+from sqlalchemy import JSON, Column, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
@@ -9,7 +9,10 @@ class RepositoryStatistics(Base):
 
     id = Column(String, primary_key=True, index=True)
     repository_id = Column(
-        String, ForeignKey("repositories.id", ondelete="CASCADE"), nullable=False, unique=True
+        String,
+        ForeignKey("repositories.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
     )
     total_files = Column(Integer, default=0, nullable=False)
     total_lines = Column(Integer, default=0, nullable=False)

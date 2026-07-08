@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, Float, String, JSON
+from sqlalchemy import JSON, Column, DateTime, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -52,7 +52,9 @@ class ComponentSnapshot(Base):
     commit_snapshot_id = Column(
         String, ForeignKey("commit_snapshots.id", ondelete="CASCADE"), nullable=False
     )
-    path = Column(String, nullable=False, index=True)  # path/to/file, folder/path, or domain name
+    path = Column(
+        String, nullable=False, index=True
+    )  # path/to/file, folder/path, or domain name
     type = Column(String, nullable=False)  # "file", "folder", "domain"
     name = Column(String, nullable=False)
 

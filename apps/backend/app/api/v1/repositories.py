@@ -1,17 +1,18 @@
-from typing import List, Optional, Dict
-from fastapi import APIRouter, Depends, status, HTTPException
+from typing import Dict, List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api.v1.auth import get_current_user
 from app.core.database import get_db
-from app.models.user import User
-from app.models.repository import Repository
 from app.models.file import File
-from app.models.symbol import Symbol
+from app.models.repository import Repository
 from app.models.repository_statistics import RepositoryStatistics
-from app.services.repository import RepositoryService
+from app.models.symbol import Symbol
+from app.models.user import User
 from app.services.parse_service import ParseService
+from app.services.repository import RepositoryService
 
 router = APIRouter()
 
@@ -84,7 +85,6 @@ class FileResponse(BaseModel):
 
     class Config:
         from_attributes = True
-
 
 
 class SymbolResponse(BaseModel):
@@ -178,7 +178,6 @@ def get_repositories(
     ]
 
 
-
 @router.delete("/repositories/{repo_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_repository(
     repo_id: str,
@@ -202,7 +201,9 @@ def parse_repository(
 ):
     repo = db.query(Repository).filter(Repository.id == repo_id).first()
     if not repo or repo.user_id != user.id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repository not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Repository not found"
+        )
 
     stats = service.parse_repository(db=db, repo_id=repo_id)
     return stats
@@ -219,7 +220,9 @@ def get_files(
 ):
     repo = db.query(Repository).filter(Repository.id == repo_id).first()
     if not repo or repo.user_id != user.id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repository not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Repository not found"
+        )
 
     files = db.query(File).filter(File.repository_id == repo_id).all()
     res = []
@@ -238,25 +241,24 @@ def get_files(
         imports_resp = []
         if f.imports:
             for imp in f.imports:
-                imports_resp.append(ImportResponse(
-                    module=imp.module,
-                    names=imp.names,
-                    line=imp.line
-                ))
-        res.append(FileResponse(
-            id=f.id,
-            file_path=f.file_path,
-            language=f.language,
-            size_bytes=f.size_bytes,
-            code_lines=f.code_lines,
-            comment_lines=f.comment_lines,
-            blank_lines=f.blank_lines,
-            total_lines=f.total_lines,
-            metrics=metrics_resp,
-            imports=imports_resp
-        ))
+                imports_resp.append(
+                    ImportResponse(module=imp.module, names=imp.names, line=imp.line)
+                )
+        res.append(
+            FileResponse(
+                id=f.id,
+                file_path=f.file_path,
+                language=f.language,
+                size_bytes=f.size_bytes,
+                code_lines=f.code_lines,
+                comment_lines=f.comment_lines,
+                blank_lines=f.blank_lines,
+                total_lines=f.total_lines,
+                metrics=metrics_resp,
+                imports=imports_resp,
+            )
+        )
     return res
-
 
 
 @router.get(
@@ -270,25 +272,29 @@ def get_symbols(
 ):
     repo = db.query(Repository).filter(Repository.id == repo_id).first()
     if not repo or repo.user_id != user.id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repository not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Repository not found"
+        )
 
     symbols = db.query(Symbol).join(File).filter(File.repository_id == repo_id).all()
     res = []
     for sym in symbols:
-        res.append(SymbolResponse(
-            id=sym.id,
-            name=sym.name,
-            kind=sym.kind,
-            file_path=sym.file.file_path,
-            start_line=sym.start_line,
-            start_column=sym.start_column,
-            end_line=sym.end_line,
-            end_column=sym.end_column,
-            parent_name=sym.parent_name,
-            docstring=sym.docstring,
-            is_async=sym.is_async,
-            is_exported=sym.is_exported,
-        ))
+        res.append(
+            SymbolResponse(
+                id=sym.id,
+                name=sym.name,
+                kind=sym.kind,
+                file_path=sym.file.file_path,
+                start_line=sym.start_line,
+                start_column=sym.start_column,
+                end_line=sym.end_line,
+                end_column=sym.end_column,
+                parent_name=sym.parent_name,
+                docstring=sym.docstring,
+                is_async=sym.is_async,
+                is_exported=sym.is_exported,
+            )
+        )
     return res
 
 
@@ -303,11 +309,20 @@ def get_metrics(
 ):
     repo = db.query(Repository).filter(Repository.id == repo_id).first()
     if not repo or repo.user_id != user.id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repository not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Repository not found"
+        )
 
-    stats = db.query(RepositoryStatistics).filter(RepositoryStatistics.repository_id == repo_id).first()
+    stats = (
+        db.query(RepositoryStatistics)
+        .filter(RepositoryStatistics.repository_id == repo_id)
+        .first()
+    )
     if not stats:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Repository has not been parsed yet")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Repository has not been parsed yet",
+        )
 
     files = db.query(File).filter(File.repository_id == repo_id).all()
     file_metric_summaries = []
@@ -319,15 +334,12 @@ def get_metrics(
                 file_path=f.file_path,
                 complexity_total=comp_tot,
                 coverage_percent=cov_pct,
-                total_lines=f.total_lines
+                total_lines=f.total_lines,
             )
         )
 
     stats_resp = RepositoryStatisticsResponse.model_validate(stats)
-    return RepositoryMetricsResponse(
-        statistics=stats_resp,
-        files=file_metric_summaries
-    )
+    return RepositoryMetricsResponse(statistics=stats_resp, files=file_metric_summaries)
 
 
 @router.get(
@@ -341,11 +353,19 @@ def get_languages(
 ):
     repo = db.query(Repository).filter(Repository.id == repo_id).first()
     if not repo or repo.user_id != user.id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repository not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Repository not found"
+        )
 
-    stats = db.query(RepositoryStatistics).filter(RepositoryStatistics.repository_id == repo_id).first()
+    stats = (
+        db.query(RepositoryStatistics)
+        .filter(RepositoryStatistics.repository_id == repo_id)
+        .first()
+    )
     if not stats:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Repository has not been parsed yet")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Repository has not been parsed yet",
+        )
 
     return LanguageBreakdownResponse(languages=stats.languages or {})
-

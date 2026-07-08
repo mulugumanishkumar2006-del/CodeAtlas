@@ -20,14 +20,15 @@ from app.services.ast_service import ASTNode, ASTResult
 from app.services.language_detector import Language
 from app.services.symbol_extractor import ExtractionResult, SymbolKind
 
-
 # ──────────────────────────────────────────────────────────────────────
 # Data models
 # ──────────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class LineMetrics:
     """Line-level breakdown."""
+
     total: int = 0
     code: int = 0
     blank: int = 0
@@ -37,24 +38,27 @@ class LineMetrics:
 @dataclass
 class ComplexityMetrics:
     """Cyclomatic complexity information."""
-    total: int = 0                       # Sum across all functions
-    average: float = 0.0                 # Average per function
-    max: int = 0                         # Highest single-function complexity
-    max_function: Optional[str] = None   # Name of the most complex function
+
+    total: int = 0  # Sum across all functions
+    average: float = 0.0  # Average per function
+    max: int = 0  # Highest single-function complexity
+    max_function: Optional[str] = None  # Name of the most complex function
     per_function: Dict[str, int] = field(default_factory=dict)
 
 
 @dataclass
 class DocumentationMetrics:
     """Documentation / docstring coverage."""
+
     documented_symbols: int = 0
-    total_documentable: int = 0          # classes + functions + methods
+    total_documentable: int = 0  # classes + functions + methods
     coverage_percent: float = 0.0
 
 
 @dataclass
 class FileMetadata:
     """Complete metadata for a single source file."""
+
     file_path: str
     language: Language
     file_size_bytes: int
@@ -76,6 +80,7 @@ class FileMetadata:
 @dataclass
 class RepositoryMetadata:
     """Aggregated metadata for an entire repository."""
+
     files: List[FileMetadata] = field(default_factory=list)
 
     @property
@@ -104,7 +109,9 @@ class RepositoryMetadata:
 
     @property
     def average_complexity(self) -> float:
-        complexities = [f.complexity.average for f in self.files if f.complexity.average > 0]
+        complexities = [
+            f.complexity.average for f in self.files if f.complexity.average > 0
+        ]
         return sum(complexities) / len(complexities) if complexities else 0.0
 
     @property
@@ -146,7 +153,7 @@ _SINGLE_LINE_COMMENT = {
 }
 
 _MULTI_LINE_COMMENT_START = {
-    Language.PYTHON: re.compile(r'^\s*("""|\'\'\')')  ,  # docstrings
+    Language.PYTHON: re.compile(r'^\s*("""|\'\'\')'),  # docstrings
     Language.JAVASCRIPT: re.compile(r"^\s*/\*"),
     Language.TYPESCRIPT: re.compile(r"^\s*/\*"),
 }
@@ -164,15 +171,35 @@ _MULTI_LINE_COMMENT_END = {
 
 _BRANCH_KEYWORDS = {
     Language.PYTHON: {"if", "elif", "for", "while", "except", "with", "and", "or"},
-    Language.JAVASCRIPT: {"if", "else if", "for", "while", "do", "catch", "case", "&&", "||", "?"},
-    Language.TYPESCRIPT: {"if", "else if", "for", "while", "do", "catch", "case", "&&", "||", "?"},
+    Language.JAVASCRIPT: {
+        "if",
+        "else if",
+        "for",
+        "while",
+        "do",
+        "catch",
+        "case",
+        "&&",
+        "||",
+        "?",
+    },
+    Language.TYPESCRIPT: {
+        "if",
+        "else if",
+        "for",
+        "while",
+        "do",
+        "catch",
+        "case",
+        "&&",
+        "||",
+        "?",
+    },
 }
 
 # Regex to match branch-inducing tokens in source
 _BRANCH_PATTERNS = {
-    Language.PYTHON: re.compile(
-        r"\b(if|elif|for|while|except|with)\b|\b(and|or)\b"
-    ),
+    Language.PYTHON: re.compile(r"\b(if|elif|for|while|except|with)\b|\b(and|or)\b"),
     Language.JAVASCRIPT: re.compile(
         r"\b(if|for|while|do|catch|case)\b|(\?\s*[^?:])|(\&\&|\|\|)"
     ),
@@ -185,6 +212,7 @@ _BRANCH_PATTERNS = {
 # ──────────────────────────────────────────────────────────────────────
 # Metadata Engine
 # ──────────────────────────────────────────────────────────────────────
+
 
 class MetadataEngine:
     """
@@ -355,7 +383,8 @@ class MetadataEngine:
         matches = pattern.findall(text)
         # Each match is a tuple of groups; count non-empty groups
         branch_count = sum(
-            1 for match in matches
+            1
+            for match in matches
             for group in (match if isinstance(match, tuple) else (match,))
             if group
         )

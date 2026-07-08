@@ -61,4 +61,3 @@ class RepositoryService:
 
     def get_repositories_by_user(self, db: Session, user: User) -> List[Repository]:
         return repository_repository.get_by_user_id(db, user.id)
-

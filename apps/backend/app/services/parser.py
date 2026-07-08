@@ -21,33 +21,36 @@ from typing import List, Optional
 
 from app.services.language_detector import Language
 
-
 # ──────────────────────────────────────────────────────────────────────
 # Data models
 # ──────────────────────────────────────────────────────────────────────
 
+
 @dataclass(frozen=True)
 class ImportStatement:
     """A single import found in a source file."""
-    module: str           # e.g. "os.path" or "react"
-    names: List[str]      # e.g. ["join", "dirname"]  (empty for bare imports)
-    line: int             # 1-indexed source line
+
+    module: str  # e.g. "os.path" or "react"
+    names: List[str]  # e.g. ["join", "dirname"]  (empty for bare imports)
+    line: int  # 1-indexed source line
 
 
 @dataclass(frozen=True)
 class FunctionSymbol:
     """A function or method definition."""
+
     name: str
     line: int
     end_line: Optional[int] = None
     parameters: List[str] = field(default_factory=list)
-    is_method: bool = False        # True when nested inside a class
+    is_method: bool = False  # True when nested inside a class
     is_async: bool = False
 
 
 @dataclass(frozen=True)
 class ClassSymbol:
     """A class definition."""
+
     name: str
     line: int
     end_line: Optional[int] = None
@@ -58,6 +61,7 @@ class ClassSymbol:
 @dataclass
 class ParseResult:
     """Aggregated output of parsing a single source file."""
+
     file_path: str
     language: Language
     imports: List[ImportStatement] = field(default_factory=list)
@@ -81,6 +85,7 @@ class ParseResult:
 # Abstract base parser
 # ──────────────────────────────────────────────────────────────────────
 
+
 class BaseParser(ABC):
     """Contract that every language parser must satisfy."""
 
@@ -100,8 +105,7 @@ class BaseParser(ABC):
 
     @property
     @abstractmethod
-    def language(self) -> Language:
-        ...
+    def language(self) -> Language: ...
 
     # Shared helper
     @staticmethod
@@ -113,6 +117,7 @@ class BaseParser(ABC):
 # ──────────────────────────────────────────────────────────────────────
 # Python parser  (uses the stdlib ``ast`` module)
 # ──────────────────────────────────────────────────────────────────────
+
 
 class PythonParser(BaseParser):
     """Parses Python files using the built-in ``ast`` module."""
@@ -139,7 +144,9 @@ class PythonParser(BaseParser):
             elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 # Only top-level functions (not methods inside classes)
                 if not self._is_method(node, tree):
-                    result.functions.append(self._convert_function(node, is_method=False))
+                    result.functions.append(
+                        self._convert_function(node, is_method=False)
+                    )
 
         return result
 
@@ -204,8 +211,7 @@ class PythonParser(BaseParser):
 # ──────────────────────────────────────────────────────────────────────
 
 # Shared regex patterns for JS/TS
-_RE_IMPORT = re.compile(
-    r"""(?mx)
+_RE_IMPORT = re.compile(r"""(?mx)
     ^[ \t]*import\s+
     (?:
       (?:\{([^}]+)\}\s+from\s+)           # named:  import { a, b } from '...'
@@ -214,54 +220,43 @@ _RE_IMPORT = re.compile(
       |()                                 # bare:   import '...'
     )
     ['"]([^'"]+)['"]
-    """
-)
+    """)
 
-_RE_REQUIRE = re.compile(
-    r"""(?mx)
+_RE_REQUIRE = re.compile(r"""(?mx)
     ^[ \t]*(?:const|let|var)\s+
     (?:
       \{([^}]+)\}                          # destructured require
       |(\w+)                               # simple require
     )
     \s*=\s*require\s*\(\s*['"]([^'"]+)['"]\s*\)
-    """
-)
+    """)
 
-_RE_FUNCTION = re.compile(
-    r"""(?mx)
+_RE_FUNCTION = re.compile(r"""(?mx)
     ^[ \t]*(?:export\s+)?(?:default\s+)?
     (async\s+)?
     function\s*(\*?)\s*(\w+)\s*
     \(([^)]*)\)
-    """
-)
+    """)
 
-_RE_ARROW_FUNCTION = re.compile(
-    r"""(?mx)
+_RE_ARROW_FUNCTION = re.compile(r"""(?mx)
     ^[ \t]*(?:export\s+)?(?:const|let|var)\s+
     (\w+)\s*=\s*(async\s+)?
     (?:\([^)]*\)|[a-zA-Z_]\w*)\s*=>
-    """
-)
+    """)
 
-_RE_CLASS = re.compile(
-    r"""(?mx)
+_RE_CLASS = re.compile(r"""(?mx)
     ^[ \t]*(?:export\s+)?(?:default\s+)?(?:abstract\s+)?
     class\s+(\w+)
     (?:\s+extends\s+(\w+))?
     (?:\s+implements\s+[\w,\s]+)?
     \s*\{
-    """
-)
+    """)
 
-_RE_METHOD = re.compile(
-    r"""(?mx)
+_RE_METHOD = re.compile(r"""(?mx)
     ^[ \t]+(async\s+)?
     (?:static\s+)?(?:get\s+|set\s+)?
     (\w+)\s*\(([^)]*)\)\s*[\{:]
-    """
-)
+    """)
 
 
 class _JSBaseParser(BaseParser):
@@ -286,13 +281,19 @@ class _JSBaseParser(BaseParser):
             named, default, star, bare, module = m.groups()
             names: list[str] = []
             if named:
-                names = [n.strip().split(" as ")[0].strip() for n in named.split(",") if n.strip()]
+                names = [
+                    n.strip().split(" as ")[0].strip()
+                    for n in named.split(",")
+                    if n.strip()
+                ]
             elif default:
                 names = [default]
             elif star:
                 names = [f"* as {star}"]
             line = source[: m.start()].count("\n") + 1
-            result.imports.append(ImportStatement(module=module, names=names, line=line))
+            result.imports.append(
+                ImportStatement(module=module, names=names, line=line)
+            )
 
         for m in _RE_REQUIRE.finditer(source):
             destructured, simple, module = m.groups()
@@ -302,7 +303,9 @@ class _JSBaseParser(BaseParser):
             elif simple:
                 names = [simple]
             line = source[: m.start()].count("\n") + 1
-            result.imports.append(ImportStatement(module=module, names=names, line=line))
+            result.imports.append(
+                ImportStatement(module=module, names=names, line=line)
+            )
 
     # -- functions ---------------------------------------------------------
 
@@ -310,25 +313,32 @@ class _JSBaseParser(BaseParser):
     def _extract_functions(source: str, lines: list[str], result: ParseResult) -> None:
         for m in _RE_FUNCTION.finditer(source):
             is_async_str, _generator, name, params_str = m.groups()
-            params = [p.strip().split(":")[0].split("=")[0].strip()
-                      for p in params_str.split(",") if p.strip()]
+            params = [
+                p.strip().split(":")[0].split("=")[0].strip()
+                for p in params_str.split(",")
+                if p.strip()
+            ]
             line = source[: m.start()].count("\n") + 1
-            result.functions.append(FunctionSymbol(
-                name=name,
-                line=line,
-                parameters=params,
-                is_async=bool(is_async_str),
-            ))
+            result.functions.append(
+                FunctionSymbol(
+                    name=name,
+                    line=line,
+                    parameters=params,
+                    is_async=bool(is_async_str),
+                )
+            )
 
         for m in _RE_ARROW_FUNCTION.finditer(source):
             name, is_async_str = m.groups()
             line = source[: m.start()].count("\n") + 1
             # Avoid duplicating class methods picked up as arrow fns
-            result.functions.append(FunctionSymbol(
-                name=name,
-                line=line,
-                is_async=bool(is_async_str),
-            ))
+            result.functions.append(
+                FunctionSymbol(
+                    name=name,
+                    line=line,
+                    is_async=bool(is_async_str),
+                )
+            )
 
     # -- classes -----------------------------------------------------------
 
@@ -353,26 +363,36 @@ class _JSBaseParser(BaseParser):
                     if brace_depth == 0:
                         break
                 i += 1
-            class_body = source[class_start: i + 1]
+            class_body = source[class_start : i + 1]
 
             for mm in _RE_METHOD.finditer(class_body):
                 is_async_str, mname, params_str = mm.groups()
                 if mname in ("if", "for", "while", "switch", "catch"):
                     continue
-                params = [p.strip().split(":")[0].split("=")[0].strip()
-                          for p in params_str.split(",") if p.strip()]
+                params = [
+                    p.strip().split(":")[0].split("=")[0].strip()
+                    for p in params_str.split(",")
+                    if p.strip()
+                ]
                 mline = line + class_body[: mm.start()].count("\n")
-                methods.append(FunctionSymbol(
-                    name=mname,
-                    line=mline,
-                    parameters=params,
-                    is_method=True,
-                    is_async=bool(is_async_str),
-                ))
+                methods.append(
+                    FunctionSymbol(
+                        name=mname,
+                        line=mline,
+                        parameters=params,
+                        is_method=True,
+                        is_async=bool(is_async_str),
+                    )
+                )
 
-            result.classes.append(ClassSymbol(
-                name=name, line=line, bases=bases, methods=methods,
-            ))
+            result.classes.append(
+                ClassSymbol(
+                    name=name,
+                    line=line,
+                    bases=bases,
+                    methods=methods,
+                )
+            )
 
 
 class JavaScriptParser(_JSBaseParser):
@@ -394,6 +414,7 @@ class TypeScriptParser(_JSBaseParser):
 # ──────────────────────────────────────────────────────────────────────
 # Parser Factory
 # ──────────────────────────────────────────────────────────────────────
+
 
 class ParserFactory:
     """

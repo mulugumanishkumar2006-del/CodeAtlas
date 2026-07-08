@@ -1,5 +1,7 @@
-from pydantic import BaseModel
 from typing import List, Optional
+
+from pydantic import BaseModel
+
 
 class EntityContextResponse(BaseModel):
     name: str
@@ -10,14 +12,17 @@ class EntityContextResponse(BaseModel):
     related_pr: Optional[str] = None
     dependencies: List[str]
 
+
 class LineageStep(BaseModel):
     type: str  # API, Doc, ADR, Implementation, Test
     name: str
     file_path: Optional[str] = None
 
+
 class EntityLineageResponse(BaseModel):
     entity_name: str
     steps: List[LineageStep]
+
 
 class NodeContextResponse(BaseModel):
     node_id: str

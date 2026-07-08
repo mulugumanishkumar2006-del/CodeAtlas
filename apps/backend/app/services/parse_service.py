@@ -1,30 +1,29 @@
 import os
 import uuid
-from typing import List, Dict
+from typing import Dict, List
 
-from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
+from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.neo4j_client import neo4j_client
 from app.models.file import File
-from app.models.symbol import Symbol
-from app.models.import_model import Import
-from app.models.relationship import Relationship
-from app.models.metric import Metric
-from app.models.repository import Repository
-from app.models.repository_statistics import RepositoryStatistics
+from app.models.graph_enums import GraphNodeType, GraphRelationshipType
 from app.models.graph_node import GraphNode
 from app.models.graph_relationship import GraphRelationship
-from app.models.graph_enums import GraphNodeType, GraphRelationshipType
-from app.core.neo4j_client import neo4j_client
-
-from app.services.scanner import RepositoryScanner
-from app.services.language_detector import LanguageDetector, Language
-from app.services.ast_service import TreeSitterAST, ASTResult
-from app.services.symbol_extractor import SymbolExtractor, ExtractionResult
+from app.models.import_model import Import
+from app.models.metric import Metric
+from app.models.relationship import Relationship
+from app.models.repository import Repository
+from app.models.repository_statistics import RepositoryStatistics
+from app.models.symbol import Symbol
+from app.services.ast_service import ASTResult, TreeSitterAST
+from app.services.language_detector import LanguageDetector
+from app.services.metadata_engine import FileMetadata, MetadataEngine
 from app.services.parser import ParserFactory
 from app.services.relationship_builder import RelationshipBuilder
-from app.services.metadata_engine import MetadataEngine, FileMetadata
+from app.services.scanner import RepositoryScanner
+from app.services.symbol_extractor import ExtractionResult, SymbolExtractor
 
 
 class ParseService:
@@ -55,13 +54,17 @@ class ParseService:
         if not os.path.exists(repo_dir):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Cloned repository directory not found on disk",
+                detail="Cloned repository directory not found on disk",
             )
 
         # Clear existing parsed data to allow overwrite
-        db.query(RepositoryStatistics).filter(RepositoryStatistics.repository_id == repo_id).delete()
+        db.query(RepositoryStatistics).filter(
+            RepositoryStatistics.repository_id == repo_id
+        ).delete()
         db.query(Relationship).filter(Relationship.repository_id == repo_id).delete()
-        db.query(GraphRelationship).filter(GraphRelationship.repository_id == repo_id).delete()
+        db.query(GraphRelationship).filter(
+            GraphRelationship.repository_id == repo_id
+        ).delete()
         db.query(GraphNode).filter(GraphNode.repository_id == repo_id).delete()
         # Deleting files cascades to symbols, imports, and metrics
         db.query(File).filter(File.repository_id == repo_id).delete()
@@ -76,12 +79,16 @@ class ParseService:
 
         for scanned_file in scan_result.files:
             # Detect language
-            detection = self.detector.detect(scanned_file.absolute_path, extension=scanned_file.extension)
+            detection = self.detector.detect(
+                scanned_file.absolute_path, extension=scanned_file.extension
+            )
             lang = detection.language
 
             # Read source content
             try:
-                with open(scanned_file.absolute_path, "r", encoding="utf-8", errors="ignore") as f:
+                with open(
+                    scanned_file.absolute_path, "r", encoding="utf-8", errors="ignore"
+                ) as f:
                     source_content = f.read()
             except Exception:
                 source_content = ""
@@ -105,9 +112,13 @@ class ParseService:
             # Process files with AST support
             if self.ast_gen.supports(lang):
                 if scanned_file.extension == ".tsx":
-                    ast_result = self.ast_gen.parse_tsx_file(scanned_file.absolute_path, source=source_content)
+                    ast_result = self.ast_gen.parse_tsx_file(
+                        scanned_file.absolute_path, source=source_content
+                    )
                 else:
-                    ast_result = self.ast_gen.parse_file(scanned_file.absolute_path, lang, source=source_content)
+                    ast_result = self.ast_gen.parse_file(
+                        scanned_file.absolute_path, lang, source=source_content
+                    )
 
                 if ast_result and not ast_result.error:
                     # Extract symbols
@@ -119,13 +130,13 @@ class ParseService:
                         language=ast_result.language,
                         root=ast_result.root,
                         total_nodes=ast_result.total_nodes,
-                        error=ast_result.error
+                        error=ast_result.error,
                     )
                     extractions[scanned_file.relative_path] = ExtractionResult(
                         file_path=scanned_file.relative_path,
                         language=extraction_result.language,
                         symbols=extraction_result.symbols,
-                        errors=extraction_result.errors
+                        errors=extraction_result.errors,
                     )
 
             # Analyze file metrics
@@ -190,7 +201,9 @@ class ParseService:
             parser = self.parser_factory.get_parser(lang)
             if parser:
                 try:
-                    parse_result = parser.parse(scanned_file.absolute_path, source=source_content)
+                    parse_result = parser.parse(
+                        scanned_file.absolute_path, source=source_content
+                    )
                     for imp in parse_result.imports:
                         db_import = Import(
                             id=str(uuid.uuid4()),
@@ -217,7 +230,9 @@ class ParseService:
                     return "Domain"
                 if t_lower in ("file", "module"):
                     return "Module"
-                if t_lower == "service" or (t_lower == "class" and "service" in n_lower):
+                if t_lower == "service" or (
+                    t_lower == "class" and "service" in n_lower
+                ):
                     return "Service"
                 if t_lower in ("api endpoint", "api", "api_endpoint"):
                     return "API"
@@ -246,7 +261,10 @@ class ParseService:
                         repository_id=repo_id,
                         type=GraphNodeType.MODULE.value,
                         name=layer,
-                        properties={"layer": layer, "raw_type": GraphNodeType.MODULE.value}
+                        properties={
+                            "layer": layer,
+                            "raw_type": GraphNodeType.MODULE.value,
+                        },
                     )
                     db.add(db_graph_node)
                     added_node_ids.add(layer_id)
@@ -260,7 +278,11 @@ class ParseService:
                     return "Service"
                 if "repository" in path_lower or "repos" in path_lower:
                     return "Repository"
-                if "db" in path_lower or "database" in path_lower or "models" in path_lower:
+                if (
+                    "db" in path_lower
+                    or "database" in path_lower
+                    or "models" in path_lower
+                ):
                     return "Database"
                 return "Other"
 
@@ -277,13 +299,18 @@ class ParseService:
                 folder_id = scope_id(f"folder::{folder}")
                 if folder_id not in added_node_ids:
                     folder_name = folder.split("/")[-1]
-                    canonical_type = map_to_ontology_type(GraphNodeType.FOLDER.value, folder_name)
+                    canonical_type = map_to_ontology_type(
+                        GraphNodeType.FOLDER.value, folder_name
+                    )
                     db_graph_node = GraphNode(
                         id=folder_id,
                         repository_id=repo_id,
                         type=canonical_type,
                         name=folder_name,
-                        properties={"path": folder, "raw_type": GraphNodeType.FOLDER.value}
+                        properties={
+                            "path": folder,
+                            "raw_type": GraphNodeType.FOLDER.value,
+                        },
                     )
                     db.add(db_graph_node)
                     added_node_ids.add(folder_id)
@@ -297,7 +324,11 @@ class ParseService:
                     repository_id=repo_id,
                     type=GraphNodeType.REPOSITORY.value,
                     name=repo.name,
-                    properties={"full_name": repo.full_name, "clone_url": repo.clone_url, "raw_type": GraphNodeType.REPOSITORY.value}
+                    properties={
+                        "full_name": repo.full_name,
+                        "clone_url": repo.clone_url,
+                        "raw_type": GraphNodeType.REPOSITORY.value,
+                    },
                 )
                 db.add(db_repo_node)
                 added_node_ids.add(repo_node_id)
@@ -311,7 +342,10 @@ class ParseService:
                     repository_id=repo_id,
                     type=GraphNodeType.ENVIRONMENT.value,
                     name=env_name,
-                    properties={"environment": env_name, "raw_type": GraphNodeType.ENVIRONMENT.value}
+                    properties={
+                        "environment": env_name,
+                        "raw_type": GraphNodeType.ENVIRONMENT.value,
+                    },
                 )
                 db.add(db_env_node)
                 added_node_ids.add(env_node_id)
@@ -322,7 +356,7 @@ class ParseService:
                 source_id=repo_node_id,
                 target_id=env_node_id,
                 type=GraphRelationshipType.DEPLOYS_TO.value,
-                properties={"label": f"deploys to {env_name} environment"}
+                properties={"label": f"deploys to {env_name} environment"},
             )
             db.add(db_deploys)
 
@@ -331,62 +365,80 @@ class ParseService:
             for path, extraction in extractions.items():
                 file_node_id = f"file::{path}"
                 for sym in extraction.symbols:
-                    sym_id = f"symbol::{path}::{sym.parent_name}.{sym.name}" if sym.parent_name else f"symbol::{path}::{sym.name}"
-                    
+                    sym_id = (
+                        f"symbol::{path}::{sym.parent_name}.{sym.name}"
+                        if sym.parent_name
+                        else f"symbol::{path}::{sym.name}"
+                    )
+
                     if not sym.parent_name:
                         # File OWNS symbol
-                        db.add(GraphRelationship(
-                            id=str(uuid.uuid4()),
-                            repository_id=repo_id,
-                            source_id=file_node_id,
-                            target_id=sym_id,
-                            type=GraphRelationshipType.OWNS.value,
-                            properties={"label": f"owns {sym.name}"}
-                        ))
+                        db.add(
+                            GraphRelationship(
+                                id=str(uuid.uuid4()),
+                                repository_id=repo_id,
+                                source_id=file_node_id,
+                                target_id=sym_id,
+                                type=GraphRelationshipType.OWNS.value,
+                                properties={"label": f"owns {sym.name}"},
+                            )
+                        )
                         # Symbol BELONGS_TO File
-                        db.add(GraphRelationship(
-                            id=str(uuid.uuid4()),
-                            repository_id=repo_id,
-                            source_id=sym_id,
-                            target_id=file_node_id,
-                            type=GraphRelationshipType.BELONGS_TO.value,
-                            properties={"label": f"belongs to {path}"}
-                        ))
+                        db.add(
+                            GraphRelationship(
+                                id=str(uuid.uuid4()),
+                                repository_id=repo_id,
+                                source_id=sym_id,
+                                target_id=file_node_id,
+                                type=GraphRelationshipType.BELONGS_TO.value,
+                                properties={"label": f"belongs to {path}"},
+                            )
+                        )
                     else:
                         parent_id = f"symbol::{path}::{sym.parent_name}"
                         # Class OWNS Method
-                        db.add(GraphRelationship(
-                            id=str(uuid.uuid4()),
-                            repository_id=repo_id,
-                            source_id=parent_id,
-                            target_id=sym_id,
-                            type=GraphRelationshipType.OWNS.value,
-                            properties={"label": f"owns {sym.name}"}
-                        ))
+                        db.add(
+                            GraphRelationship(
+                                id=str(uuid.uuid4()),
+                                repository_id=repo_id,
+                                source_id=parent_id,
+                                target_id=sym_id,
+                                type=GraphRelationshipType.OWNS.value,
+                                properties={"label": f"owns {sym.name}"},
+                            )
+                        )
                         # Method BELONGS_TO Class
-                        db.add(GraphRelationship(
-                            id=str(uuid.uuid4()),
-                            repository_id=repo_id,
-                            source_id=sym_id,
-                            target_id=parent_id,
-                            type=GraphRelationshipType.BELONGS_TO.value,
-                            properties={"label": f"belongs to {sym.parent_name}"}
-                        ))
+                        db.add(
+                            GraphRelationship(
+                                id=str(uuid.uuid4()),
+                                repository_id=repo_id,
+                                source_id=sym_id,
+                                target_id=parent_id,
+                                type=GraphRelationshipType.BELONGS_TO.value,
+                                properties={"label": f"belongs to {sym.parent_name}"},
+                            )
+                        )
 
             # 4. File exposures (EXPOSES)
             for path, extraction in extractions.items():
                 file_node_id = f"file::{path}"
                 for sym in extraction.symbols:
                     if sym.is_exported:
-                        sym_id = f"symbol::{path}::{sym.parent_name}.{sym.name}" if sym.parent_name else f"symbol::{path}::{sym.name}"
-                        db.add(GraphRelationship(
-                            id=str(uuid.uuid4()),
-                            repository_id=repo_id,
-                            source_id=file_node_id,
-                            target_id=sym_id,
-                            type=GraphRelationshipType.EXPOSES.value,
-                            properties={"label": f"exposes {sym.name}"}
-                        ))
+                        sym_id = (
+                            f"symbol::{path}::{sym.parent_name}.{sym.name}"
+                            if sym.parent_name
+                            else f"symbol::{path}::{sym.name}"
+                        )
+                        db.add(
+                            GraphRelationship(
+                                id=str(uuid.uuid4()),
+                                repository_id=repo_id,
+                                source_id=file_node_id,
+                                target_id=sym_id,
+                                type=GraphRelationshipType.EXPOSES.value,
+                                properties={"label": f"exposes {sym.name}"},
+                            )
+                        )
 
             # Save GraphNodes from the parsed codebase
             for node_id, node in graph.nodes.items():
@@ -417,7 +469,10 @@ class ParseService:
                         repository_id=repo_id,
                         type=canonical_type,
                         name=node.name,
-                        properties={**(node.metadata or {}), "raw_type": node_type.value}
+                        properties={
+                            **(node.metadata or {}),
+                            "raw_type": node_type.value,
+                        },
                     )
                     db.add(db_graph_node)
                     added_node_ids.add(scoped_id)
@@ -427,9 +482,19 @@ class ParseService:
             service_nodes = []
             db_table_nodes = []
             for node_id, node in graph.nodes.items():
-                is_service = "service" in node.name.lower() or "service" in node_id.lower()
-                is_api = "api" in node.name.lower() or "router" in node_id.lower() or "endpoint" in node.name.lower()
-                is_db = "db" in node.name.lower() or "database" in node_id.lower() or "model" in node.name.lower()
+                is_service = (
+                    "service" in node.name.lower() or "service" in node_id.lower()
+                )
+                is_api = (
+                    "api" in node.name.lower()
+                    or "router" in node_id.lower()
+                    or "endpoint" in node.name.lower()
+                )
+                is_db = (
+                    "db" in node.name.lower()
+                    or "database" in node_id.lower()
+                    or "model" in node.name.lower()
+                )
                 if is_service:
                     service_nodes.append(node)
                 if is_api:
@@ -439,31 +504,41 @@ class ParseService:
 
             for s_node in service_nodes:
                 for a_node in api_nodes:
-                    db.add(GraphRelationship(
-                        id=str(uuid.uuid4()),
-                        repository_id=repo_id,
-                        source_id=scope_id(s_node.id),
-                        target_id=scope_id(a_node.id),
-                        type=GraphRelationshipType.EXPOSES.value,
-                        properties={"label": f"exposes API endpoint {a_node.name}"}
-                    ))
+                    db.add(
+                        GraphRelationship(
+                            id=str(uuid.uuid4()),
+                            repository_id=repo_id,
+                            source_id=scope_id(s_node.id),
+                            target_id=scope_id(a_node.id),
+                            type=GraphRelationshipType.EXPOSES.value,
+                            properties={"label": f"exposes API endpoint {a_node.name}"},
+                        )
+                    )
                 for d_node in db_table_nodes:
-                    db.add(GraphRelationship(
-                        id=str(uuid.uuid4()),
-                        repository_id=repo_id,
-                        source_id=scope_id(s_node.id),
-                        target_id=scope_id(d_node.id),
-                        type=GraphRelationshipType.READS.value,
-                        properties={"label": f"reads from database table {d_node.name}"}
-                    ))
-                    db.add(GraphRelationship(
-                        id=str(uuid.uuid4()),
-                        repository_id=repo_id,
-                        source_id=scope_id(s_node.id),
-                        target_id=scope_id(d_node.id),
-                        type=GraphRelationshipType.WRITES.value,
-                        properties={"label": f"writes to database table {d_node.name}"}
-                    ))
+                    db.add(
+                        GraphRelationship(
+                            id=str(uuid.uuid4()),
+                            repository_id=repo_id,
+                            source_id=scope_id(s_node.id),
+                            target_id=scope_id(d_node.id),
+                            type=GraphRelationshipType.READS.value,
+                            properties={
+                                "label": f"reads from database table {d_node.name}"
+                            },
+                        )
+                    )
+                    db.add(
+                        GraphRelationship(
+                            id=str(uuid.uuid4()),
+                            repository_id=repo_id,
+                            source_id=scope_id(s_node.id),
+                            target_id=scope_id(d_node.id),
+                            type=GraphRelationshipType.WRITES.value,
+                            properties={
+                                "label": f"writes to database table {d_node.name}"
+                            },
+                        )
+                    )
 
             # 6. Cache connections (CONNECTS_TO) and Celery queues (CONSUMES, PRODUCES)
             has_redis = False
@@ -478,49 +553,67 @@ class ParseService:
             if has_redis:
                 cache_id = f"cache::{repo_id}::redis"
                 if cache_id not in added_node_ids:
-                    db.add(GraphNode(
-                        id=cache_id,
-                        repository_id=repo_id,
-                        type=GraphNodeType.EXTERNAL_SERVICE.value,
-                        name="RedisCache",
-                        properties={"type": "Redis", "raw_type": GraphNodeType.EXTERNAL_SERVICE.value}
-                    ))
+                    db.add(
+                        GraphNode(
+                            id=cache_id,
+                            repository_id=repo_id,
+                            type=GraphNodeType.EXTERNAL_SERVICE.value,
+                            name="RedisCache",
+                            properties={
+                                "type": "Redis",
+                                "raw_type": GraphNodeType.EXTERNAL_SERVICE.value,
+                            },
+                        )
+                    )
                     added_node_ids.add(cache_id)
                 for path in extractions.keys():
                     if "cache" in path.lower() or "redis" in path.lower():
-                        db.add(GraphRelationship(
-                            id=str(uuid.uuid4()),
-                            repository_id=repo_id,
-                            source_id=f"file::{path}",
-                            target_id=cache_id,
-                            type=GraphRelationshipType.CONNECTS_TO.value,
-                            properties={"label": "connects to Redis Cache"}
-                        ))
+                        db.add(
+                            GraphRelationship(
+                                id=str(uuid.uuid4()),
+                                repository_id=repo_id,
+                                source_id=f"file::{path}",
+                                target_id=cache_id,
+                                type=GraphRelationshipType.CONNECTS_TO.value,
+                                properties={"label": "connects to Redis Cache"},
+                            )
+                        )
 
             if has_celery:
                 queue_node_id = f"queue::{repo_id}::celery"
                 if queue_node_id not in added_node_ids:
-                    db.add(GraphNode(
-                        id=queue_node_id,
-                        repository_id=repo_id,
-                        type=GraphNodeType.EXTERNAL_SERVICE.value,
-                        name="CeleryQueue",
-                        properties={"type": "Celery", "raw_type": GraphNodeType.EXTERNAL_SERVICE.value}
-                    ))
+                    db.add(
+                        GraphNode(
+                            id=queue_node_id,
+                            repository_id=repo_id,
+                            type=GraphNodeType.EXTERNAL_SERVICE.value,
+                            name="CeleryQueue",
+                            properties={
+                                "type": "Celery",
+                                "raw_type": GraphNodeType.EXTERNAL_SERVICE.value,
+                            },
+                        )
+                    )
                     added_node_ids.add(queue_node_id)
                 for path, extraction in extractions.items():
                     for sym in extraction.symbols:
                         sym_id = f"symbol::{path}::{sym.name}"
-                        is_task = any("task" in dec.lower() for dec in (sym.decorators or []))
+                        is_task = any(
+                            "task" in dec.lower() for dec in (sym.decorators or [])
+                        )
                         if is_task:
-                            db.add(GraphRelationship(
-                                id=str(uuid.uuid4()),
-                                repository_id=repo_id,
-                                source_id=sym_id,
-                                target_id=queue_node_id,
-                                type=GraphRelationshipType.CONSUMES.value,
-                                properties={"label": f"consumes task queue for {sym.name}"}
-                            ))
+                            db.add(
+                                GraphRelationship(
+                                    id=str(uuid.uuid4()),
+                                    repository_id=repo_id,
+                                    source_id=sym_id,
+                                    target_id=queue_node_id,
+                                    type=GraphRelationshipType.CONSUMES.value,
+                                    properties={
+                                        "label": f"consumes task queue for {sym.name}"
+                                    },
+                                )
+                            )
 
             # 7. Save GraphRelationships and map folder & layer dependencies
             written_layer_relations = set()
@@ -534,18 +627,44 @@ class ParseService:
                 elif kind == "calls":
                     rel_type = GraphRelationshipType.CALLS
                     # Celery PRODUCES
-                    if "delay" in (edge.label or "").lower() or "apply_async" in (edge.label or "").lower():
+                    if (
+                        "delay" in (edge.label or "").lower()
+                        or "apply_async" in (edge.label or "").lower()
+                    ):
                         rel_type = GraphRelationshipType.PRODUCES
                     # DB QUERIES
-                    elif any(db_word in (edge.label or "").lower() for db_word in ("db_session", "session.query", "session.execute", "session.commit", ".execute", "db.query", "db.execute", "db.commit", "select ", "insert ", "update ", "delete ")):
+                    elif any(
+                        db_word in (edge.label or "").lower()
+                        for db_word in (
+                            "db_session",
+                            "session.query",
+                            "session.execute",
+                            "session.commit",
+                            ".execute",
+                            "db.query",
+                            "db.execute",
+                            "db.commit",
+                            "select ",
+                            "insert ",
+                            "update ",
+                            "delete ",
+                        )
+                    ):
                         rel_type = GraphRelationshipType.QUERIES
                 elif kind == "inherits":
                     # Check if target is Interface -> IMPLEMENTS; else INHERITS
                     is_interface = False
                     tgt_node = graph.nodes.get(edge.target_id)
-                    if tgt_node and (tgt_node.kind.lower() == "interface" or "interface" in tgt_node.name.lower()):
+                    if tgt_node and (
+                        tgt_node.kind.lower() == "interface"
+                        or "interface" in tgt_node.name.lower()
+                    ):
                         is_interface = True
-                    rel_type = GraphRelationshipType.IMPLEMENTS if is_interface else GraphRelationshipType.INHERITS
+                    rel_type = (
+                        GraphRelationshipType.IMPLEMENTS
+                        if is_interface
+                        else GraphRelationshipType.INHERITS
+                    )
                 elif kind == "composition":
                     rel_type = GraphRelationshipType.USES
                 elif kind == "class_usage":
@@ -557,14 +676,20 @@ class ParseService:
                     source_id=scope_id(edge.source_id),
                     target_id=scope_id(edge.target_id),
                     type=rel_type.value,
-                    properties={"label": edge.label, "line": edge.line, "file_path": edge.file_path}
+                    properties={
+                        "label": edge.label,
+                        "line": edge.line,
+                        "file_path": edge.file_path,
+                    },
                 )
                 db.add(db_graph_rel)
 
                 # Determine module/layer dependencies based on this edge's files
                 src_path = edge.file_path or ""
                 target_path = ""
-                if edge.target_id.startswith("symbol::") or edge.target_id.startswith("file::"):
+                if edge.target_id.startswith("symbol::") or edge.target_id.startswith(
+                    "file::"
+                ):
                     parts = edge.target_id.split("::")
                     target_path = parts[1] if len(parts) > 1 else ""
 
@@ -581,7 +706,9 @@ class ParseService:
                                 source_id=f"layer::{repo_id}::{layer_A}",
                                 target_id=f"layer::{repo_id}::{layer_B}",
                                 type=GraphRelationshipType.DEPENDS_ON.value,
-                                properties={"label": f"{layer_A} communication with {layer_B}"}
+                                properties={
+                                    "label": f"{layer_A} communication with {layer_B}"
+                                },
                             )
                             db.add(db_layer_rel)
 
@@ -603,42 +730,73 @@ class ParseService:
             extra_relationships = []
             try:
                 from app.services.entity_recognition import EntityRecognitionEngine
+
                 cloned_dir = os.path.join(settings.CLONED_REPOS_DIR, repo_id)
                 engine = EntityRecognitionEngine(repo_dir=cloned_dir, repo_id=repo_id)
                 extra_nodes, extra_relationships = engine.run()
-                
+
                 # Write recognized nodes to PostgreSQL
                 for ext_node in extra_nodes:
                     node_id = scope_id(ext_node["id"])
                     if node_id not in added_node_ids:
-                        existing_node = db.query(GraphNode).filter(GraphNode.id == node_id, GraphNode.repository_id == repo_id).first()
+                        existing_node = (
+                            db.query(GraphNode)
+                            .filter(
+                                GraphNode.id == node_id,
+                                GraphNode.repository_id == repo_id,
+                            )
+                            .first()
+                        )
                         if not existing_node:
-                            canonical_type = map_to_ontology_type(ext_node["type"], ext_node["name"])
+                            canonical_type = map_to_ontology_type(
+                                ext_node["type"], ext_node["name"]
+                            )
                             db_node = GraphNode(
                                 id=node_id,
                                 repository_id=repo_id,
                                 type=canonical_type,
                                 name=ext_node["name"],
-                                properties={**ext_node["properties"], "raw_type": ext_node["type"]}
+                                properties={
+                                    **ext_node["properties"],
+                                    "raw_type": ext_node["type"],
+                                },
                             )
                             db.add(db_node)
                             added_node_ids.add(node_id)
-                
+
                 # Write recognized relationships to PostgreSQL
                 for ext_rel in extra_relationships:
                     src_id = scope_id(ext_rel["source_id"])
                     tgt_id = scope_id(ext_rel["target_id"])
-                    
-                    source_exists = (src_id in added_node_ids) or (db.query(GraphNode).filter(GraphNode.id == src_id, GraphNode.repository_id == repo_id).first() is not None)
-                    target_exists = (tgt_id in added_node_ids) or (db.query(GraphNode).filter(GraphNode.id == tgt_id, GraphNode.repository_id == repo_id).first() is not None)
-                    
+
+                    source_exists = (src_id in added_node_ids) or (
+                        db.query(GraphNode)
+                        .filter(
+                            GraphNode.id == src_id, GraphNode.repository_id == repo_id
+                        )
+                        .first()
+                        is not None
+                    )
+                    target_exists = (tgt_id in added_node_ids) or (
+                        db.query(GraphNode)
+                        .filter(
+                            GraphNode.id == tgt_id, GraphNode.repository_id == repo_id
+                        )
+                        .first()
+                        is not None
+                    )
+
                     if source_exists and target_exists:
-                        existing_rel = db.query(GraphRelationship).filter(
-                            GraphRelationship.source_id == src_id,
-                            GraphRelationship.target_id == tgt_id,
-                            GraphRelationship.type == ext_rel["type"],
-                            GraphRelationship.repository_id == repo_id
-                        ).first()
+                        existing_rel = (
+                            db.query(GraphRelationship)
+                            .filter(
+                                GraphRelationship.source_id == src_id,
+                                GraphRelationship.target_id == tgt_id,
+                                GraphRelationship.type == ext_rel["type"],
+                                GraphRelationship.repository_id == repo_id,
+                            )
+                            .first()
+                        )
                         if not existing_rel:
                             db_rel = GraphRelationship(
                                 id=ext_rel["id"],
@@ -646,7 +804,7 @@ class ParseService:
                                 source_id=src_id,
                                 target_id=tgt_id,
                                 type=ext_rel["type"],
-                                properties=ext_rel["properties"]
+                                properties=ext_rel["properties"],
                             )
                             db.add(db_rel)
             except Exception as ere_err:
@@ -657,13 +815,20 @@ class ParseService:
                 session = neo4j_client.get_session()
                 if session:
                     # 1. Clear old data for repo
-                    session.run("MATCH (n {repository_id: $repo_id}) DETACH DELETE n", repo_id=repo_id)
-                    session.run("MATCH (n:Repository {id: $repo_id}) DETACH DELETE n", repo_id=repo_id)
+                    session.run(
+                        "MATCH (n {repository_id: $repo_id}) DETACH DELETE n",
+                        repo_id=repo_id,
+                    )
+                    session.run(
+                        "MATCH (n:Repository {id: $repo_id}) DETACH DELETE n",
+                        repo_id=repo_id,
+                    )
 
                     # 2. Create Repository Node
                     session.run(
                         "MERGE (n:Repository {id: $id}) SET n.name = $name, n.type = 'Repository'",
-                        id=repo_id, name=repo_id
+                        id=repo_id,
+                        name=repo_id,
                     )
 
                     # 3. Create Folder Nodes
@@ -674,7 +839,10 @@ class ParseService:
                             "MERGE (n:Folder {id: $id, repository_id: $repo_id}) "
                             "SET n.name = $name, n.type = 'Folder' "
                             "SET n += $props",
-                        id=folder_id, repo_id=repo_id, name=folder_name, props={"path": folder}
+                            id=folder_id,
+                            repo_id=repo_id,
+                            name=folder_name,
+                            props={"path": folder},
                         )
 
                     # 4. Create GraphNodes from ast extraction
@@ -697,18 +865,29 @@ class ParseService:
                             label = "Variable"
 
                         # Additional check for Service layer naming pattern
-                        is_service = "service" in node.name.lower() or "service" in node_id.lower()
+                        is_service = (
+                            "service" in node.name.lower()
+                            or "service" in node_id.lower()
+                        )
                         labels = [label]
                         if is_service:
                             labels.append("Service")
 
                         # Database connection or table checks
-                        is_db = "db" in node.name.lower() or "database" in node_id.lower() or "model" in node.name.lower()
+                        is_db = (
+                            "db" in node.name.lower()
+                            or "database" in node_id.lower()
+                            or "model" in node.name.lower()
+                        )
                         if is_db and label == "Class":
                             labels.append("Database_Table")
 
                         # API check
-                        is_api = "api" in node.name.lower() or "router" in node_id.lower() or "endpoint" in node.name.lower()
+                        is_api = (
+                            "api" in node.name.lower()
+                            or "router" in node_id.lower()
+                            or "endpoint" in node.name.lower()
+                        )
                         if is_api:
                             labels.append("API_Endpoint")
 
@@ -723,12 +902,16 @@ class ParseService:
                                 flat_props[k] = str(v)
                             else:
                                 flat_props[k] = v
-                        
+
                         session.run(
                             f"MERGE (n:{labels_str} {{id: $id, repository_id: $repo_id}}) "
                             "SET n.name = $name, n.type = $type "
                             "SET n += $props",
-                            id=scoped_id, repo_id=repo_id, name=node.name, type=node.kind, props=flat_props
+                            id=scoped_id,
+                            repo_id=repo_id,
+                            name=node.name,
+                            type=node.kind,
+                            props=flat_props,
                         )
 
                     # 5. Create Relationships
@@ -747,7 +930,9 @@ class ParseService:
                         session.run(
                             f"MATCH (a {{id: $src, repository_id: $repo_id}}), (b {{id: $tgt, repository_id: $repo_id}}) "
                             f"MERGE (a)-[r:{rel_type}]->(b)",
-                            src=scope_id(edge.source_id), tgt=scope_id(edge.target_id), repo_id=repo_id
+                            src=scope_id(edge.source_id),
+                            tgt=scope_id(edge.target_id),
+                            repo_id=repo_id,
                         )
 
                     # 6. Parse external dependencies/libs (requirements.txt or package.json)
@@ -761,12 +946,14 @@ class ParseService:
                                     session.run(
                                         "MERGE (l:External_Library {id: $id}) "
                                         "SET l.name = $name, l.type = 'External Library'",
-                                        id=f"lib::{lib}", name=lib
+                                        id=f"lib::{lib}",
+                                        name=lib,
                                     )
                                     session.run(
                                         "MATCH (r:Repository {id: $repo_id}), (l:External_Library {id: $lib_id}) "
                                         "MERGE (r)-[:DEPENDS_ON_LIB]->(l)",
-                                        repo_id=repo_id, lib_id=f"lib::{lib}"
+                                        repo_id=repo_id,
+                                        lib_id=f"lib::{lib}",
                                     )
 
                     # 7. Parse env vars (.env)
@@ -782,7 +969,10 @@ class ParseService:
                                         session.run(
                                             "MERGE (e:Environment_Variable {id: $id, repository_id: $repo_id}) "
                                             "SET e.name = $name, e.type = 'Environment Variable', e.value = $val",
-                                            id=f"env::{repo_id}::{var_name}", repo_id=repo_id, name=var_name, val=var_val
+                                            id=f"env::{repo_id}::{var_name}",
+                                            repo_id=repo_id,
+                                            name=var_name,
+                                            val=var_val,
                                         )
 
                     # 8. Create Cache, Queue, Configuration placeholders if settings suggest them
@@ -798,23 +988,25 @@ class ParseService:
                     if has_redis:
                         session.run(
                             "MERGE (c:Cache {id: $id, repository_id: $repo_id}) SET c.name = 'RedisCache', c.type = 'Cache'",
-                            id=f"cache::{repo_id}::redis", repo_id=repo_id
+                            id=f"cache::{repo_id}::redis",
+                            repo_id=repo_id,
                         )
                     if has_celery:
                         session.run(
                             "MERGE (q:Queue {id: $id, repository_id: $repo_id}) SET q.name = 'CeleryQueue', q.type = 'Queue'",
-                            id=f"queue::{repo_id}::celery", repo_id=repo_id
+                            id=f"queue::{repo_id}::celery",
+                            repo_id=repo_id,
                         )
 
                     # 9. Build semantic Knowledge Graph hierarchy connections (Feature 2)
                     # Repository -> Module -> Service -> API -> Database
-                    
+
                     # Link Repository containing Modules/Folders
                     session.run(
                         "MATCH (r:Repository {id: $repo_id}), (m {repository_id: $repo_id}) "
                         "WHERE m:Folder OR m:Module OR m:File "
                         "MERGE (r)-[:HAS_MODULE]->(m)",
-                        repo_id=repo_id
+                        repo_id=repo_id,
                     )
 
                     # Link Modules/Folders containing Services
@@ -822,14 +1014,14 @@ class ParseService:
                         "MATCH (m {repository_id: $repo_id}), (s:Service {repository_id: $repo_id}) "
                         "WHERE (m:Folder OR m:Module) AND m.id <> s.id "
                         "MERGE (m)-[:HAS_SERVICE]->(s)",
-                        repo_id=repo_id
+                        repo_id=repo_id,
                     )
 
                     # Link Services exposing API Endpoints
                     session.run(
                         "MATCH (s:Service {repository_id: $repo_id}), (a:API_Endpoint {repository_id: $repo_id}) "
                         "MERGE (s)-[:EXPOSES_API]->(a)",
-                        repo_id=repo_id
+                        repo_id=repo_id,
                     )
 
                     # Link Services writing/reading Database Tables
@@ -837,7 +1029,7 @@ class ParseService:
                         "MATCH (s {repository_id: $repo_id}), (d:Database_Table {repository_id: $repo_id}) "
                         "WHERE s:Service OR s.type = 'Repository' "
                         "MERGE (s)-[:WRITES_TO]->(d)",
-                        repo_id=repo_id
+                        repo_id=repo_id,
                     )
 
                     # 10. Write EntityRecognitionEngine extra nodes and relationships to Neo4j
@@ -854,13 +1046,19 @@ class ParseService:
                             f"MERGE (n:{lbl} {{id: $id, repository_id: $repo_id}}) "
                             "SET n.name = $name, n.type = $type "
                             "SET n += $props",
-                            id=scope_id(ext_node["id"]), repo_id=repo_id, name=ext_node["name"], type=ext_node["type"], props=flat_props
+                            id=scope_id(ext_node["id"]),
+                            repo_id=repo_id,
+                            name=ext_node["name"],
+                            type=ext_node["type"],
+                            props=flat_props,
                         )
                     for ext_rel in extra_relationships:
                         session.run(
                             f"MATCH (a {{id: $src, repository_id: $repo_id}}), (b {{id: $tgt, repository_id: $repo_id}}) "
                             f"MERGE (a)-[r:{ext_rel['type']}]->(b)",
-                            src=scope_id(ext_rel["source_id"]), tgt=scope_id(ext_rel["target_id"]), repo_id=repo_id
+                            src=scope_id(ext_rel["source_id"]),
+                            tgt=scope_id(ext_rel["target_id"]),
+                            repo_id=repo_id,
                         )
 
             except Exception as neo_err:
@@ -872,6 +1070,7 @@ class ParseService:
         # Trigger Repository Memory & AI Context Engine
         try:
             from app.services.repository_memory_engine import RepositoryMemoryEngine
+
             memory_engine = RepositoryMemoryEngine(repo_dir=repo_dir, repo_id=repo_id)
             memory_engine.extract_and_index(db)
         except Exception as memory_err:
@@ -879,6 +1078,7 @@ class ParseService:
 
         # Aggregate repository statistics
         from sqlalchemy import func
+
         stats_query = (
             db.query(GraphNode.type, func.count(GraphNode.id))
             .filter(GraphNode.repository_id == repo_id)
@@ -889,8 +1089,12 @@ class ParseService:
 
         repo_meta = self.metadata_engine.analyse_repository(file_metas)
         languages_dict = repo_meta.language_breakdown()
-        dominant_lang = max(languages_dict.keys(), key=lambda k: languages_dict[k]) if languages_dict else "N/A"
-        
+        dominant_lang = (
+            max(languages_dict.keys(), key=lambda k: languages_dict[k])
+            if languages_dict
+            else "N/A"
+        )
+
         # Update Repository metadata
         repo_obj = db.query(Repository).filter(Repository.id == repo_id).first()
         if repo_obj:
