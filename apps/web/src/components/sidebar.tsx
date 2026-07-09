@@ -20,24 +20,16 @@ import { cn } from '@/lib/utils';
 const navigation = [
                         { name: 'Overview', href: '/', icon: LayoutDashboard },
                         { name: 'Architecture', href: '/architecture', icon: Layers },
-                        { name: 'Knowledge', href: '/knowledge', icon: BookOpen },
                         { name: 'Time Machine', href: '/time-machine', icon: Clock },
                         { name: 'Technical Debt', href: '/tech-debt', icon: Flame },
                         {
-                                                name: '⭐ Architecture Governance',
+                                                name: 'Governance',
                                                 href: '/architecture?tab=governance',
                                                 icon: ShieldAlert,
                         },
-                        {
-                                                name: '  • Compliance',
-                                                href: '/architecture?tab=compliance',
-                                                icon: ShieldAlert,
-                        },
-                        {
-                                                name: '  • Policies',
-                                                href: '/architecture?tab=policies',
-                                                icon: Settings,
-                        },
+                        { name: '⭐ Future Impact Simulator', href: '/simulator', icon: Brain },
+                        { name: '  • Scenarios', href: '/simulator?subtab=scenarios', icon: Brain },
+                        { name: '  • Reports', href: '/simulator?subtab=reports', icon: BarChart3 },
 ];
 
 interface SidebarProps {

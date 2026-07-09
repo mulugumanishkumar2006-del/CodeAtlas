@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1 import (
     architecture_drift,
     auth,
+    digital_twin,
     evolution,
     graph,
     health,
@@ -61,4 +62,7 @@ app.include_router(evolution.router, prefix=settings.API_V1_STR, tags=["evolutio
 app.include_router(tech_debt.router, prefix=settings.API_V1_STR, tags=["tech_debt"])
 app.include_router(
     architecture_drift.router, prefix=settings.API_V1_STR, tags=["architecture_drift"]
+)
+app.include_router(
+    digital_twin.router, prefix=settings.API_V1_STR, tags=["digital_twin"]
 )

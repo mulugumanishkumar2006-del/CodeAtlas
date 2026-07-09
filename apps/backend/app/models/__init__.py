@@ -5,6 +5,7 @@ from app.models.architecture import (
     ComplianceHistory,
     GovernancePolicy,
 )
+from app.models.digital_twin import DigitalTwinChange, DigitalTwinSession
 from app.models.evolution import CommitSnapshot, ComponentSnapshot
 from app.models.file import File
 from app.models.graph_node import GraphNode
