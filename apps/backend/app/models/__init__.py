@@ -1,4 +1,9 @@
 from app.models.activity import Activity
+from app.models.architect import (
+    ArchitectureDecisionGenerated,
+    ArchitectureRecommendation,
+    ArchitectureReview,
+)
 from app.models.architecture import (
     ArchitectureBaseline,
     ArchitectureViolation,
@@ -19,6 +24,7 @@ from app.models.memory_models import (
 )
 from app.models.metric import Metric
 from app.models.relationship import Relationship
+from app.models.reliability import ReliabilityPrediction, ReliabilitySummary
 from app.models.repository import Repository
 from app.models.repository_statistics import RepositoryStatistics
 from app.models.setting import Setting

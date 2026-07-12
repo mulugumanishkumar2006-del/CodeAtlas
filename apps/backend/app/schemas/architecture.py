@@ -195,6 +195,16 @@ class PRArchitectureReviewResponse(BaseModel):
     feedback: str = Field(
         ..., description="Automated architectural review feedback comments"
     )
+    change_risk: str = Field(
+        default="LOW", description="Predicted change risk level (LOW, MEDIUM, HIGH)"
+    )
+    change_risk_reasons: List[str] = Field(
+        default_factory=list, description="Reasons for predicted change risk level"
+    )
+    likely_broken_tests: List[str] = Field(
+        default_factory=list,
+        description="List of tests likely broken by the PR changes",
+    )
 
 
 class EnterprisePolicyItem(BaseModel):

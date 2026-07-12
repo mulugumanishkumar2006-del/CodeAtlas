@@ -1,7 +1,7 @@
 """Quick smoke test for RepositoryScanner – run from the backend directory."""
 
-import sys
 import os
+import sys
 
 # Add the backend app to sys.path so we can import directly
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "apps", "backend"))

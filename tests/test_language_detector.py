@@ -1,14 +1,13 @@
 """Smoke test for LanguageDetector — run from the repo root."""
 
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "apps", "backend"))
 
 
+from app.services.language_detector import Language, LanguageDetector
 from app.services.scanner import RepositoryScanner
-
-from app.services.language_detector import LanguageDetector, Language
 
 
 def main():
@@ -33,7 +32,7 @@ def main():
 
     # Print summary
     print("=== Language Detection Summary ===\n")
-    for lang in sorted(counts, key=lambda l: counts[l], reverse=True):
+    for lang in sorted(counts, key=lambda lang_key: counts[lang_key], reverse=True):
         print(f"  {lang.value:15s}  {counts[lang]:4d} files")
         for s in samples[lang]:
             print(f"      e.g. {s}")
@@ -41,15 +40,18 @@ def main():
 
     # Verify known files
     py_files = [
-        f for f in result.files
+        f
+        for f in result.files
         if detector.detect(f.absolute_path, f.extension).language == Language.PYTHON
     ]
     ts_files = [
-        f for f in result.files
+        f
+        for f in result.files
         if detector.detect(f.absolute_path, f.extension).language == Language.TYPESCRIPT
     ]
     js_files = [
-        f for f in result.files
+        f
+        for f in result.files
         if detector.detect(f.absolute_path, f.extension).language == Language.JAVASCRIPT
     ]
 

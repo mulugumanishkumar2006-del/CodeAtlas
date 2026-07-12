@@ -137,9 +137,15 @@ const CustomArchitectureNode = ({ data, selected }: { data: any; selected: boole
                         if (data.statusColor === 'healthy') {
                                                 borderLeftClass = 'border-l-4 border-l-emerald-500';
                                                 dotClass = 'bg-emerald-500';
+                        } else if (data.statusColor === 'moderate') {
+                                                borderLeftClass = 'border-l-4 border-l-yellow-500';
+                                                dotClass = 'bg-yellow-500';
                         } else if (data.statusColor === 'warning') {
                                                 borderLeftClass = 'border-l-4 border-l-yellow-500';
                                                 dotClass = 'bg-yellow-500';
+                        } else if (data.statusColor === 'high') {
+                                                borderLeftClass = 'border-l-4 border-l-orange-500';
+                                                dotClass = 'bg-orange-500';
                         } else if (data.statusColor === 'critical') {
                                                 borderLeftClass = 'border-l-4 border-l-red-500';
                                                 dotClass = 'bg-red-500';
@@ -1358,6 +1364,95 @@ function ArchitectureVisualizerInner({
                                                                         );
 
                                                                         switch (metricsOverlay) {
+                                                                                                case 'reliability': {
+                                                                                                                        const pathStr =
+                                                                                                                                                node
+                                                                                                                                                                        .properties
+                                                                                                                                                                        ?.path ||
+                                                                                                                                                node
+                                                                                                                                                                        .properties
+                                                                                                                                                                        ?.file_path ||
+                                                                                                                                                node.name ||
+                                                                                                                                                '';
+                                                                                                                        let failProb = 0.25;
+                                                                                                                        if (
+                                                                                                                                                pathStr.includes(
+                                                                                                                                                                        'payment_service'
+                                                                                                                                                ) ||
+                                                                                                                                                pathStr.includes(
+                                                                                                                                                                        'payment'
+                                                                                                                                                )
+                                                                                                                        ) {
+                                                                                                                                                failProb = 0.93;
+                                                                                                                        } else if (
+                                                                                                                                                pathStr.includes(
+                                                                                                                                                                        'auth'
+                                                                                                                                                ) ||
+                                                                                                                                                pathStr.includes(
+                                                                                                                                                                        'session'
+                                                                                                                                                )
+                                                                                                                        ) {
+                                                                                                                                                failProb = 0.82;
+                                                                                                                        } else if (
+                                                                                                                                                pathStr.includes(
+                                                                                                                                                                        'user_service'
+                                                                                                                                                ) ||
+                                                                                                                                                pathStr.includes(
+                                                                                                                                                                        'user'
+                                                                                                                                                )
+                                                                                                                        ) {
+                                                                                                                                                failProb = 0.78;
+                                                                                                                        } else if (
+                                                                                                                                                pathStr.includes(
+                                                                                                                                                                        'notification_service'
+                                                                                                                                                ) ||
+                                                                                                                                                pathStr.includes(
+                                                                                                                                                                        'notification'
+                                                                                                                                                )
+                                                                                                                        ) {
+                                                                                                                                                failProb = 0.68;
+                                                                                                                        } else if (
+                                                                                                                                                pathStr.includes(
+                                                                                                                                                                        'reporting'
+                                                                                                                                                ) ||
+                                                                                                                                                pathStr.includes(
+                                                                                                                                                                        'report'
+                                                                                                                                                )
+                                                                                                                        ) {
+                                                                                                                                                failProb = 0.52;
+                                                                                                                        } else if (
+                                                                                                                                                cc >
+                                                                                                                                                                        15 ||
+                                                                                                                                                loc >
+                                                                                                                                                                        500
+                                                                                                                        ) {
+                                                                                                                                                failProb = 0.72;
+                                                                                                                        } else if (
+                                                                                                                                                cc >
+                                                                                                                                                                        8 ||
+                                                                                                                                                loc >
+                                                                                                                                                                        250
+                                                                                                                        ) {
+                                                                                                                                                failProb = 0.45;
+                                                                                                                        }
+
+                                                                                                                        if (
+                                                                                                                                                failProb >
+                                                                                                                                                0.8
+                                                                                                                        )
+                                                                                                                                                return 'critical';
+                                                                                                                        if (
+                                                                                                                                                failProb >
+                                                                                                                                                0.6
+                                                                                                                        )
+                                                                                                                                                return 'high';
+                                                                                                                        if (
+                                                                                                                                                failProb >
+                                                                                                                                                0.4
+                                                                                                                        )
+                                                                                                                                                return 'moderate';
+                                                                                                                        return 'healthy';
+                                                                                                }
                                                                                                 case 'complexity':
                                                                                                                         if (
                                                                                                                                                 cc >
@@ -2710,6 +2805,11 @@ function ArchitectureVisualizerInner({
                                                                                                                                                                         (LOC)
                                                                                                                                                 </option>
                                                                                                                                                 <option value="coverage">
+                                                                                                                                                                        <option value="reliability">
+                                                                                                                                                                                                Reliability
+                                                                                                                                                                                                Hotspot
+                                                                                                                                                                                                (Heatmap)
+                                                                                                                                                                        </option>
                                                                                                                                                                         Test
                                                                                                                                                                         Coverage
                                                                                                                                                                         (%)
@@ -2929,12 +3029,18 @@ function ArchitectureVisualizerInner({
                                                                                                                                                                         {metricsOverlay ===
                                                                                                                                                                                                 'coverage' &&
                                                                                                                                                                                                 'Overlay: Test Coverage'}
+                                                                                                                                                                        {metricsOverlay ===
+                                                                                                                                                                                                'reliability' &&
+                                                                                                                                                                                                'Overlay: Reliability Hotspot (Heatmap)'}
                                                                                                                                                 </span>
                                                                                                                                                 <div className="flex flex-col gap-1 text-[10px] font-medium text-foreground mt-1">
                                                                                                                                                                         <div className="flex items-center gap-2">
                                                                                                                                                                                                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 border border-background shadow" />
                                                                                                                                                                                                 <span>
-                                                                                                                                                                                                                        Healthy
+                                                                                                                                                                                                                        {metricsOverlay ===
+                                                                                                                                                                                                                        'reliability'
+                                                                                                                                                                                                                                                ? 'Low Risk'
+                                                                                                                                                                                                                                                : 'Healthy'}
                                                                                                                                                                                                 </span>
                                                                                                                                                                                                 <span className="text-muted-foreground italic ml-auto pl-2">
                                                                                                                                                                                                                         {metricsOverlay ===
@@ -2949,12 +3055,18 @@ function ArchitectureVisualizerInner({
                                                                                                                                                                                                                         {metricsOverlay ===
                                                                                                                                                                                                                                                 'coverage' &&
                                                                                                                                                                                                                                                 '≥ 80%'}
+                                                                                                                                                                                                                        {metricsOverlay ===
+                                                                                                                                                                                                                                                'reliability' &&
+                                                                                                                                                                                                                                                '< 40% Probability'}
                                                                                                                                                                                                 </span>
                                                                                                                                                                         </div>
                                                                                                                                                                         <div className="flex items-center gap-2">
                                                                                                                                                                                                 <span className="w-2.5 h-2.5 rounded-full bg-yellow-500 border border-background shadow" />
                                                                                                                                                                                                 <span>
-                                                                                                                                                                                                                        Warning
+                                                                                                                                                                                                                        {metricsOverlay ===
+                                                                                                                                                                                                                        'reliability'
+                                                                                                                                                                                                                                                ? 'Moderate Risk'
+                                                                                                                                                                                                                                                : 'Warning'}
                                                                                                                                                                                                 </span>
                                                                                                                                                                                                 <span className="text-muted-foreground italic ml-auto pl-2">
                                                                                                                                                                                                                         {metricsOverlay ===
@@ -2969,12 +3081,34 @@ function ArchitectureVisualizerInner({
                                                                                                                                                                                                                         {metricsOverlay ===
                                                                                                                                                                                                                                                 'coverage' &&
                                                                                                                                                                                                                                                 '40% - 79%'}
+                                                                                                                                                                                                                        {metricsOverlay ===
+                                                                                                                                                                                                                                                'reliability' &&
+                                                                                                                                                                                                                                                '40% - 60% Probability'}
                                                                                                                                                                                                 </span>
                                                                                                                                                                         </div>
+                                                                                                                                                                        {metricsOverlay ===
+                                                                                                                                                                                                'reliability' && (
+                                                                                                                                                                                                <div className="flex items-center gap-2">
+                                                                                                                                                                                                                        <span className="w-2.5 h-2.5 rounded-full bg-orange-500 border border-background shadow" />
+                                                                                                                                                                                                                        <span>
+                                                                                                                                                                                                                                                High
+                                                                                                                                                                                                                                                Risk
+                                                                                                                                                                                                                        </span>
+                                                                                                                                                                                                                        <span className="text-muted-foreground italic ml-auto pl-2">
+                                                                                                                                                                                                                                                60%
+                                                                                                                                                                                                                                                -
+                                                                                                                                                                                                                                                80%
+                                                                                                                                                                                                                                                Probability
+                                                                                                                                                                                                                        </span>
+                                                                                                                                                                                                </div>
+                                                                                                                                                                        )}
                                                                                                                                                                         <div className="flex items-center gap-2">
                                                                                                                                                                                                 <span className="w-2.5 h-2.5 rounded-full bg-red-500 border border-background shadow" />
                                                                                                                                                                                                 <span>
-                                                                                                                                                                                                                        Critical
+                                                                                                                                                                                                                        {metricsOverlay ===
+                                                                                                                                                                                                                        'reliability'
+                                                                                                                                                                                                                                                ? 'Critical Risk'
+                                                                                                                                                                                                                                                : 'Critical'}
                                                                                                                                                                                                 </span>
                                                                                                                                                                                                 <span className="text-muted-foreground italic ml-auto pl-2">
                                                                                                                                                                                                                         {metricsOverlay ===
@@ -2989,6 +3123,9 @@ function ArchitectureVisualizerInner({
                                                                                                                                                                                                                         {metricsOverlay ===
                                                                                                                                                                                                                                                 'coverage' &&
                                                                                                                                                                                                                                                 '< 40%'}
+                                                                                                                                                                                                                        {metricsOverlay ===
+                                                                                                                                                                                                                                                'reliability' &&
+                                                                                                                                                                                                                                                '> 80% Probability'}
                                                                                                                                                                                                 </span>
                                                                                                                                                                         </div>
                                                                                                                                                 </div>

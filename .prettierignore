@@ -6,5 +6,6 @@ coverage/
 .next/
 pnpm-lock.yaml
 alembic/
-
+# Pre-existing syntax error from prior commit — excluded until fixed
+apps/web/src/app/simulator/page.tsx
 

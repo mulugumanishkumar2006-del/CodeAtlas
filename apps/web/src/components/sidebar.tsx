@@ -14,12 +14,14 @@ import {
                         Flame,
                         BookOpen,
                         Clock,
+                        Cpu,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navigation = [
                         { name: 'Overview', href: '/', icon: LayoutDashboard },
                         { name: 'Architecture', href: '/architecture', icon: Layers },
+                        { name: 'Knowledge', href: '/knowledge', icon: BookOpen },
                         { name: 'Time Machine', href: '/time-machine', icon: Clock },
                         { name: 'Technical Debt', href: '/tech-debt', icon: Flame },
                         {
@@ -27,9 +29,20 @@ const navigation = [
                                                 href: '/architecture?tab=governance',
                                                 icon: ShieldAlert,
                         },
-                        { name: '⭐ Future Impact Simulator', href: '/simulator', icon: Brain },
-                        { name: '  • Scenarios', href: '/simulator?subtab=scenarios', icon: Brain },
-                        { name: '  • Reports', href: '/simulator?subtab=reports', icon: BarChart3 },
+                        { name: 'Future Simulator', href: '/simulator', icon: Brain },
+                        { name: 'Bug Forecast', href: '/reliability', icon: ShieldAlert },
+                        { name: '⭐ AI Software Architect', href: '/architect', icon: Cpu },
+                        {
+                                                name: '  • Architecture Review',
+                                                href: '/architect?tab=review',
+                                                icon: Cpu,
+                        },
+                        { name: '  • Sprint Planner', href: '/architect?tab=sprints', icon: Cpu },
+                        {
+                                                name: '  • Recommendations',
+                                                href: '/architect?tab=recommendations',
+                                                icon: Cpu,
+                        },
 ];
 
 interface SidebarProps {

@@ -1,14 +1,14 @@
 """Smoke test for Tree-sitter AST integration — run from the repo root."""
 
 import json
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "apps", "backend"))
 
-from app.services.scanner import RepositoryScanner
-from app.services.language_detector import LanguageDetector, Language
 from app.services.ast_service import TreeSitterAST
+from app.services.language_detector import Language, LanguageDetector
+from app.services.scanner import RepositoryScanner
 
 
 def main():
@@ -50,7 +50,9 @@ def main():
 
     # The Python snippet should have a function_definition node
     func_nodes = [n for n in py_result.root.walk() if n.type == "function_definition"]
-    assert len(func_nodes) == 1, f"Expected 1 function_definition, got {len(func_nodes)}"
+    assert (
+        len(func_nodes) == 1
+    ), f"Expected 1 function_definition, got {len(func_nodes)}"
     func = func_nodes[0]
     print(f"  function_definition @ {func.position}")
     print(f"    children: {[c.type for c in func.children]}")
@@ -96,7 +98,9 @@ def main():
             errors.append((f.relative_path, result.error))
 
     for lang in sorted(lang_counts):
-        print(f"  {lang:15s}  {lang_counts[lang]:3d} files  {node_counts[lang]:6d} AST nodes")
+        print(
+            f"  {lang:15s}  {lang_counts[lang]:3d} files  {node_counts[lang]:6d} AST nodes"
+        )
 
     if errors:
         print(f"\n  Errors ({len(errors)}):")

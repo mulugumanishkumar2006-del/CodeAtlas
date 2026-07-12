@@ -1,14 +1,14 @@
 """Smoke test for SymbolExtractor — run from the repo root."""
 
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "apps", "backend"))
 
-from app.services.scanner import RepositoryScanner
-from app.services.language_detector import LanguageDetector, Language
 from app.services.ast_service import TreeSitterAST
-from app.services.symbol_extractor import SymbolExtractor, SymbolKind
+from app.services.language_detector import Language, LanguageDetector
+from app.services.scanner import RepositoryScanner
+from app.services.symbol_extractor import SymbolExtractor
 
 
 def main():
@@ -50,20 +50,32 @@ async def async_fetch(url: str):
     print(f"  {py_result.summary()}")
     _print_symbols(py_result.symbols)
 
-    assert len(py_result.classes) >= 2, f"Expected 2+ classes, got {len(py_result.classes)}"
-    assert len(py_result.methods) >= 3, f"Expected 3+ methods, got {len(py_result.methods)}"
-    assert len(py_result.functions) >= 2, f"Expected 2+ functions, got {len(py_result.functions)}"
-    assert len(py_result.constants) >= 1, f"Expected 1+ constant, got {len(py_result.constants)}"
+    assert (
+        len(py_result.classes) >= 2
+    ), f"Expected 2+ classes, got {len(py_result.classes)}"
+    assert (
+        len(py_result.methods) >= 3
+    ), f"Expected 3+ methods, got {len(py_result.methods)}"
+    assert (
+        len(py_result.functions) >= 2
+    ), f"Expected 2+ functions, got {len(py_result.functions)}"
+    assert (
+        len(py_result.constants) >= 1
+    ), f"Expected 1+ constant, got {len(py_result.constants)}"
     assert any(s.name == "MAX_SIZE" for s in py_result.constants)
     assert any(s.is_async for s in py_result.methods), "Expected async method"
     assert any(s.is_async for s in py_result.functions), "Expected async function"
 
     # Check decorator extraction
-    assert len(py_result.decorators) >= 1, f"Expected decorators, got {len(py_result.decorators)}"
+    assert (
+        len(py_result.decorators) >= 1
+    ), f"Expected decorators, got {len(py_result.decorators)}"
 
     # Check docstring on Animal
     animal = [s for s in py_result.classes if s.name == "Animal"][0]
-    assert animal.docstring == "Base animal class.", f"Got docstring: {animal.docstring}"
+    assert (
+        animal.docstring == "Base animal class."
+    ), f"Got docstring: {animal.docstring}"
 
     # Check bases on Dog
     dog = [s for s in py_result.classes if s.name == "Dog"][0]
@@ -75,7 +87,7 @@ async def async_fetch(url: str):
     # 2. JavaScript snippet
     # ──────────────────────────────────────────────────────────────────
     print("=== JavaScript Extraction ===\n")
-    js_src = '''\
+    js_src = """\
 const API_URL = "https://example.com";
 let counter = 0;
 
@@ -102,15 +114,21 @@ class Server extends EventEmitter {
         console.log("Starting on " + port);
     }
 }
-'''
+"""
     js_ast = ast_gen.parse_string(js_src, Language.JAVASCRIPT)
     js_result = extractor.extract(js_ast)
     print(f"  {js_result.summary()}")
     _print_symbols(js_result.symbols)
 
-    assert len(js_result.classes) >= 2, f"Expected 2+ classes, got {len(js_result.classes)}"
-    assert len(js_result.functions) >= 2, f"Expected 2+ functions, got {len(js_result.functions)}"
-    assert len(js_result.constants) >= 1, f"Expected 1+ constant, got {len(js_result.constants)}"
+    assert (
+        len(js_result.classes) >= 2
+    ), f"Expected 2+ classes, got {len(js_result.classes)}"
+    assert (
+        len(js_result.functions) >= 2
+    ), f"Expected 2+ functions, got {len(js_result.functions)}"
+    assert (
+        len(js_result.constants) >= 1
+    ), f"Expected 1+ constant, got {len(js_result.constants)}"
     assert any(s.name == "API_URL" for s in js_result.constants)
     print("  JavaScript assertions passed\n")
 
@@ -118,7 +136,7 @@ class Server extends EventEmitter {
     # 3. TypeScript snippet (interfaces, enums, type aliases)
     # ──────────────────────────────────────────────────────────────────
     print("=== TypeScript Extraction ===\n")
-    ts_src = '''\
+    ts_src = """\
 export interface User {
     id: string;
     name: string;
@@ -144,15 +162,19 @@ export class UserService {
 export function createApp(config: Config): void {
     console.log("creating app");
 }
-'''
+"""
     ts_ast = ast_gen.parse_string(ts_src, Language.TYPESCRIPT)
     ts_result = extractor.extract(ts_ast)
     print(f"  {ts_result.summary()}")
     _print_symbols(ts_result.symbols)
 
-    assert len(ts_result.interfaces) >= 1, f"Expected 1+ interface, got {len(ts_result.interfaces)}"
+    assert (
+        len(ts_result.interfaces) >= 1
+    ), f"Expected 1+ interface, got {len(ts_result.interfaces)}"
     assert len(ts_result.enums) >= 1, f"Expected 1+ enum, got {len(ts_result.enums)}"
-    assert len(ts_result.annotations) >= 1, f"Expected 1+ annotation (type alias), got {len(ts_result.annotations)}"
+    assert (
+        len(ts_result.annotations) >= 1
+    ), f"Expected 1+ annotation (type alias), got {len(ts_result.annotations)}"
     assert any(s.is_exported for s in ts_result.symbols), "Expected exported symbols"
     print("  TypeScript assertions passed\n")
 

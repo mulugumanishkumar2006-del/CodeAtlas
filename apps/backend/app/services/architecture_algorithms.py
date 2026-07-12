@@ -183,3 +183,60 @@ def predict_drift_decay(timeline_points: list) -> dict:
         "decay_date": decay_date.isoformat(),
         "slope": round(slope * 24 * 3600, 2),
     }
+
+
+def multi_criteria_decision_analysis(
+    alternatives: list, criteria_weights: dict
+) -> list:
+    """
+    Multi-criteria decision analysis (MCDA) using Simple Additive Weighting (SAW).
+    Normalizes criteria and applies weights to rank recommendations or patterns.
+    """
+    scored = []
+    for alt in alternatives:
+        # Expected criteria: business_impact, technical_impact, risk_reduction, effort (cost)
+        bi = float(alt.get("business_impact", 50))
+        ti = float(alt.get("technical_impact", 50))
+        rr = float(alt.get("risk_reduction", 50))
+        # Note: effort is negative criterion (lower effort is better, so we do 100 - effort)
+        eff = float(alt.get("effort", 50))
+        inverted_effort = max(100.0 - eff, 0.0)
+
+        score = (
+            bi * criteria_weights.get("business_impact", 0.25)
+            + ti * criteria_weights.get("technical_impact", 0.25)
+            + rr * criteria_weights.get("risk_reduction", 0.25)
+            + inverted_effort * criteria_weights.get("effort", 0.25)
+        )
+        item = dict(alt)
+        item["mcda_score"] = round(score, 2)
+        scored.append(item)
+    return sorted(scored, key=lambda x: x["mcda_score"], reverse=True)
+
+
+def optimize_dependencies(graph: dict) -> list:
+    """
+    Dependency optimization heuristic.
+    Determines optimal topological order or sequence of refactor steps
+    to minimize coupling impacts, prioritizing removing nodes with high out-degree
+    or nodes involved in cycle loops first.
+    """
+    # 1. Compute in-degree / out-degree
+    in_degree = {node: 0 for node in graph}
+    out_degree = {node: len(neighbors) for node, neighbors in graph.items()}
+    for node, neighbors in graph.items():
+        for nbr in neighbors:
+            if nbr in in_degree:
+                in_degree[nbr] += 1
+            else:
+                in_degree[nbr] = 1
+
+    # 2. Heuristic ranking: high (out_degree - in_degree) indicates god dependency source
+    scores = []
+    for node in graph:
+        score = out_degree.get(node, 0) * 1.5 - in_degree.get(node, 0) * 0.5
+        scores.append({"node": node, "score": score})
+
+    # Sort descending so we refactor highest score nodes first
+    scores.sort(key=lambda x: x["score"], reverse=True)
+    return [item["node"] for item in scores]

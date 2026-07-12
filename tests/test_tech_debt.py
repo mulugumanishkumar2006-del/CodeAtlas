@@ -1,22 +1,22 @@
 """Integration test for Technical Debt & Risk Heatmap endpoints."""
 
 import os
-import sys
 import shutil
+import sys
 
 # Add the backend app to sys.path so we can import directly
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "apps", "backend"))
 
-from fastapi.testclient import TestClient
-from app.main import app
 from app.api.v1.auth import get_current_user
-from app.core.database import SessionLocal
-from app.models.user import User
-from app.models.repository import Repository
-from app.models.file import File
-from app.models.repository_statistics import RepositoryStatistics
-from app.models.relationship import Relationship
 from app.core.config import settings
+from app.core.database import SessionLocal
+from app.main import app
+from app.models.file import File
+from app.models.relationship import Relationship
+from app.models.repository import Repository
+from app.models.repository_statistics import RepositoryStatistics
+from app.models.user import User
+from fastapi.testclient import TestClient
 
 
 def main():
@@ -55,7 +55,9 @@ def check_auth(token):
             
     return True
 """
-    with open(os.path.join(cloned_dir, "services", "auth.py"), "w", encoding="utf-8") as f:
+    with open(
+        os.path.join(cloned_dir, "services", "auth.py"), "w", encoding="utf-8"
+    ) as f:
         f.write(auth_content)
 
     # Simple python helper in utils/
@@ -63,7 +65,9 @@ def check_auth(token):
 def clean_string(s):
     return s.strip().lower()
 """
-    with open(os.path.join(cloned_dir, "utils", "helper.py"), "w", encoding="utf-8") as f:
+    with open(
+        os.path.join(cloned_dir, "utils", "helper.py"), "w", encoding="utf-8"
+    ) as f:
         f.write(helper_content)
 
     # 2. Setup mock user and repository in the database
@@ -83,8 +87,12 @@ def clean_string(s):
         # Delete any previous repo records
         repo = db.query(Repository).filter(Repository.id == repo_id).first()
         if repo:
-            db.query(RepositoryStatistics).filter(RepositoryStatistics.repository_id == repo_id).delete()
-            db.query(Relationship).filter(Relationship.repository_id == repo_id).delete()
+            db.query(RepositoryStatistics).filter(
+                RepositoryStatistics.repository_id == repo_id
+            ).delete()
+            db.query(Relationship).filter(
+                Relationship.repository_id == repo_id
+            ).delete()
             db.query(File).filter(File.repository_id == repo_id).delete()
             db.delete(repo)
             db.commit()
@@ -117,7 +125,9 @@ def clean_string(s):
     # 4. Parse the repository to populate files & metrics tables
     print("=== Triggering repository parsing ===")
     parse_response = client.post(f"/api/v1/repositories/{repo_id}/parse")
-    assert parse_response.status_code == 200, f"Expected 200 from parsing, got {parse_response.status_code}"
+    assert (
+        parse_response.status_code == 200
+    ), f"Expected 200 from parsing, got {parse_response.status_code}"
     print("Parsing successful!")
 
     # 5. Fetch Technical Debt Report
@@ -125,17 +135,17 @@ def clean_string(s):
     response = client.get(f"/api/v1/repositories/{repo_id}/tech-debt")
     print(f"Status code: {response.status_code}")
     assert response.status_code == 200, f"Expected 200, got {response.status_code}"
-    
+
     report = response.json()
     print("Report summary:")
     print(report["summary"])
-    
+
     # Assert correct summary keys
     assert "average_debt_score" in report["summary"]
     assert "high_risk_components_count" in report["summary"]
     assert "circular_dependencies_count" in report["summary"]
     assert "average_doc_coverage" in report["summary"]
-    
+
     # Assert correct scorecard keys (Feature 2)
     assert "scorecard" in report
     scorecard = report["scorecard"]
@@ -155,12 +165,12 @@ def clean_string(s):
     assert heatmap["name"] == "root"
     assert heatmap["type"] == "directory"
     assert len(heatmap["children"]) > 0
-    
+
     # Verify nesting structure exists
     child_names = [child["name"] for child in heatmap["children"]]
     print(f"Root child folders/files: {child_names}")
     assert "services" in child_names or "utils" in child_names
-    
+
     # Verify details of nested children
     services_dir = next(c for c in heatmap["children"] if c["name"] == "services")
     assert services_dir["type"] == "directory"
@@ -172,8 +182,10 @@ def clean_string(s):
     assert "cognitive_complexity" in auth_file
     assert "has_long_methods" in auth_file
     assert "has_god_classes" in auth_file
-    print(f"services/auth.py risk score: {auth_file['score']}, code lines: {auth_file['value']}, cognitive: {auth_file['cognitive_complexity']}")
-    
+    print(
+        f"services/auth.py risk score: {auth_file['score']}, code lines: {auth_file['value']}, cognitive: {auth_file['cognitive_complexity']}"
+    )
+
     # Assert remediation recommendations
     assert "remediations" in report
     remediations = report["remediations"]
@@ -183,65 +195,94 @@ def clean_string(s):
         print(f"  Risk Level: {plan['risk_level']}")
         print(f"  Reasons: {plan['reasons']}")
         print(f"  Action: {plan['action']}")
-        print(f"  Effort: {plan['estimated_effort']}, Improvement: {plan['expected_improvement']}")
+        print(
+            f"  Effort: {plan['estimated_effort']}, Improvement: {plan['expected_improvement']}"
+        )
         assert "risk_level" in plan
         assert "action" in plan
         assert "estimated_effort" in plan
 
     # 6. Verify specific new Technical Debt and Health API endpoints
     print("\n=== Fetching specific endpoints ===")
-    
+
     # POST /api/v1/repositories/{repo_id}/technical-debt/analyze
     analyze_res = client.post(f"/api/v1/repositories/{repo_id}/technical-debt/analyze")
-    assert analyze_res.status_code == 200, f"Expected 200 from analyze, got {analyze_res.status_code}"
+    assert (
+        analyze_res.status_code == 200
+    ), f"Expected 200 from analyze, got {analyze_res.status_code}"
     assert "scorecard" in analyze_res.json()
     print("POST /technical-debt/analyze: PASS")
 
     # GET /api/v1/repositories/{repo_id}/technical-debt/heatmap
     heatmap_res = client.get(f"/api/v1/repositories/{repo_id}/technical-debt/heatmap")
-    assert heatmap_res.status_code == 200, f"Expected 200 from heatmap, got {heatmap_res.status_code}"
+    assert (
+        heatmap_res.status_code == 200
+    ), f"Expected 200 from heatmap, got {heatmap_res.status_code}"
     assert heatmap_res.json()["name"] == "root"
     print("GET /technical-debt/heatmap: PASS")
 
     # GET /api/v1/repositories/{repo_id}/technical-debt/hotspots
     hotspots_res = client.get(f"/api/v1/repositories/{repo_id}/technical-debt/hotspots")
-    assert hotspots_res.status_code == 200, f"Expected 200 from hotspots, got {hotspots_res.status_code}"
+    assert (
+        hotspots_res.status_code == 200
+    ), f"Expected 200 from hotspots, got {hotspots_res.status_code}"
     assert "most_dangerous_file" in hotspots_res.json()
     print("GET /technical-debt/hotspots: PASS")
 
     # GET /api/v1/repositories/{repo_id}/technical-debt/recommendations
-    recs_res = client.get(f"/api/v1/repositories/{repo_id}/technical-debt/recommendations")
-    assert recs_res.status_code == 200, f"Expected 200 from recommendations, got {recs_res.status_code}"
+    recs_res = client.get(
+        f"/api/v1/repositories/{repo_id}/technical-debt/recommendations"
+    )
+    assert (
+        recs_res.status_code == 200
+    ), f"Expected 200 from recommendations, got {recs_res.status_code}"
     assert isinstance(recs_res.json(), list)
     print("GET /technical-debt/recommendations: PASS")
 
     # GET /api/v1/repositories/{repo_id}/technical-debt/history
     hist_res = client.get(f"/api/v1/repositories/{repo_id}/technical-debt/history")
-    assert hist_res.status_code == 200, f"Expected 200 from history, got {hist_res.status_code}"
+    assert (
+        hist_res.status_code == 200
+    ), f"Expected 200 from history, got {hist_res.status_code}"
     assert isinstance(hist_res.json(), list)
     print("GET /technical-debt/history: PASS")
 
     # GET /api/v1/repositories/{repo_id}/technical-debt/forecast
     forecast_res = client.get(f"/api/v1/repositories/{repo_id}/technical-debt/forecast")
-    assert forecast_res.status_code == 200, f"Expected 200 from forecast, got {forecast_res.status_code}"
+    assert (
+        forecast_res.status_code == 200
+    ), f"Expected 200 from forecast, got {forecast_res.status_code}"
     assert isinstance(forecast_res.json(), list)
     print("GET /technical-debt/forecast: PASS")
 
     # GET /api/v1/repositories/{repo_id}/health
     health_res = client.get(f"/api/v1/repositories/{repo_id}/health")
-    assert health_res.status_code == 200, f"Expected 200 from health, got {health_res.status_code}"
+    assert (
+        health_res.status_code == 200
+    ), f"Expected 200 from health, got {health_res.status_code}"
     assert "overall_health" in health_res.json()
     print("GET /health: PASS")
 
     # 7. Query PostgreSQL db directly to verify database records were saved properly
     db_verify = SessionLocal()
     try:
-        from app.models.tech_debt import TechnicalDebtReport, HealthScore, RiskForecast
-        reports = db_verify.query(TechnicalDebtReport).filter(TechnicalDebtReport.repo_id == repo_id).all()
-        healths = db_verify.query(HealthScore).filter(HealthScore.repo_id == repo_id).all()
-        forecasts = db_verify.query(RiskForecast).filter(RiskForecast.repo_id == repo_id).all()
-        
-        assert len(reports) > 0, "Expected at least one TechnicalDebtReport record saved in DB"
+        from app.models.tech_debt import HealthScore, RiskForecast, TechnicalDebtReport
+
+        reports = (
+            db_verify.query(TechnicalDebtReport)
+            .filter(TechnicalDebtReport.repo_id == repo_id)
+            .all()
+        )
+        healths = (
+            db_verify.query(HealthScore).filter(HealthScore.repo_id == repo_id).all()
+        )
+        forecasts = (
+            db_verify.query(RiskForecast).filter(RiskForecast.repo_id == repo_id).all()
+        )
+
+        assert (
+            len(reports) > 0
+        ), "Expected at least one TechnicalDebtReport record saved in DB"
         assert len(healths) > 0, "Expected at least one HealthScore record saved in DB"
         assert len(forecasts) > 0, "Expected RiskForecast records saved in DB"
         print("PostgreSQL direct records verification: PASS")

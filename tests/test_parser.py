@@ -1,13 +1,13 @@
 """Smoke test for ParserFactory — run from the repo root."""
 
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "apps", "backend"))
 
-from app.services.scanner import RepositoryScanner
-from app.services.language_detector import LanguageDetector, Language
+from app.services.language_detector import Language, LanguageDetector
 from app.services.parser import ParserFactory
+from app.services.scanner import RepositoryScanner
 
 
 def main():
@@ -61,20 +61,29 @@ def main():
     # ---- Parse a known Python file to verify structure ----
     py_parser = factory.get_parser(Language.PYTHON)
     scanner_file = os.path.join(
-        os.path.dirname(__file__), "..", "apps", "backend", "app", "services", "scanner.py"
+        os.path.dirname(__file__),
+        "..",
+        "apps",
+        "backend",
+        "app",
+        "services",
+        "scanner.py",
     )
     py_result = py_parser.parse(scanner_file)
     print(f"\n  scanner.py  ->  {py_result.summary()}")
     assert len(py_result.classes) >= 1, "Expected at least 1 class in scanner.py"
     class_names = [c.name for c in py_result.classes]
-    assert "RepositoryScanner" in class_names, f"Expected RepositoryScanner class, got {class_names}"
+    assert (
+        "RepositoryScanner" in class_names
+    ), f"Expected RepositoryScanner class, got {class_names}"
     print(f"    Classes: {class_names}")
     print(f"    Functions: {[f.name for f in py_result.functions]}")
     print()
 
     # ---- Parse a known TypeScript file ----
     ts_files = [
-        f for f in scan_result.files
+        f
+        for f in scan_result.files
         if detector.detect(f.absolute_path, f.extension).language == Language.TYPESCRIPT
     ]
     if ts_files:

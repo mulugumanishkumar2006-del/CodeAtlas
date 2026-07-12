@@ -1,19 +1,20 @@
 import os
 import sys
+
 import pytest
 from fastapi.testclient import TestClient
 
 # Add the backend app to sys.path so we can import directly
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "apps", "backend"))
 
-from app.main import app
 from app.api.v1.auth import get_current_user
 from app.core.database import SessionLocal
-from app.models.user import User
-from app.models.repository import Repository
+from app.main import app
+from app.models.graph_enums import GraphNodeType, GraphRelationshipType
 from app.models.graph_node import GraphNode
 from app.models.graph_relationship import GraphRelationship
-from app.models.graph_enums import GraphNodeType, GraphRelationshipType
+from app.models.repository import Repository
+from app.models.user import User
 
 
 @pytest.fixture(scope="module")
@@ -36,7 +37,9 @@ def db_session():
         repo_id = "test_graph_repo"
         repo = db.query(Repository).filter(Repository.id == repo_id).first()
         if repo:
-            db.query(GraphRelationship).filter(GraphRelationship.repository_id == repo_id).delete()
+            db.query(GraphRelationship).filter(
+                GraphRelationship.repository_id == repo_id
+            ).delete()
             db.query(GraphNode).filter(GraphNode.repository_id == repo_id).delete()
             db.delete(repo)
             db.commit()
@@ -55,7 +58,9 @@ def db_session():
         yield db
 
         # Cleanup
-        db.query(GraphRelationship).filter(GraphRelationship.repository_id == repo_id).delete()
+        db.query(GraphRelationship).filter(
+            GraphRelationship.repository_id == repo_id
+        ).delete()
         db.query(GraphNode).filter(GraphNode.repository_id == repo_id).delete()
         db.delete(repo)
         db.commit()
@@ -87,7 +92,7 @@ def test_create_and_fetch_graph(client):
             "id": node_id,
             "type": node_type.value,
             "name": f"Test {node_type.value} Node",
-            "properties": {"index": i, "meta": "test-val"}
+            "properties": {"index": i, "meta": "test-val"},
         }
         res = client.post(f"/api/v1/repositories/{repo_id}/graph/nodes", json=payload)
         assert res.status_code == 201
@@ -103,7 +108,7 @@ def test_create_and_fetch_graph(client):
             "id": f"node_{GraphNodeType.REPOSITORY.name.lower()}",
             "type": GraphNodeType.REPOSITORY.value,
             "name": "Duplicate Node",
-        }
+        },
     )
     assert res.status_code == 400
 
@@ -121,9 +126,11 @@ def test_create_and_fetch_graph(client):
             "source_id": source_id,
             "target_id": target_id,
             "type": rel_type.value,
-            "properties": {"weight": 1.5}
+            "properties": {"weight": 1.5},
         }
-        res = client.post(f"/api/v1/repositories/{repo_id}/graph/relationships", json=payload)
+        res = client.post(
+            f"/api/v1/repositories/{repo_id}/graph/relationships", json=payload
+        )
         assert res.status_code == 201
         data = res.json()
         assert data["id"] == rel_id
@@ -139,7 +146,7 @@ def test_create_and_fetch_graph(client):
             "source_id": "nonexistent_source",
             "target_id": "nonexistent_target",
             "type": GraphRelationshipType.DEPENDS_ON.value,
-        }
+        },
     )
     assert res.status_code == 400
 
@@ -162,8 +169,9 @@ def test_create_and_fetch_graph(client):
 
 def test_import_and_call_graph(client):
     import shutil
-    from app.services.parse_service import ParseService
+
     from app.core.config import settings
+    from app.services.parse_service import ParseService
 
     # 1. Setup mock repository files on disk simulating import and call flow
     repo_id = "test_graph_repo"
@@ -215,20 +223,33 @@ def login():
 
     # Verify specific calling dependencies
     # login() -> authenticate() -> generate_token() -> save_session()
-    login_calls_auth = [r for r in call_edges if "login" in r["source_id"] and "authenticate" in r["target_id"]]
+    login_calls_auth = [
+        r
+        for r in call_edges
+        if "login" in r["source_id"] and "authenticate" in r["target_id"]
+    ]
     assert len(login_calls_auth) > 0
 
-    auth_calls_token = [r for r in call_edges if "authenticate" in r["source_id"] and "generate_token" in r["target_id"]]
+    auth_calls_token = [
+        r
+        for r in call_edges
+        if "authenticate" in r["source_id"] and "generate_token" in r["target_id"]
+    ]
     assert len(auth_calls_token) > 0
 
-    token_calls_save = [r for r in call_edges if "generate_token" in r["source_id"] and "save_session" in r["target_id"]]
+    token_calls_save = [
+        r
+        for r in call_edges
+        if "generate_token" in r["source_id"] and "save_session" in r["target_id"]
+    ]
     assert len(token_calls_save) > 0
 
 
 def test_graph_analysis_suite(client):
     import shutil
-    from app.services.parse_service import ParseService
+
     from app.core.config import settings
+    from app.services.parse_service import ParseService
 
     # 1. Setup mock repository files on disk creating cycles, coupling and call context
     repo_id = "test_graph_repo"
@@ -285,7 +306,10 @@ def function_C():
         if "function_A" in c["description"] and "function_B" in c["description"]:
             cycle_found = True
             assert len(c["suggested_fixes"]) > 0
-            assert "function_A" in c["affected_modules"] or "function_B" in c["affected_modules"]
+            assert (
+                "function_A" in c["affected_modules"]
+                or "function_B" in c["affected_modules"]
+            )
     assert cycle_found
 
     # 4. Verify Coupling Analysis (Feature 7)
@@ -317,8 +341,9 @@ def function_C():
 
 def test_inheritance_and_module_dependency_graph(client):
     import shutil
-    from app.services.parse_service import ParseService
+
     from app.core.config import settings
+    from app.services.parse_service import ParseService
 
     # 1. Setup mock repository with API Service DB files containing class inheritance
     repo_id = "test_graph_repo"
@@ -337,7 +362,9 @@ from app.services.auth import AdminService
 def handle_login():
     AdminService().execute_login()
 """
-    with open(os.path.join(cloned_dir, "app", "api", "auth.py"), "w", encoding="utf-8") as f:
+    with open(
+        os.path.join(cloned_dir, "app", "api", "auth.py"), "w", encoding="utf-8"
+    ) as f:
         f.write(api_content)
 
     # Service Layer: class Admin inheriting from User, calls database
@@ -352,7 +379,9 @@ class Admin(User):
     def execute_login(self):
         DatabaseConnection().query_data()
 """
-    with open(os.path.join(cloned_dir, "app", "services", "auth.py"), "w", encoding="utf-8") as f:
+    with open(
+        os.path.join(cloned_dir, "app", "services", "auth.py"), "w", encoding="utf-8"
+    ) as f:
         f.write(service_content)
 
     # Database Layer
@@ -361,7 +390,9 @@ class DatabaseConnection:
     def query_data(self):
         pass
 """
-    with open(os.path.join(cloned_dir, "app", "db", "connection.py"), "w", encoding="utf-8") as f:
+    with open(
+        os.path.join(cloned_dir, "app", "db", "connection.py"), "w", encoding="utf-8"
+    ) as f:
         f.write(db_content)
 
     # 2. Parse mock repository and update DB tables
@@ -381,7 +412,11 @@ class DatabaseConnection:
     # Admin inherits from User
     inherits_edges = [r for r in graph_data["relationships"] if r["type"] == "INHERITS"]
     assert len(inherits_edges) > 0
-    admin_extends_user = [r for r in inherits_edges if "Admin" in r["source_id"] and "User" in r["target_id"]]
+    admin_extends_user = [
+        r
+        for r in inherits_edges
+        if "Admin" in r["source_id"] and "User" in r["target_id"]
+    ]
     assert len(admin_extends_user) > 0
 
     # 5. Assert Folders exist as nodes (Domain in ontology)
@@ -401,19 +436,36 @@ class DatabaseConnection:
     assert "Database" in module_names
 
     # Assert API depends on Service (api/auth.py calls services/auth.py)
-    depends_edges = [r for r in graph_data["relationships"] if r["type"] == "DEPENDS_ON"]
-    api_depends_service = [r for r in depends_edges if "layer::" in r["source_id"] and "API" in r["source_id"] and "layer::" in r["target_id"] and "Service" in r["target_id"]]
+    depends_edges = [
+        r for r in graph_data["relationships"] if r["type"] == "DEPENDS_ON"
+    ]
+    api_depends_service = [
+        r
+        for r in depends_edges
+        if "layer::" in r["source_id"]
+        and "API" in r["source_id"]
+        and "layer::" in r["target_id"]
+        and "Service" in r["target_id"]
+    ]
     assert len(api_depends_service) > 0
 
     # Assert Service depends on Database (services/auth.py calls db/connection.py)
-    service_depends_db = [r for r in depends_edges if "layer::" in r["source_id"] and "Service" in r["source_id"] and "layer::" in r["target_id"] and "Database" in r["target_id"]]
+    service_depends_db = [
+        r
+        for r in depends_edges
+        if "layer::" in r["source_id"]
+        and "Service" in r["source_id"]
+        and "layer::" in r["target_id"]
+        and "Database" in r["target_id"]
+    ]
     assert len(service_depends_db) > 0
 
 
 def test_dependency_query_engine(client):
     import shutil
-    from app.services.parse_service import ParseService
+
     from app.core.config import settings
+    from app.services.parse_service import ParseService
 
     # 1. Setup mock repository files on disk with queries context
     repo_id = "test_graph_repo"
@@ -460,13 +512,15 @@ def orphan_function():
     res = client.get(f"/api/v1/repositories/{repo_id}/graph")
     assert res.status_code == 200
     graph_data = res.json()
-    
+
     file_x_node = [n for n in graph_data["nodes"] if "file_x.py" in n["id"]][0]
-    file_y_node = [n for n in graph_data["nodes"] if "file_y.py" in n["id"]][0]
+    _file_y_node = [n for n in graph_data["nodes"] if "file_y.py" in n["id"]][0]
     file_z_node = [n for n in graph_data["nodes"] if "file_z.py" in n["id"]][0]
 
     # Query 1: Direct Dependencies of file_x.py
-    res = client.get(f"/api/v1/repositories/{repo_id}/query/dependencies?node_id={file_x_node['id']}")
+    res = client.get(
+        f"/api/v1/repositories/{repo_id}/query/dependencies?node_id={file_x_node['id']}"
+    )
     assert res.status_code == 200
     dep_data = res.json()
     # file_x.py depends on file_y
@@ -474,7 +528,9 @@ def orphan_function():
     assert f"module::{repo_id}::app.file_y" in dep_targets
 
     # Query 2: Callers of start_service
-    res = client.get(f"/api/v1/repositories/{repo_id}/query/callers?symbol_name=start_service")
+    res = client.get(
+        f"/api/v1/repositories/{repo_id}/query/callers?symbol_name=start_service"
+    )
     assert res.status_code == 200
     callers_data = res.json()
     assert len(callers_data["callers"]) > 0
@@ -483,14 +539,18 @@ def orphan_function():
     assert "run_process" in caller_names
 
     # Query 3: Import Tree starting from file_x.py
-    res = client.get(f"/api/v1/repositories/{repo_id}/query/imports?node_id={file_x_node['id']}")
+    res = client.get(
+        f"/api/v1/repositories/{repo_id}/query/imports?node_id={file_x_node['id']}"
+    )
     assert res.status_code == 200
     imports_data = res.json()
     imports_targets = {e["target_id"] for e in imports_data["edges"]}
     assert f"module::{repo_id}::app.file_y" in imports_targets
 
     # Query 4: Downstream Impact starting from file_x.py
-    res = client.get(f"/api/v1/repositories/{repo_id}/query/downstream?node_id={file_x_node['id']}")
+    res = client.get(
+        f"/api/v1/repositories/{repo_id}/query/downstream?node_id={file_x_node['id']}"
+    )
     assert res.status_code == 200
     downstream_data = res.json()
     downstream_nodes = {n["id"] for n in downstream_data["nodes"]}
@@ -506,9 +566,10 @@ def orphan_function():
 
 def test_neo4j_and_knowledge_graph_builder(client):
     import shutil
-    from app.services.parse_service import ParseService
+
     from app.core.config import settings
     from app.core.neo4j_client import neo4j_client
+    from app.services.parse_service import ParseService
 
     # 1. Setup mock repository files on disk matching services, tables, routers, libs, envs
     repo_id = "test_graph_repo"
@@ -521,7 +582,9 @@ def test_neo4j_and_knowledge_graph_builder(client):
 def execute_endpoint():
     pass
 """
-    with open(os.path.join(cloned_dir, "app", "api_router.py"), "w", encoding="utf-8") as f:
+    with open(
+        os.path.join(cloned_dir, "app", "api_router.py"), "w", encoding="utf-8"
+    ) as f:
         f.write(api_content)
 
     # Service layer node check: service/Service context
@@ -529,7 +592,9 @@ def execute_endpoint():
 def run_auth_service():
     pass
 """
-    with open(os.path.join(cloned_dir, "app", "auth_service.py"), "w", encoding="utf-8") as f:
+    with open(
+        os.path.join(cloned_dir, "app", "auth_service.py"), "w", encoding="utf-8"
+    ) as f:
         f.write(service_content)
 
     # Database Table class check
@@ -537,7 +602,9 @@ def run_auth_service():
 class UserDBModel:
     pass
 """
-    with open(os.path.join(cloned_dir, "app", "db_model.py"), "w", encoding="utf-8") as f:
+    with open(
+        os.path.join(cloned_dir, "app", "db_model.py"), "w", encoding="utf-8"
+    ) as f:
         f.write(db_content)
 
     # requirements.txt mapping External Library entities
@@ -561,34 +628,51 @@ class UserDBModel:
     assert session is not None
     try:
         # Check Repository node
-        res_repo = session.run("MATCH (r:Repository {id: $repo_id}) RETURN r", repo_id=repo_id)
+        res_repo = session.run(
+            "MATCH (r:Repository {id: $repo_id}) RETURN r", repo_id=repo_id
+        )
         assert res_repo.single() is not None
 
         # Check Service node
-        res_srv = session.run("MATCH (s:Service {repository_id: $repo_id}) RETURN s", repo_id=repo_id)
+        res_srv = session.run(
+            "MATCH (s:Service {repository_id: $repo_id}) RETURN s", repo_id=repo_id
+        )
         records_srv = list(res_srv)
         assert len(records_srv) > 0
 
         # Check API Endpoint node
-        res_api = session.run("MATCH (a:API_Endpoint {repository_id: $repo_id}) RETURN a", repo_id=repo_id)
+        res_api = session.run(
+            "MATCH (a:API_Endpoint {repository_id: $repo_id}) RETURN a", repo_id=repo_id
+        )
         records_api = list(res_api)
         assert len(records_api) > 0
 
         # Check Database Table node
-        res_tbl = session.run("MATCH (d:Database_Table {repository_id: $repo_id}) RETURN d", repo_id=repo_id)
+        res_tbl = session.run(
+            "MATCH (d:Database_Table {repository_id: $repo_id}) RETURN d",
+            repo_id=repo_id,
+        )
         records_tbl = list(res_tbl)
         assert len(records_tbl) > 0
 
         # Check External Library node
-        res_lib = session.run("MATCH (l:External_Library {id: 'lib::fastapi'}) RETURN l")
+        res_lib = session.run(
+            "MATCH (l:External_Library {id: 'lib::fastapi'}) RETURN l"
+        )
         assert res_lib.single() is not None
 
         # Check Environment Variable node
-        res_env = session.run("MATCH (e:Environment_Variable {name: 'API_KEY', repository_id: $repo_id}) RETURN e", repo_id=repo_id)
+        res_env = session.run(
+            "MATCH (e:Environment_Variable {name: 'API_KEY', repository_id: $repo_id}) RETURN e",
+            repo_id=repo_id,
+        )
         assert res_env.single() is not None
 
         # Check semantic connections HAS_MODULE
-        res_has_mod = session.run("MATCH (r:Repository {id: $repo_id})-[h:HAS_MODULE]->() RETURN h", repo_id=repo_id)
+        res_has_mod = session.run(
+            "MATCH (r:Repository {id: $repo_id})-[h:HAS_MODULE]->() RETURN h",
+            repo_id=repo_id,
+        )
         assert len(list(res_has_mod)) > 0
 
     finally:
@@ -597,8 +681,9 @@ class UserDBModel:
 
 def test_semantic_relationships_and_search(client):
     import shutil
-    from app.services.parse_service import ParseService
+
     from app.core.config import settings
+    from app.services.parse_service import ParseService
 
     repo_id = "test_graph_repo"
     cloned_dir = os.path.join(settings.CLONED_REPOS_DIR, repo_id)
@@ -645,18 +730,28 @@ class MyTestClass:
     # Verify BELONGS_TO relationship exists: Method belongs to Class
     belongs_rels = [r for r in rels if r["type"] == "BELONGS_TO"]
     assert len(belongs_rels) > 0
-    method_belongs = [r for r in belongs_rels if "my_test_method" in r["source"]["name"]]
+    method_belongs = [
+        r for r in belongs_rels if "my_test_method" in r["source"]["name"]
+    ]
     assert len(method_belongs) > 0
 
     # Search with query filters
-    res_query = client.get(f"/api/v1/repositories/{repo_id}/relationships/search?query=my_test_method")
+    res_query = client.get(
+        f"/api/v1/repositories/{repo_id}/relationships/search?query=my_test_method"
+    )
     assert res_query.status_code == 200
     query_rels = res_query.json()
     assert len(query_rels) > 0
-    assert all("my_test_method" in r["source"]["name"] or "my_test_method" in r["target"]["name"] for r in query_rels)
+    assert all(
+        "my_test_method" in r["source"]["name"]
+        or "my_test_method" in r["target"]["name"]
+        for r in query_rels
+    )
 
     # Search with relationship type filter
-    res_type = client.get(f"/api/v1/repositories/{repo_id}/relationships/search?type=OWNS")
+    res_type = client.get(
+        f"/api/v1/repositories/{repo_id}/relationships/search?type=OWNS"
+    )
     assert res_type.status_code == 200
     type_rels = res_type.json()
     assert len(type_rels) > 0
@@ -665,13 +760,14 @@ class MyTestClass:
 
 def test_repository_ontology_and_entity_recognition(client):
     import shutil
-    from app.services.parse_service import ParseService
+
     from app.core.config import settings
+    from app.services.parse_service import ParseService
 
     repo_id = "test_graph_repo"
     cloned_dir = os.path.join(settings.CLONED_REPOS_DIR, repo_id)
     shutil.rmtree(cloned_dir, ignore_errors=True)
-    
+
     # Create directory tree
     os.makedirs(os.path.join(cloned_dir, "app"), exist_ok=True)
     os.makedirs(os.path.join(cloned_dir, ".github", "workflows"), exist_ok=True)
@@ -693,7 +789,9 @@ services:
     ports:
       - "5432:5432"
 """
-    with open(os.path.join(cloned_dir, "docker-compose.yml"), "w", encoding="utf-8") as f:
+    with open(
+        os.path.join(cloned_dir, "docker-compose.yml"), "w", encoding="utf-8"
+    ) as f:
         f.write(docker_content)
 
     # 2. Create GitHub Actions workflow
@@ -710,7 +808,11 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 """
-    with open(os.path.join(cloned_dir, ".github", "workflows", "ci.yml"), "w", encoding="utf-8") as f:
+    with open(
+        os.path.join(cloned_dir, ".github", "workflows", "ci.yml"),
+        "w",
+        encoding="utf-8",
+    ) as f:
         f.write(workflow_content)
 
     # 3. Create .env file
@@ -757,10 +859,10 @@ def process_data_task():
     res = client.get(f"/api/v1/repositories/{repo_id}/graph")
     assert res.status_code == 200
     graph_data = res.json()
-    
+
     nodes = graph_data["nodes"]
     relationships = graph_data["relationships"]
-    
+
     # Assert Ontology Mapping
     # File node should have type = "Module"
     file_node = next((n for n in nodes if n["id"] == "file::app/main.py"), None)
@@ -783,7 +885,10 @@ def process_data_task():
     api_node = next((n for n in nodes if "/users" in n["name"]), None)
     assert api_node is not None
     assert api_node["type"] == "API"
-    assert api_node["properties"].get("raw_type") in ("API Endpoint", "REST API Endpoint")
+    assert api_node["properties"].get("raw_type") in (
+        "API Endpoint",
+        "REST API Endpoint",
+    )
 
     # Assert Entity Recognition Engine Discovered Infrastructure Node types
     # Docker Service nodes
@@ -792,19 +897,28 @@ def process_data_task():
     assert web_docker["properties"].get("raw_type") == "Docker Service"
 
     # GitHub Action node
-    workflow_node = next((n for n in nodes if n["id"] == f"github_action::{repo_id}::ci.yml"), None)
+    workflow_node = next(
+        (n for n in nodes if n["id"] == f"github_action::{repo_id}::ci.yml"), None
+    )
     assert workflow_node is not None
     assert workflow_node["name"] == "CI/CD Pipeline"
 
     # Cron Job node
-    cron_node = next((n for n in nodes if n["id"] == f"cron::{repo_id}::workflow::ci.yml"), None)
+    cron_node = next(
+        (n for n in nodes if n["id"] == f"cron::{repo_id}::workflow::ci.yml"), None
+    )
     assert cron_node is not None
     assert cron_node["properties"].get("cron_expression") == "0 0 * * *"
 
     # Environment variables
-    api_key_node = next((n for n in nodes if n["id"] == f"env::{repo_id}::API_KEY"), None)
+    api_key_node = next(
+        (n for n in nodes if n["id"] == f"env::{repo_id}::API_KEY"), None
+    )
     assert api_key_node is not None
-    assert api_key_node["properties"].get("raw_type") in ("Environment", "Environment Variable")
+    assert api_key_node["properties"].get("raw_type") in (
+        "Environment",
+        "Environment Variable",
+    )
 
     # Redis Cache node
     redis_node = next((n for n in nodes if n["id"] == f"cache::{repo_id}::redis"), None)
@@ -812,18 +926,37 @@ def process_data_task():
 
     # Assert Relationships connecting infrastructure and code
     # File uses Environment Variable
-    env_use = next((r for r in relationships if r["source_id"] == "file::app/main.py" and r["target_id"] == f"env::{repo_id}::API_KEY" and r["type"] == "USES"), None)
+    env_use = next(
+        (
+            r
+            for r in relationships
+            if r["source_id"] == "file::app/main.py"
+            and r["target_id"] == f"env::{repo_id}::API_KEY"
+            and r["type"] == "USES"
+        ),
+        None,
+    )
     assert env_use is not None
 
     # File connects to Redis
-    redis_connect = next((r for r in relationships if r["source_id"] == "file::app/main.py" and r["target_id"] == f"cache::{repo_id}::redis" and r["type"] == "CONNECTS_TO"), None)
+    redis_connect = next(
+        (
+            r
+            for r in relationships
+            if r["source_id"] == "file::app/main.py"
+            and r["target_id"] == f"cache::{repo_id}::redis"
+            and r["type"] == "CONNECTS_TO"
+        ),
+        None,
+    )
     assert redis_connect is not None
 
 
 def test_architecture_pattern_detection(client):
     import shutil
-    from app.services.parse_service import ParseService
+
     from app.core.config import settings
+    from app.services.parse_service import ParseService
 
     repo_id = "test_graph_repo"
     cloned_dir = os.path.join(settings.CLONED_REPOS_DIR, repo_id)
@@ -842,7 +975,9 @@ class AuthController:
     def login(self):
         AuthService().authenticate()
 """
-    with open(os.path.join(cloned_dir, "app", "api", "auth.py"), "w", encoding="utf-8") as f:
+    with open(
+        os.path.join(cloned_dir, "app", "api", "auth.py"), "w", encoding="utf-8"
+    ) as f:
         f.write(api_content)
 
     # 2. Business Service
@@ -853,7 +988,9 @@ class AuthService:
     def authenticate(self):
         UserRepository().find_by_id(1)
 """
-    with open(os.path.join(cloned_dir, "app", "services", "auth.py"), "w", encoding="utf-8") as f:
+    with open(
+        os.path.join(cloned_dir, "app", "services", "auth.py"), "w", encoding="utf-8"
+    ) as f:
         f.write(service_content)
 
     # 3. Repository
@@ -862,7 +999,11 @@ class UserRepository:
     def find_by_id(self, user_id):
         pass
 """
-    with open(os.path.join(cloned_dir, "app", "repositories", "user.py"), "w", encoding="utf-8") as f:
+    with open(
+        os.path.join(cloned_dir, "app", "repositories", "user.py"),
+        "w",
+        encoding="utf-8",
+    ) as f:
         f.write(repo_content)
 
     # Parse repo
@@ -893,8 +1034,9 @@ class UserRepository:
 
 def test_domain_clustering(client):
     import shutil
-    from app.services.parse_service import ParseService
+
     from app.core.config import settings
+    from app.services.parse_service import ParseService
 
     repo_id = "test_graph_repo"
     cloned_dir = os.path.join(settings.CLONED_REPOS_DIR, repo_id)
@@ -909,7 +1051,9 @@ def test_domain_clustering(client):
 def perform_user_login():
     pass
 """
-    with open(os.path.join(cloned_dir, "app", "auth", "login.py"), "w", encoding="utf-8") as f:
+    with open(
+        os.path.join(cloned_dir, "app", "auth", "login.py"), "w", encoding="utf-8"
+    ) as f:
         f.write(auth_content)
 
     # Billing file: checkout endpoint
@@ -917,7 +1061,9 @@ def perform_user_login():
 def run_checkout_transaction():
     pass
 """
-    with open(os.path.join(cloned_dir, "app", "billing", "checkout.py"), "w", encoding="utf-8") as f:
+    with open(
+        os.path.join(cloned_dir, "app", "billing", "checkout.py"), "w", encoding="utf-8"
+    ) as f:
         f.write(billing_content)
 
     # Parse repo
@@ -933,14 +1079,14 @@ def run_checkout_transaction():
     assert res.status_code == 200
     data = res.json()
     assert "domains" in data
-    
+
     domains_map = {d["name"]: d for d in data["domains"]}
-    
+
     # Assert domains exist and contain correct nodes
     assert "Authentication & Security" in domains_map
     auth_node_ids = domains_map["Authentication & Security"]["node_ids"]
     assert any("login.py" in nid for nid in auth_node_ids)
-    
+
     assert "Billing & Payment" in domains_map
     billing_node_ids = domains_map["Billing & Payment"]["node_ids"]
     assert any("checkout.py" in nid for nid in billing_node_ids)
@@ -948,8 +1094,9 @@ def run_checkout_transaction():
 
 def test_semantic_queries(client):
     import shutil
-    from app.services.parse_service import ParseService
+
     from app.core.config import settings
+    from app.services.parse_service import ParseService
 
     repo_id = "test_graph_repo"
     cloned_dir = os.path.join(settings.CLONED_REPOS_DIR, repo_id)
@@ -991,20 +1138,26 @@ def login(jwt_secret=None):
         db.close()
 
     # Query 1: Which modules interact with Redis?
-    res1 = client.get(f"/api/v1/repositories/{repo_id}/query/semantic?query=Which modules interact with Redis?")
+    res1 = client.get(
+        f"/api/v1/repositories/{repo_id}/query/semantic?query=Which modules interact with Redis?"
+    )
     assert res1.status_code == 200
     data1 = res1.json()
     assert "results" in data1
     assert any("main.py" in r["name"] for r in data1["results"])
 
     # Query 2: Which services own this API?
-    res2 = client.get(f"/api/v1/repositories/{repo_id}/query/semantic?query=Which services own this API?")
+    res2 = client.get(
+        f"/api/v1/repositories/{repo_id}/query/semantic?query=Which services own this API?"
+    )
     assert res2.status_code == 200
     data2 = res2.json()
     assert "results" in data2
 
     # Query 3: Which APIs use JWT?
-    res3 = client.get(f"/api/v1/repositories/{repo_id}/query/semantic?query=Which APIs use JWT?")
+    res3 = client.get(
+        f"/api/v1/repositories/{repo_id}/query/semantic?query=Which APIs use JWT?"
+    )
     assert res3.status_code == 200
     data3 = res3.json()
     assert "results" in data3
@@ -1013,8 +1166,9 @@ def login(jwt_secret=None):
 
 def test_semantic_search_nodes(client):
     import shutil
-    from app.services.parse_service import ParseService
+
     from app.core.config import settings
+    from app.services.parse_service import ParseService
 
     repo_id = "test_graph_repo"
     cloned_dir = os.path.join(settings.CLONED_REPOS_DIR, repo_id)
@@ -1057,7 +1211,7 @@ def login():
     res = client.get(f"/api/v1/repositories/{repo_id}/search?query=login")
     assert res.status_code == 200
     data = res.json()
-    
+
     # Assert concept expanded results are returned (e.g. JWTModule, AuthenticationService)
     node_names = [n["name"] for n in data]
     assert any("jwt-login" in n for n in node_names)
@@ -1085,7 +1239,9 @@ def test_aligned_knowledge_endpoints(client):
     assert "entities" in res_entities.json()
 
     # 4. Search
-    res_search = client.get(f"/api/v1/repositories/{repo_id}/knowledge/search?query=login")
+    res_search = client.get(
+        f"/api/v1/repositories/{repo_id}/knowledge/search?query=login"
+    )
     assert res_search.status_code == 200
     assert len(res_search.json()) > 0
 
@@ -1103,10 +1259,3 @@ def test_aligned_knowledge_endpoints(client):
     res_stats = client.get(f"/api/v1/repositories/{repo_id}/knowledge/statistics")
     assert res_stats.status_code == 200
     assert "statistics" in res_stats.json()
-
-
-
-
-
-
-

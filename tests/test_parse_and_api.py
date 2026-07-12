@@ -1,24 +1,22 @@
 """Integration test for repository parsing database storage and API endpoints."""
 
 import os
-import sys
 import shutil
+import sys
 
 # Add the backend app to sys.path so we can import directly
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "apps", "backend"))
 
-from fastapi.testclient import TestClient
-from app.main import app
 from app.api.v1.auth import get_current_user
-from app.core.database import SessionLocal
-from app.models import base_models
-from app.models.user import User
-from app.models.repository import Repository
-from app.models.file import File
-from app.models.symbol import Symbol
-from app.models.relationship import Relationship
-from app.models.repository_statistics import RepositoryStatistics
 from app.core.config import settings
+from app.core.database import SessionLocal
+from app.main import app
+from app.models.file import File
+from app.models.relationship import Relationship
+from app.models.repository import Repository
+from app.models.repository_statistics import RepositoryStatistics
+from app.models.user import User
+from fastapi.testclient import TestClient
 
 
 def main():
@@ -71,8 +69,12 @@ function greet() {
         # Delete any previous repo records
         repo = db.query(Repository).filter(Repository.id == repo_id).first()
         if repo:
-            db.query(RepositoryStatistics).filter(RepositoryStatistics.repository_id == repo_id).delete()
-            db.query(Relationship).filter(Relationship.repository_id == repo_id).delete()
+            db.query(RepositoryStatistics).filter(
+                RepositoryStatistics.repository_id == repo_id
+            ).delete()
+            db.query(Relationship).filter(
+                Relationship.repository_id == repo_id
+            ).delete()
             db.query(File).filter(File.repository_id == repo_id).delete()
             db.delete(repo)
             db.commit()
@@ -111,7 +113,9 @@ function greet() {
         for u in users:
             print(f"  User: id={u.id}, username={u.username}")
         for r in repos:
-            print(f"  Repo: id={r.id}, name={r.name}, user_id={r.user_id}, status={r.status}")
+            print(
+                f"  Repo: id={r.id}, name={r.name}, user_id={r.user_id}, status={r.status}"
+            )
     finally:
         db.close()
 
@@ -135,7 +139,9 @@ function greet() {
     files = response.json()
     print(f"Files returned ({len(files)}):")
     for f in files:
-        print(f"  Path: {f['file_path']}, Lang: {f['language']}, Size: {f['size_bytes']} bytes")
+        print(
+            f"  Path: {f['file_path']}, Lang: {f['language']}, Size: {f['size_bytes']} bytes"
+        )
         print(f"  Metrics: {f['metrics']}")
     assert len(files) == 2
 
@@ -147,7 +153,9 @@ function greet() {
     print(f"Symbols returned ({len(symbols)}):")
     for sym in symbols:
         print(f"  Name: {sym['name']}, Kind: {sym['kind']}, Path: {sym['file_path']}")
-    assert len(symbols) >= 3  # hello_world, Animal, greet (plus potentially constructors/methods if parsed)
+    assert (
+        len(symbols) >= 3
+    )  # hello_world, Animal, greet (plus potentially constructors/methods if parsed)
 
     print("\n=== Testing GET /repositories/{repo_id}/metrics ===")
     response = client.get(f"/api/v1/repositories/{repo_id}/metrics")

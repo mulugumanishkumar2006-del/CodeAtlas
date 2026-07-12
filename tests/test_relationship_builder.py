@@ -1,20 +1,19 @@
 """Smoke test for RelationshipBuilder — run from the repo root."""
 
 import json
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "apps", "backend"))
 
-from app.services.scanner import RepositoryScanner
-from app.services.language_detector import LanguageDetector, Language
 from app.services.ast_service import TreeSitterAST
-from app.services.symbol_extractor import SymbolExtractor
+from app.services.language_detector import Language, LanguageDetector
 from app.services.relationship_builder import (
-    RelationshipBuilder,
     EdgeKind,
-    CodeGraph,
+    RelationshipBuilder,
 )
+from app.services.scanner import RepositoryScanner
+from app.services.symbol_extractor import SymbolExtractor
 
 
 def main():
@@ -29,18 +28,18 @@ def main():
     print("=== Inline Relationship Test ===\n")
 
     files = {
-        "models/user.py": '''\
+        "models/user.py": """\
 class User:
     def __init__(self, name: str):
         self.name = name
-''',
-        "models/admin.py": '''\
+""",
+        "models/admin.py": """\
 from models.user import User
 
 class Admin(User):
     role: str = "admin"
-''',
-        "services/user_service.py": '''\
+""",
+        "services/user_service.py": """\
 from models.user import User
 from models.admin import Admin
 
@@ -53,7 +52,7 @@ class UserService:
 
 def create_service() -> UserService:
     return UserService()
-''',
+""",
     }
 
     extractions = {}
@@ -62,8 +61,10 @@ def create_service() -> UserService:
         lang = Language.PYTHON
         ast_result = ast_gen.parse_string(src, lang)
         ast_result = type(ast_result)(
-            file_path=path, language=lang,
-            root=ast_result.root, total_nodes=ast_result.total_nodes,
+            file_path=path,
+            language=lang,
+            root=ast_result.root,
+            total_nodes=ast_result.total_nodes,
         )
         asts[path] = ast_result
         ext = extractor.extract(ast_result)
@@ -84,15 +85,17 @@ def create_service() -> UserService:
     inherit_edges = graph.edges_of_kind(EdgeKind.INHERITS)
     inherit_labels = [e.label for e in inherit_edges]
     print(f"  Inheritance: {inherit_labels}")
-    assert any("Admin extends User" in l for l in inherit_labels if l), \
-        f"Expected Admin->User inheritance, got {inherit_labels}"
+    assert any(
+        "Admin extends User" in label for label in inherit_labels if label
+    ), f"Expected Admin->User inheritance, got {inherit_labels}"
 
     # Verify composition: UserService uses User and Admin
     comp_edges = graph.edges_of_kind(EdgeKind.COMPOSITION)
     comp_labels = [e.label for e in comp_edges]
     print(f"  Composition: {comp_labels}")
-    assert any("User" in l for l in comp_labels if l), \
-        f"Expected User in composition, got {comp_labels}"
+    assert any(
+        "User" in label for label in comp_labels if label
+    ), f"Expected User in composition, got {comp_labels}"
 
     # Verify module usage
     mod_edges = graph.edges_of_kind(EdgeKind.MODULE_USAGE)
@@ -120,11 +123,15 @@ def create_service() -> UserService:
         ext = extractor.extract(ast_result)
         # Use relative path as key
         repo_extractions[f.relative_path] = type(ext)(
-            file_path=f.relative_path, language=ext.language, symbols=ext.symbols,
+            file_path=f.relative_path,
+            language=ext.language,
+            symbols=ext.symbols,
         )
         repo_asts[f.relative_path] = type(ast_result)(
-            file_path=f.relative_path, language=ast_result.language,
-            root=ast_result.root, total_nodes=ast_result.total_nodes,
+            file_path=f.relative_path,
+            language=ast_result.language,
+            root=ast_result.root,
+            total_nodes=ast_result.total_nodes,
         )
 
     repo_graph = builder.build(repo_extractions, repo_asts)
@@ -140,8 +147,12 @@ def create_service() -> UserService:
     print()
 
     # Verify graph has substance
-    assert len(repo_graph.nodes) > 50, f"Expected 50+ nodes, got {len(repo_graph.nodes)}"
-    assert len(repo_graph.edges) > 20, f"Expected 20+ edges, got {len(repo_graph.edges)}"
+    assert (
+        len(repo_graph.nodes) > 50
+    ), f"Expected 50+ nodes, got {len(repo_graph.nodes)}"
+    assert (
+        len(repo_graph.edges) > 20
+    ), f"Expected 20+ edges, got {len(repo_graph.edges)}"
 
     # ── 3. Serialisation test ───────────────────────────────────────
     print("=== Serialisation Test ===\n")
@@ -162,8 +173,10 @@ def create_service() -> UserService:
         nbrs = repo_graph.neighbours(sample.id)
         outgoing = repo_graph.edges_from(sample.id)
         incoming = repo_graph.edges_to(sample.id)
-        print(f"  {sample.name}: {len(nbrs)} neighbours, "
-              f"{len(outgoing)} outgoing, {len(incoming)} incoming")
+        print(
+            f"  {sample.name}: {len(nbrs)} neighbours, "
+            f"{len(outgoing)} outgoing, {len(incoming)} incoming"
+        )
 
     print("\nAll tests passed")
 

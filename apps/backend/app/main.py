@@ -3,12 +3,14 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # pyrefly: ignore [missing-import]
 from app.api.v1 import (
+    architect,
     architecture_drift,
     auth,
     digital_twin,
     evolution,
     graph,
     health,
+    reliability,
     repositories,
     tech_debt,
 )
@@ -66,3 +68,5 @@ app.include_router(
 app.include_router(
     digital_twin.router, prefix=settings.API_V1_STR, tags=["digital_twin"]
 )
+app.include_router(architect.router, prefix=settings.API_V1_STR, tags=["architect"])
+app.include_router(reliability.router, prefix=settings.API_V1_STR, tags=["reliability"])

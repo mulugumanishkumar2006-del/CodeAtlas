@@ -1,17 +1,18 @@
 import os
 import sys
-import pytest
 from datetime import datetime, timezone
+
+import pytest
 
 # Add backend directory to sys.path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "apps", "backend"))
 
-from fastapi.testclient import TestClient
-from app.main import app
 from app.core.database import SessionLocal
-from app.models.user import User
-from app.models.repository import Repository
+from app.main import app
 from app.models.evolution import CommitSnapshot, ComponentSnapshot
+from app.models.repository import Repository
+from app.models.user import User
+from fastapi.testclient import TestClient
 
 
 @pytest.fixture(scope="module")
@@ -41,10 +42,19 @@ def setup_test_data(db_session):
     repo_id = "test_evo_repo_id"
     repo = db_session.query(Repository).filter(Repository.id == repo_id).first()
     if repo:
-        commit_ids = [c.id for c in db_session.query(CommitSnapshot).filter(CommitSnapshot.repository_id == repo_id).all()]
+        commit_ids = [
+            c.id
+            for c in db_session.query(CommitSnapshot)
+            .filter(CommitSnapshot.repository_id == repo_id)
+            .all()
+        ]
         if commit_ids:
-            db_session.query(ComponentSnapshot).filter(ComponentSnapshot.commit_snapshot_id.in_(commit_ids)).delete(synchronize_session=False)
-        db_session.query(CommitSnapshot).filter(CommitSnapshot.repository_id == repo_id).delete()
+            db_session.query(ComponentSnapshot).filter(
+                ComponentSnapshot.commit_snapshot_id.in_(commit_ids)
+            ).delete(synchronize_session=False)
+        db_session.query(CommitSnapshot).filter(
+            CommitSnapshot.repository_id == repo_id
+        ).delete()
         db_session.delete(repo)
         db_session.commit()
 
@@ -78,8 +88,20 @@ def setup_test_data(db_session):
         dependencies_count=5,
         languages={"python": 100},
         health_score=85.0,
-        architecture_patterns=[{"pattern": "MVC", "confidence": 0.8, "description": "MVC Pattern", "evidence": []}],
-        graph_data={"nodes": [{"id": "auth", "name": "auth", "kind": "file", "file_path": "auth.py"}], "edges": []},
+        architecture_patterns=[
+            {
+                "pattern": "MVC",
+                "confidence": 0.8,
+                "description": "MVC Pattern",
+                "evidence": [],
+            }
+        ],
+        graph_data={
+            "nodes": [
+                {"id": "auth", "name": "auth", "kind": "file", "file_path": "auth.py"}
+            ],
+            "edges": [],
+        },
         average_function_size=20.0,
         cohesion_score=0.9,
         maintainability_index=80.0,
@@ -102,21 +124,41 @@ def setup_test_data(db_session):
         complexity_average=10.0,
         complexity_max=15,
         documentation_coverage=0.6,
-        dependencies_count=20, # dependency explosion spike
+        dependencies_count=20,  # dependency explosion spike
         languages={"python": 180},
         health_score=65.0,
         average_function_size=35.0,
         cohesion_score=0.7,
         maintainability_index=60.0,
-        architecture_patterns=[{"pattern": "MVC", "confidence": 0.8, "description": "MVC Pattern", "evidence": []}],
-        graph_data={"nodes": [
-            {"id": "auth", "name": "auth", "kind": "file", "file_path": "auth.py"},
-            {"id": "payment_api", "name": "payment_api", "kind": "api", "file_path": "payment_api.py"},
-            {"id": "users_db", "name": "users_db", "kind": "database table", "file_path": "models.py"},
-        ], "edges": [
-            {"source": "payment_api", "target": "users_db", "kind": "CALLS"},
-            {"source": "auth", "target": "payment_api", "kind": "CALLS"}
-        ]},
+        architecture_patterns=[
+            {
+                "pattern": "MVC",
+                "confidence": 0.8,
+                "description": "MVC Pattern",
+                "evidence": [],
+            }
+        ],
+        graph_data={
+            "nodes": [
+                {"id": "auth", "name": "auth", "kind": "file", "file_path": "auth.py"},
+                {
+                    "id": "payment_api",
+                    "name": "payment_api",
+                    "kind": "api",
+                    "file_path": "payment_api.py",
+                },
+                {
+                    "id": "users_db",
+                    "name": "users_db",
+                    "kind": "database table",
+                    "file_path": "models.py",
+                },
+            ],
+            "edges": [
+                {"source": "payment_api", "target": "users_db", "kind": "CALLS"},
+                {"source": "auth", "target": "payment_api", "kind": "CALLS"},
+            ],
+        },
     )
     db_session.add(head_snap)
     db_session.commit()
@@ -147,7 +189,7 @@ def setup_test_data(db_session):
         path="auth",
         type="domain",
         name="auth",
-        complexity_total=20, # complexity and tech debt spike
+        complexity_total=20,  # complexity and tech debt spike
         complexity_average=10.0,
         complexity_max=12,
         code_lines=80,
@@ -155,7 +197,7 @@ def setup_test_data(db_session):
         dependencies_count=8,
         dependents_count=1,
         coupling_score=0.88,
-        technical_debt_score=65.2, # Spikes from 25.5 -> 65.2 (>15 point spike)
+        technical_debt_score=65.2,  # Spikes from 25.5 -> 65.2 (>15 point spike)
     )
     db_session.add(c1_head)
 
@@ -186,10 +228,19 @@ def setup_test_data(db_session):
     }
 
     # Clean up test database records
-    commit_ids = [c.id for c in db_session.query(CommitSnapshot).filter(CommitSnapshot.repository_id == repo_id).all()]
+    commit_ids = [
+        c.id
+        for c in db_session.query(CommitSnapshot)
+        .filter(CommitSnapshot.repository_id == repo_id)
+        .all()
+    ]
     if commit_ids:
-        db_session.query(ComponentSnapshot).filter(ComponentSnapshot.commit_snapshot_id.in_(commit_ids)).delete(synchronize_session=False)
-    db_session.query(CommitSnapshot).filter(CommitSnapshot.repository_id == repo_id).delete()
+        db_session.query(ComponentSnapshot).filter(
+            ComponentSnapshot.commit_snapshot_id.in_(commit_ids)
+        ).delete(synchronize_session=False)
+    db_session.query(CommitSnapshot).filter(
+        CommitSnapshot.repository_id == repo_id
+    ).delete()
     db_session.query(Repository).filter(Repository.id == repo_id).delete()
     db_session.query(User).filter(User.id == "test_evo_user").delete()
     db_session.commit()
@@ -197,6 +248,7 @@ def setup_test_data(db_session):
 
 def test_evolution_timeline_api(setup_test_data):
     from app.api.v1.auth import get_current_user
+
     client = TestClient(app)
 
     # Mock user auth dependency
@@ -235,7 +287,9 @@ def test_evolution_timeline_api(setup_test_data):
     # 3. Test diff endpoint
     base_sha = setup_test_data["base_sha"]
     head_sha = setup_test_data["head_sha"]
-    res = client.get(f"/api/v1/repositories/{repo_id}/evolution/diff?base_sha={base_sha}&head_sha={head_sha}")
+    res = client.get(
+        f"/api/v1/repositories/{repo_id}/evolution/diff?base_sha={base_sha}&head_sha={head_sha}"
+    )
     assert res.status_code == 200
     diff_data = res.json()
     assert diff_data["code_lines_diff"] == 350
@@ -260,7 +314,9 @@ def test_evolution_timeline_api(setup_test_data):
     assert "tech_debt" in metrics
 
     # 5. Test graph endpoint (Phase 7)
-    res = client.get(f"/api/v1/repositories/{repo_id}/evolution/graph?commit_sha={head_sha}")
+    res = client.get(
+        f"/api/v1/repositories/{repo_id}/evolution/graph?commit_sha={head_sha}"
+    )
     assert res.status_code == 200
     graph_json = res.json()
     assert "nodes" in graph_json
@@ -291,7 +347,9 @@ def test_evolution_timeline_api(setup_test_data):
     assert "service" in event_types
 
     # 8. Test AI Summary endpoint (Phase 7 - Feature 9)
-    res = client.get(f"/api/v1/repositories/{repo_id}/evolution/ai-summary?base_sha={base_sha}&head_sha={head_sha}")
+    res = client.get(
+        f"/api/v1/repositories/{repo_id}/evolution/ai-summary?base_sha={base_sha}&head_sha={head_sha}"
+    )
     assert res.status_code == 200
     ai_summary = res.json()
     assert "summary_bullets" in ai_summary
@@ -319,7 +377,7 @@ def test_evolution_timeline_api(setup_test_data):
     assert "change_points" in analytics
     assert "community_evolution" in analytics
     assert "trend_slopes" in analytics
-    
+
     lcs_val = analytics["longest_common_subgraph"]
     assert "nodes" in lcs_val
     assert "edges" in lcs_val

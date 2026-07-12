@@ -1,6 +1,6 @@
 import collections
 import random
-from typing import Dict, List, Set, Any
+from typing import Any, Dict, List, Set
 
 
 class SimulationAlgorithms:

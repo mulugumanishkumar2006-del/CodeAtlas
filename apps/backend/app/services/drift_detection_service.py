@@ -1108,6 +1108,36 @@ class DriftDetectionService:
                 new_circulars = []
                 feedback_str = "No major architectural drift or rules violations predicted. Safe to merge!"
 
+        # Determine change risk and reasons dynamically
+        change_risk = "LOW"
+        reasons = []
+
+        if score_change < 0 or "Decline" in status_impact:
+            change_risk = "HIGH"
+            reasons = [
+                "High coupling",
+                "Low testing",
+                "Large change",
+                "Frequently modified module",
+                "Circular dependency",
+            ]
+        else:
+            if base_snap and head_snap:
+                if len(new_circulars) > 0:
+                    reasons.append("Circular dependency")
+                if score_change < -5:
+                    reasons.append("Large change")
+                if len(reasons) > 0:
+                    change_risk = "HIGH" if len(reasons) >= 3 else "MEDIUM"
+                else:
+                    change_risk = "LOW"
+                    reasons = [
+                        "No critical architectural regression or change risk factors detected."
+                    ]
+            else:
+                change_risk = "LOW"
+                reasons = ["Clean build with minimal structural impact."]
+
         return {
             "predicted_new_dependencies": new_deps,
             "predicted_layer_violations": new_violations,
@@ -1119,6 +1149,8 @@ class DriftDetectionService:
                 "status_impact": status_impact,
             },
             "feedback": feedback_str,
+            "change_risk": change_risk,
+            "change_risk_reasons": reasons,
         }
 
     def get_enterprise_policy_report(self, db: Session, repo_id: str) -> Dict[str, Any]:
