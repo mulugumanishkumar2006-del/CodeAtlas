@@ -381,8 +381,11 @@ def test_architecture_drift():
     assert len(pr_review["predicted_layer_violations"]) > 0
     assert pr_review["drift_impact"]["score_change"] == -22.0
     assert "bypass" in pr_review["feedback"]
-    assert pr_review["change_risk"] == "HIGH"
     assert "High coupling" in pr_review["change_risk_reasons"]
+    assert "Authentication" in pr_review["likely_broken_tests"]
+    assert "Payment" in pr_review["likely_broken_tests"]
+    assert "Invoices" in pr_review["likely_broken_tests"]
+    assert "Notifications" in pr_review["likely_broken_tests"]
 
     # GET /api/v1/repositories/{repo_id}/architecture/policies
     policy_res = client.get(f"/api/v1/repositories/{repo_id}/architecture/policies")

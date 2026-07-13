@@ -301,6 +301,7 @@ function ArchitectureVisualizerInner({
                                                 | 'coupling'
                                                 | 'tech_debt'
                                                 | 'coverage'
+                                                | 'reliability'
                         >('none');
 
                         // Reset focus mode if node deselected
@@ -1438,19 +1439,14 @@ function ArchitectureVisualizerInner({
 
                                                                                                                         if (
                                                                                                                                                 failProb >
-                                                                                                                                                0.8
+                                                                                                                                                0.6
                                                                                                                         )
                                                                                                                                                 return 'critical';
                                                                                                                         if (
                                                                                                                                                 failProb >
-                                                                                                                                                0.6
+                                                                                                                                                0.3
                                                                                                                         )
-                                                                                                                                                return 'high';
-                                                                                                                        if (
-                                                                                                                                                failProb >
-                                                                                                                                                0.4
-                                                                                                                        )
-                                                                                                                                                return 'moderate';
+                                                                                                                                                return 'warning';
                                                                                                                         return 'healthy';
                                                                                                 }
                                                                                                 case 'complexity':

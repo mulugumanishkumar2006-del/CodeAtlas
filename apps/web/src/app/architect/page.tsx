@@ -4726,7 +4726,7 @@ export default function ArchitectPage() {
                                                                                                                           'access_token'
                                                                                                   )
                                                                                                 : null;
-                                                const headers = token
+                                                const headers: HeadersInit = token
                                                                         ? {
                                                                                                   Authorization: `Bearer ${token}`,
                                                                           }
@@ -4978,7 +4978,7 @@ export default function ArchitectPage() {
                                                                                                                           'access_token'
                                                                                                   )
                                                                                                 : null;
-                                                const headers = token
+                                                const headers: HeadersInit = token
                                                                         ? {
                                                                                                   Authorization: `Bearer ${token}`,
                                                                           }

@@ -30,6 +30,10 @@ class ReliabilityPrediction(Base):
     change_risk = Column(Float, nullable=False, default=0.0)
     complexity = Column(Integer, nullable=False, default=0)
     lines_of_code = Column(Integer, nullable=False, default=0)
+    reliability = Column(Float, nullable=False, default=1.0)
+    failure_risk = Column(Float, nullable=False, default=0.0)
+    recovery_difficulty = Column(String, nullable=False, default="Medium")
+    root_cause_path = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     repository = relationship("Repository")

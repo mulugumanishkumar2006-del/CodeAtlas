@@ -263,3 +263,16 @@ class SimulationCompareResponse(BaseModel):
     scenario_a: SimulationResultResponse
     scenario_b: SimulationResultResponse
     recommendation: str
+
+
+class IncidentSimulationRequest(BaseModel):
+    query: str
+
+
+class IncidentSimulationResponse(BaseModel):
+    query: str
+    apis_affected: List[str]
+    services_affected: List[str]
+    user_impact: str
+    recovery_path: List[str]
+    estimated_downtime: str

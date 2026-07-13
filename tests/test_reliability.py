@@ -100,6 +100,10 @@ def test_reliability_prediction_and_dashboard():
             assert "change_risk" in hot
             assert "complexity" in hot
             assert "lines_of_code" in hot
+            assert "reliability" in hot
+            assert "failure_risk" in hot
+            assert "recovery_difficulty" in hot
+            assert "root_cause_path" in hot
 
         # Verify trends structure
         assert len(data_pred["trends"]) > 0
@@ -117,6 +121,14 @@ def test_reliability_prediction_and_dashboard():
         assert data_dash["deployment_risk"] == data_pred["deployment_risk"]
         assert len(data_dash["hotspots"]) == len(data_pred["hotspots"])
         assert len(data_dash["trends"]) == len(data_pred["trends"])
+
+        # Verify timeline structure
+        assert "timeline" in data_dash
+        assert len(data_dash["timeline"]) > 0
+        for pt in data_dash["timeline"]:
+            assert "month" in pt
+            assert "score" in pt
+            assert "failure_risk" in pt
 
     finally:
         # Clean up database records after tests run

@@ -175,6 +175,7 @@ def setup_mock_data():
 
 
 def test_digital_twin_endpoints():
+    setup_mock_data()
     client = TestClient(app)
 
     def override_get_current_user():
@@ -397,6 +398,20 @@ def test_digital_twin_endpoints():
     assert what_if["failure_probability"] == 45.0
     assert len(what_if["affected_components"]) > 0
     assert "verdict" in what_if["verdict"].lower()
+
+    # 10. Test Incident Simulator
+    print("=== Test Incident Simulator ===")
+    response = client.post(
+        f"/api/v1/repositories/{repo_id}/digital-twin/incident-simulate",
+        json={"query": "Database unavailable"},
+    )
+    assert response.status_code == 200
+    incident = response.json()
+    assert len(incident["apis_affected"]) > 0
+    assert len(incident["services_affected"]) > 0
+    assert len(incident["recovery_path"]) > 0
+    assert "estimated_downtime" in incident
+    assert "user_impact" in incident
 
 
 def main():

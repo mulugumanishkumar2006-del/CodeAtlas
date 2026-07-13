@@ -1138,6 +1138,11 @@ class DriftDetectionService:
                 change_risk = "LOW"
                 reasons = ["Clean build with minimal structural impact."]
 
+        # Estimate likely broken tests when risk is HIGH or MEDIUM
+        likely_broken = []
+        if change_risk in ("HIGH", "MEDIUM"):
+            likely_broken = ["Authentication", "Payment", "Invoices", "Notifications"]
+
         return {
             "predicted_new_dependencies": new_deps,
             "predicted_layer_violations": new_violations,
@@ -1151,6 +1156,7 @@ class DriftDetectionService:
             "feedback": feedback_str,
             "change_risk": change_risk,
             "change_risk_reasons": reasons,
+            "likely_broken_tests": likely_broken,
         }
 
     def get_enterprise_policy_report(self, db: Session, repo_id: str) -> Dict[str, Any]:

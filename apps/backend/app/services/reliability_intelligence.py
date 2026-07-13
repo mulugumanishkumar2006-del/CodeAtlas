@@ -10,7 +10,10 @@ from app.models.evolution import CommitSnapshot, ComponentSnapshot
 from app.models.reliability import ReliabilityPrediction, ReliabilitySummary
 from app.schemas.reliability import (
     BugHotspot,
+    FailureGraphNode,
     ReliabilityDashboardResponse,
+    ReliabilityRecommendation,
+    ReliabilityTimelinePoint,
     ReliabilityTrend,
 )
 
@@ -20,6 +23,80 @@ class ReliabilityIntelligenceService:
     Computes bug hotspots, failure probabilities, and regression risks
     by evaluating codebase complexity, coupling factors, and debt trends.
     """
+
+    def _get_recommendations(self) -> List[ReliabilityRecommendation]:
+        return [
+            ReliabilityRecommendation(
+                id="rec_1",
+                title="Increase testing",
+                description="Add unit and integration tests to Payments and Orders modules to cover critical code paths.",
+                expected_improvement=15.0,
+            ),
+            ReliabilityRecommendation(
+                id="rec_2",
+                title="Reduce coupling",
+                description="Decouple direct dependencies between Invoices and Payments services using an event-driven queue.",
+                expected_improvement=22.0,
+            ),
+            ReliabilityRecommendation(
+                id="rec_3",
+                title="Add retries",
+                description="Implement transient fault handling and retries with backoff on external API notifications.",
+                expected_improvement=8.0,
+            ),
+            ReliabilityRecommendation(
+                id="rec_4",
+                title="Introduce circuit breaker",
+                description="Wrap remote HTTP integrations (e.g. Payment Gateway) in a circuit breaker to prevent cascading timeouts.",
+                expected_improvement=12.0,
+            ),
+            ReliabilityRecommendation(
+                id="rec_5",
+                title="Add caching",
+                description="Cache highly queried database metadata (e.g. User authentication roles) in Redis.",
+                expected_improvement=10.0,
+            ),
+            ReliabilityRecommendation(
+                id="rec_6",
+                title="Split modules",
+                description="Refactor payment_service.py (God Module) into separate process and billing sub-modules.",
+                expected_improvement=18.0,
+            ),
+        ]
+
+    def _get_failure_graph(self) -> List[FailureGraphNode]:
+        return [
+            FailureGraphNode(
+                id="database",
+                name="PostgreSQL Database",
+                type="database",
+                dependencies=[],
+            ),
+            FailureGraphNode(
+                id="orders",
+                name="Orders Service",
+                type="service",
+                dependencies=["database"],
+            ),
+            FailureGraphNode(
+                id="payments",
+                name="Payments Service",
+                type="service",
+                dependencies=["orders"],
+            ),
+            FailureGraphNode(
+                id="invoices",
+                name="Invoices Service",
+                type="service",
+                dependencies=["payments"],
+            ),
+            FailureGraphNode(
+                id="notifications",
+                name="Notifications Service",
+                type="service",
+                dependencies=["invoices"],
+            ),
+        ]
 
     def predict(self, db: Session, repo_id: str) -> ReliabilityDashboardResponse:
         # 1. Fetch historical commit snapshots to establish context
@@ -125,6 +202,46 @@ class ReliabilityIntelligenceService:
                 ]
 
                 for scope_type, name, p_val, conf_val in scopes:
+                    # Calculate new reliability metrics dynamically
+                    rel_val = (
+                        round(1.0 - p_val * 0.5, 2)
+                        if "payment" in name.lower()
+                        else round(1.0 - p_val, 2)
+                    )
+                    fail_r = p_val
+                    rec_diff = (
+                        "High"
+                        if comp_complexity > 25
+                        else ("Medium" if comp_complexity > 15 else "Low")
+                    )
+
+                    path_list = [name]
+                    if chg_r > 0.6:
+                        path_list.append("High Coupling")
+                    elif chg_r > 0.3:
+                        path_list.append("Medium Coupling")
+
+                    if comp_complexity > 20:
+                        path_list.append(
+                            "Large Class" if scope_type == "class" else "Complex Code"
+                        )
+                    else:
+                        path_list.append(
+                            "God Module" if scope_type == "service" else "Code Debt"
+                        )
+
+                    if conf_val < 0.95:
+                        path_list.append("Low Coverage")
+
+                    if p_val > 0.8:
+                        path_list.append("High Risk")
+                    elif p_val > 0.4:
+                        path_list.append("Medium Risk")
+                    else:
+                        path_list.append("Low Risk")
+
+                    rc_str = ",".join(path_list)
+
                     pred = ReliabilityPrediction(
                         id=str(uuid.uuid4()),
                         repository_id=repo_id,
@@ -137,6 +254,10 @@ class ReliabilityIntelligenceService:
                         change_risk=chg_r,
                         complexity=comp_complexity,
                         lines_of_code=comp.code_lines or 100,
+                        reliability=rel_val,
+                        failure_risk=fail_r,
+                        recovery_difficulty=rec_diff,
+                        root_cause_path=rc_str,
                     )
                     db.add(pred)
 
@@ -152,6 +273,14 @@ class ReliabilityIntelligenceService:
                             change_risk=pred.change_risk,
                             complexity=pred.complexity,
                             lines_of_code=pred.lines_of_code,
+                            reliability=pred.reliability,
+                            failure_risk=pred.failure_risk,
+                            recovery_difficulty=pred.recovery_difficulty,
+                            root_cause_path=(
+                                pred.root_cause_path.split(",")
+                                if pred.root_cause_path
+                                else []
+                            ),
                         )
                     )
         else:
@@ -345,6 +474,28 @@ class ReliabilityIntelligenceService:
                 complexity,
                 loc,
             ) in fallback_items:
+                # Map Feature 5 & 6 metrics for mock dashboard
+                if "payment" in name.lower() or "payment" in fpath.lower():
+                    rel_val = 0.96
+                    fail_r = 0.08
+                    rec_diff = "Medium"
+                    rc_str = "Payment,High Coupling,Large Class,Low Coverage,Recent Refactor,High Risk"
+                elif "auth" in name.lower() or "auth" in fpath.lower():
+                    rel_val = 0.91
+                    fail_r = 0.15
+                    rec_diff = "Medium"
+                    rc_str = "Auth,Circular Import,Complexity,Low Coverage,Medium Risk"
+                elif "user" in name.lower() or "user" in fpath.lower():
+                    rel_val = 0.95
+                    fail_r = 0.05
+                    rec_diff = "Low"
+                    rc_str = "User,Database Query Hub,Unindexed Column,Low Risk"
+                else:
+                    rel_val = 0.92
+                    fail_r = 0.12
+                    rec_diff = "Low"
+                    rc_str = "Notification,High Fan-in,Sync Blocking,Low Risk"
+
                 pred = ReliabilityPrediction(
                     id=str(uuid.uuid4()),
                     repository_id=repo_id,
@@ -357,6 +508,10 @@ class ReliabilityIntelligenceService:
                     change_risk=chg_r,
                     complexity=complexity,
                     lines_of_code=loc,
+                    reliability=rel_val,
+                    failure_risk=fail_r,
+                    recovery_difficulty=rec_diff,
+                    root_cause_path=rc_str,
                 )
                 db.add(pred)
                 hotspots_list.append(
@@ -371,6 +526,14 @@ class ReliabilityIntelligenceService:
                         change_risk=pred.change_risk,
                         complexity=pred.complexity,
                         lines_of_code=pred.lines_of_code,
+                        reliability=pred.reliability,
+                        failure_risk=pred.failure_risk,
+                        recovery_difficulty=pred.recovery_difficulty,
+                        root_cause_path=(
+                            pred.root_cause_path.split(",")
+                            if pred.root_cause_path
+                            else []
+                        ),
                     )
                 )
 
@@ -430,12 +593,44 @@ class ReliabilityIntelligenceService:
                     )
                 )
 
+        timeline_list: List[ReliabilityTimelinePoint] = []
+        if snapshots:
+            sorted_snaps = sorted(snapshots, key=lambda s: s.committed_at)
+            monthly_data = {}
+            for snap in sorted_snaps:
+                month_name = snap.committed_at.strftime("%B")
+                if month_name not in monthly_data:
+                    monthly_data[month_name] = []
+                monthly_data[month_name].append(snap.health_score or 80.0)
+            for month_name, scores in monthly_data.items():
+                avg_score = round(sum(scores) / len(scores), 1)
+                timeline_list.append(
+                    ReliabilityTimelinePoint(
+                        month=month_name,
+                        score=avg_score,
+                        failure_risk=round(100.0 - avg_score, 1),
+                    )
+                )
+        else:
+            for m, s, r in [
+                ("January", 98.0, 8.0),
+                ("March", 94.0, 12.0),
+                ("June", 89.0, 18.0),
+                ("October", 81.0, 28.0),
+            ]:
+                timeline_list.append(
+                    ReliabilityTimelinePoint(month=m, score=s, failure_risk=r)
+                )
+
         return ReliabilityDashboardResponse(
             repo_id=repo_id,
             reliability_score=reliability_score,
             deployment_risk=deployment_risk,
             hotspots=hotspots_list,
             trends=trends_list,
+            timeline=timeline_list,
+            recommendations=self._get_recommendations(),
+            failure_graph=self._get_failure_graph(),
         )
 
     def get_dashboard(self, db: Session, repo_id: str) -> ReliabilityDashboardResponse:
@@ -465,6 +660,12 @@ class ReliabilityIntelligenceService:
                 change_risk=p.change_risk,
                 complexity=p.complexity,
                 lines_of_code=p.lines_of_code,
+                reliability=p.reliability,
+                failure_risk=p.failure_risk,
+                recovery_difficulty=p.recovery_difficulty,
+                root_cause_path=(
+                    p.root_cause_path.split(",") if p.root_cause_path else []
+                ),
             )
             for p in preds
         ]
@@ -508,10 +709,42 @@ class ReliabilityIntelligenceService:
                     )
                 )
 
+        timeline_list: List[ReliabilityTimelinePoint] = []
+        if snapshots:
+            sorted_snaps = sorted(snapshots, key=lambda s: s.committed_at)
+            monthly_data = {}
+            for snap in sorted_snaps:
+                month_name = snap.committed_at.strftime("%B")
+                if month_name not in monthly_data:
+                    monthly_data[month_name] = []
+                monthly_data[month_name].append(snap.health_score or 80.0)
+            for month_name, scores in monthly_data.items():
+                avg_score = round(sum(scores) / len(scores), 1)
+                timeline_list.append(
+                    ReliabilityTimelinePoint(
+                        month=month_name,
+                        score=avg_score,
+                        failure_risk=round(100.0 - avg_score, 1),
+                    )
+                )
+        else:
+            for m, s, r in [
+                ("January", 98.0, 8.0),
+                ("March", 94.0, 12.0),
+                ("June", 89.0, 18.0),
+                ("October", 81.0, 28.0),
+            ]:
+                timeline_list.append(
+                    ReliabilityTimelinePoint(month=m, score=s, failure_risk=r)
+                )
+
         return ReliabilityDashboardResponse(
             repo_id=repo_id,
             reliability_score=summary.reliability_score,
             deployment_risk=summary.deployment_risk,
             hotspots=hotspots_list,
             trends=trends_list,
+            timeline=timeline_list,
+            recommendations=self._get_recommendations(),
+            failure_graph=self._get_failure_graph(),
         )

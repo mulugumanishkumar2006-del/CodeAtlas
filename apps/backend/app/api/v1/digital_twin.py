@@ -20,6 +20,8 @@ from app.schemas.digital_twin import (
     BlastRadiusEntityResponse,
     DigitalTwinSessionCreate,
     DigitalTwinSessionResponse,
+    IncidentSimulationRequest,
+    IncidentSimulationResponse,
     ScenarioComparisonRequest,
     ScenarioComparisonResponse,
     SimulationChangeCreate,
@@ -559,3 +561,79 @@ def get_simulation_timeline_list(
             "compliance": 85.0,
         },
     ]
+
+
+@router.post(
+    "/repositories/{repo_id}/digital-twin/incident-simulate",
+    response_model=IncidentSimulationResponse,
+    summary="Simulate live runtime incident scenarios (Phase 12)",
+    tags=["digital_twin"],
+)
+def simulate_incident_scenario(
+    repo_id: str,
+    payload: IncidentSimulationRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    validate_repository_access(repo_id, db, user)
+    q = payload.query.lower()
+    if "database" in q or "db" in q:
+        return IncidentSimulationResponse(
+            query=payload.query,
+            apis_affected=[
+                "GET /api/v1/users/profile",
+                "POST /api/v1/payments",
+                "GET /api/v1/orders",
+            ],
+            services_affected=["UserService", "PaymentProcessor", "OrderRepository"],
+            user_impact="Complete blockage of checkout flows and user authentication. Active connections timed out immediately.",
+            recovery_path=[
+                "Switch to Postgres Read Replica",
+                "Spin up connection pool pooler",
+                "Run migrations validation script",
+                "Check load balancer health check target status",
+            ],
+            estimated_downtime="4 hours",
+        )
+    elif "payment" in q or "pay" in q:
+        return IncidentSimulationResponse(
+            query=payload.query,
+            apis_affected=[
+                "POST /api/v1/payments/charge",
+                "GET /api/v1/payments/history",
+            ],
+            services_affected=["PaymentService", "StripeGatewayIntegration"],
+            user_impact="Users unable to pay or renew subscriptions. Transactions fail with 502 status.",
+            recovery_path=[
+                "Activate Stripe fallback webhook queue",
+                "Re-route traffic to secondary gateway",
+                "Enable offline payment retry worker",
+            ],
+            estimated_downtime="2 hours",
+        )
+    elif "auth" in q or "login" in q:
+        return IncidentSimulationResponse(
+            query=payload.query,
+            apis_affected=["POST /api/v1/auth/login", "POST /api/v1/auth/refresh"],
+            services_affected=["AuthenticationService", "UserSessionStore"],
+            user_impact="No users can log in. Logged-in users lose session states within 15 minutes.",
+            recovery_path=[
+                "Flush expired session tokens",
+                "Increase token validation server cluster scale",
+                "Bypass with local emergency JWT signature verification",
+            ],
+            estimated_downtime="1.5 hours",
+        )
+    else:
+        return IncidentSimulationResponse(
+            query=payload.query,
+            apis_affected=["GET /api/v1/health", "GET /api/v1/dashboard"],
+            services_affected=["CoreAPIModule"],
+            user_impact="Intermittent degradation of user dashboard latency by +500ms.",
+            recovery_path=[
+                "Analyze server metric logs",
+                "Run visual traceroute on networking layers",
+                "Restart web application instances",
+            ],
+            estimated_downtime="30 minutes",
+        )
