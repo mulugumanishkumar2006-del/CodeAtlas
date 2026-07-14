@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import {
                         LayoutDashboard,
                         BarChart3,
@@ -30,18 +30,30 @@ const navigation = [
                                                 icon: ShieldAlert,
                         },
                         { name: 'Future Simulator', href: '/simulator', icon: Brain },
-                        { name: 'Bug Forecast', href: '/reliability', icon: ShieldAlert },
-                        { name: '⭐ AI Software Architect', href: '/architect', icon: Cpu },
+                        { name: 'AI Architect', href: '/architect', icon: Cpu },
                         {
-                                                name: '  • Architecture Review',
-                                                href: '/architect?tab=review',
-                                                icon: Cpu,
+                                                name: '⭐ Reliability Intelligence',
+                                                href: '/reliability',
+                                                icon: HeartPulse,
+                                                isHeader: true,
                         },
-                        { name: '  • Sprint Planner', href: '/architect?tab=sprints', icon: Cpu },
                         {
-                                                name: '  • Recommendations',
-                                                href: '/architect?tab=recommendations',
-                                                icon: Cpu,
+                                                name: 'Bug Prediction',
+                                                href: '/reliability?tab=bug-prediction',
+                                                icon: ShieldAlert,
+                                                isSub: true,
+                        },
+                        {
+                                                name: 'Incident Simulator',
+                                                href: '/reliability?tab=incident-simulator',
+                                                icon: Brain,
+                                                isSub: true,
+                        },
+                        {
+                                                name: 'Reliability Dashboard',
+                                                href: '/reliability?tab=dashboard',
+                                                icon: LayoutDashboard,
+                                                isSub: true,
                         },
 ];
 
@@ -52,6 +64,8 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                         const pathname = usePathname();
+                        const searchParams = useSearchParams();
+                        const currentTab = searchParams?.get('tab');
 
                         return (
                                                 <>
@@ -87,14 +101,54 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                                                                                                                         </Link>
                                                                                                 </div>
 
-                                                                                                <nav className="flex-1 space-y-1 px-4 py-4">
+                                                                                                <nav className="flex-1 space-y-1 px-4 py-4 overflow-y-auto">
                                                                                                                         {navigation.map(
                                                                                                                                                 (
                                                                                                                                                                         item
                                                                                                                                                 ) => {
-                                                                                                                                                                        const isActive =
+                                                                                                                                                                        if (
+                                                                                                                                                                                                item.isHeader
+                                                                                                                                                                        ) {
+                                                                                                                                                                                                return (
+                                                                                                                                                                                                                        <div
+                                                                                                                                                                                                                                                key={
+                                                                                                                                                                                                                                                                        item.name
+                                                                                                                                                                                                                                                }
+                                                                                                                                                                                                                                                className="px-3 pt-5 pb-2 text-[10px] font-extrabold text-muted-foreground uppercase tracking-widest flex items-center gap-2 border-t border-white/5 mt-4 first:mt-0 first:border-0"
+                                                                                                                                                                                                                        >
+                                                                                                                                                                                                                                                <item.icon className="h-3.5 w-3.5 text-primary/70" />
+                                                                                                                                                                                                                                                {
+                                                                                                                                                                                                                                                                        item.name
+                                                                                                                                                                                                                                                }
+                                                                                                                                                                                                                        </div>
+                                                                                                                                                                                                );
+                                                                                                                                                                        }
+
+                                                                                                                                                                        // Calculate active state by route path and tab query parameter
+                                                                                                                                                                        const isRouteMatch =
                                                                                                                                                                                                 pathname ===
-                                                                                                                                                                                                item.href;
+                                                                                                                                                                                                item.href.split(
+                                                                                                                                                                                                                        '?'
+                                                                                                                                                                                                )[0];
+                                                                                                                                                                        const queryParamsStr =
+                                                                                                                                                                                                item.href.split(
+                                                                                                                                                                                                                        '?'
+                                                                                                                                                                                                )[1] ||
+                                                                                                                                                                                                '';
+                                                                                                                                                                        const queryTab =
+                                                                                                                                                                                                new URLSearchParams(
+                                                                                                                                                                                                                        queryParamsStr
+                                                                                                                                                                                                ).get(
+                                                                                                                                                                                                                        'tab'
+                                                                                                                                                                                                );
+
+                                                                                                                                                                        const isActive =
+                                                                                                                                                                                                isRouteMatch &&
+                                                                                                                                                                                                (queryTab
+                                                                                                                                                                                                                        ? currentTab ===
+                                                                                                                                                                                                                          queryTab
+                                                                                                                                                                                                                        : !currentTab);
+
                                                                                                                                                                         return (
                                                                                                                                                                                                 <Link
                                                                                                                                                                                                                         key={
@@ -103,17 +157,27 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                                                                                                                                                                                                                         href={
                                                                                                                                                                                                                                                 item.href
                                                                                                                                                                                                                         }
+                                                                                                                                                                                                                        onClick={() =>
+                                                                                                                                                                                                                                                setIsOpen(
+                                                                                                                                                                                                                                                                        false
+                                                                                                                                                                                                                                                )
+                                                                                                                                                                                                                        }
                                                                                                                                                                                                                         className={cn(
-                                                                                                                                                                                                                                                'group flex items-center rounded-md px-3 py-2.5 text-sm font-medium transition-colors',
+                                                                                                                                                                                                                                                'group flex items-center rounded-md transition-all duration-150',
+                                                                                                                                                                                                                                                item.isSub
+                                                                                                                                                                                                                                                                        ? 'pl-8 py-2 text-xs font-semibold'
+                                                                                                                                                                                                                                                                        : 'px-3 py-2.5 text-sm font-semibold',
                                                                                                                                                                                                                                                 isActive
-                                                                                                                                                                                                                                                                        ? 'bg-primary text-primary-foreground'
+                                                                                                                                                                                                                                                                        ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/20'
                                                                                                                                                                                                                                                                         : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                                                                                                                                                                                                                         )}
                                                                                                                                                                                                 >
-                                                                                                                                                                                                                        <item.icon
-                                                                                                                                                                                                                                                className="mr-3 h-5 w-5 flex-shrink-0"
-                                                                                                                                                                                                                                                aria-hidden="true"
-                                                                                                                                                                                                                        />
+                                                                                                                                                                                                                        {!item.isSub && (
+                                                                                                                                                                                                                                                <item.icon
+                                                                                                                                                                                                                                                                        className="mr-3 h-5 w-5 flex-shrink-0"
+                                                                                                                                                                                                                                                                        aria-hidden="true"
+                                                                                                                                                                                                                                                />
+                                                                                                                                                                                                                        )}
                                                                                                                                                                                                                         {
                                                                                                                                                                                                                                                 item.name
                                                                                                                                                                                                                         }
