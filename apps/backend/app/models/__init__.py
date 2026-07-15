@@ -17,6 +17,22 @@ from app.models.graph_node import GraphNode
 from app.models.graph_relationship import GraphRelationship
 from app.models.import_model import Import
 from app.models.job import Job
+from app.models.knowledge import (
+    DocumentationAdvisor,
+    DocumentationGap,
+    DocumentationReport,
+    ExpertiseGraph,
+    KnowledgeEvolutionSnapshot,
+    KnowledgeGapDetail,
+    KnowledgeMemory,
+    KnowledgeRiskItem,
+    KnowledgeScore,
+    KnowledgeSummary,
+    KnowledgeTransferPlan,
+    ModuleOwnership,
+    Ownership,
+    OwnershipDistribution,
+)
 from app.models.memory_models import (
     ArchitectureDecision,
     MemorySnapshot,

@@ -10,6 +10,7 @@ from app.api.v1 import (
     evolution,
     graph,
     health,
+    knowledge,
     reliability,
     repositories,
     tech_debt,
@@ -70,3 +71,4 @@ app.include_router(
 )
 app.include_router(architect.router, prefix=settings.API_V1_STR, tags=["architect"])
 app.include_router(reliability.router, prefix=settings.API_V1_STR, tags=["reliability"])
+app.include_router(knowledge.router, prefix=settings.API_V1_STR, tags=["knowledge"])
