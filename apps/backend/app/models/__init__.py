@@ -1,3 +1,9 @@
+# Health Advisor Models
+from app.health.models.health import (
+    HealthHistory,
+    Recommendation,
+    RepositoryHealth,
+)
 from app.models.activity import Activity
 from app.models.architect import (
     ArchitectureDecisionGenerated,
@@ -15,6 +21,7 @@ from app.models.evolution import CommitSnapshot, ComponentSnapshot
 from app.models.file import File
 from app.models.graph_node import GraphNode
 from app.models.graph_relationship import GraphRelationship
+from app.models.health_intelligence import RepositoryHealthSnapshot
 from app.models.import_model import Import
 from app.models.job import Job
 from app.models.knowledge import (

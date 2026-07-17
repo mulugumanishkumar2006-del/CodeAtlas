@@ -4,6 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import {
+                        Activity,
                         LayoutDashboard,
                         BarChart3,
                         Settings,
@@ -18,42 +19,48 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const navigation = [
+interface NavigationItem {
+                        name: string;
+                        href: string;
+                        icon: React.ComponentType<any>;
+                        isHeader?: boolean;
+                        isSub?: boolean;
+}
+
+const navigation: NavigationItem[] = [
+                        {
+                                                name: '🏥 Health Intelligence',
+                                                href: '/health-intelligence',
+                                                icon: Activity,
+                                                isHeader: true,
+                        },
                         { name: 'Overview', href: '/', icon: LayoutDashboard },
                         { name: 'Architecture', href: '/architecture', icon: Layers },
                         { name: 'Knowledge', href: '/knowledge', icon: BookOpen },
-                        { name: 'Time Machine', href: '/time-machine', icon: Clock },
+                        { name: 'Reliability', href: '/reliability', icon: HeartPulse },
                         { name: 'Technical Debt', href: '/tech-debt', icon: Flame },
                         {
                                                 name: 'Governance',
                                                 href: '/architecture?tab=governance',
                                                 icon: ShieldAlert,
                         },
-                        { name: 'Future Simulator', href: '/simulator', icon: Brain },
                         { name: 'AI Architect', href: '/architect', icon: Cpu },
                         {
-                                                name: '⭐ Reliability Intelligence',
-                                                href: '/reliability',
-                                                icon: HeartPulse,
+                                                name: '⭐ Health Diagnostics',
+                                                href: '/health-intelligence',
+                                                icon: Activity,
                                                 isHeader: true,
                         },
+                        { name: 'Health ⭐', href: '/health-intelligence', icon: Activity },
                         {
-                                                name: 'Bug Prediction',
-                                                href: '/reliability?tab=bug-prediction',
-                                                icon: ShieldAlert,
-                                                isSub: true,
-                        },
-                        {
-                                                name: 'Incident Simulator',
-                                                href: '/reliability?tab=incident-simulator',
-                                                icon: Brain,
-                                                isSub: true,
-                        },
-                        {
-                                                name: 'Reliability Dashboard',
-                                                href: '/reliability?tab=dashboard',
+                                                name: 'Executive Dashboard',
+                                                href: '/health-intelligence?tab=executive',
                                                 icon: LayoutDashboard,
-                                                isSub: true,
+                        },
+                        {
+                                                name: 'CTO Dashboard',
+                                                href: '/health-intelligence?tab=cto',
+                                                icon: BarChart3,
                         },
 ];
 

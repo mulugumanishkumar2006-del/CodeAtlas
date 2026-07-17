@@ -10,6 +10,7 @@ from app.api.v1 import (
     evolution,
     graph,
     health,
+    health_intelligence,
     knowledge,
     reliability,
     repositories,
@@ -22,6 +23,7 @@ from app.core.config import settings
 # pyrefly: ignore [missing-import]
 from app.core.logging import setup_logging
 from app.core.neo4j_client import neo4j_client
+from app.health.api.health_router import router as health_advisor_router
 
 setup_logging()
 
@@ -62,6 +64,11 @@ app.include_router(
 )
 app.include_router(graph.router, prefix=settings.API_V1_STR, tags=["graph"])
 app.include_router(evolution.router, prefix=settings.API_V1_STR, tags=["evolution"])
+app.include_router(
+    health_advisor_router,
+    prefix=settings.API_V1_STR,
+    tags=["health_advisor"],
+)
 app.include_router(tech_debt.router, prefix=settings.API_V1_STR, tags=["tech_debt"])
 app.include_router(
     architecture_drift.router, prefix=settings.API_V1_STR, tags=["architecture_drift"]
@@ -72,3 +79,8 @@ app.include_router(
 app.include_router(architect.router, prefix=settings.API_V1_STR, tags=["architect"])
 app.include_router(reliability.router, prefix=settings.API_V1_STR, tags=["reliability"])
 app.include_router(knowledge.router, prefix=settings.API_V1_STR, tags=["knowledge"])
+app.include_router(
+    health_intelligence.router,
+    prefix=settings.API_V1_STR,
+    tags=["health_intelligence"],
+)
