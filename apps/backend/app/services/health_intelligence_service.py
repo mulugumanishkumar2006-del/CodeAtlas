@@ -73,16 +73,15 @@ logger = logging.getLogger(__name__)
 
 _WEIGHTS: Dict[str, float] = {
     "Architecture": 0.15,
-    "Technical Debt": 0.12,
+    "Technical Debt": 0.15,
     "Reliability": 0.12,
     "Knowledge": 0.10,
     "Documentation": 0.10,
-    "Performance": 0.08,
-    "Testing": 0.10,
-    "Security": 0.08,
-    "Developer Experience": 0.07,
+    "Performance": 0.10,
+    "Security": 0.10,
+    "Developer Experience": 0.05,
     "Scalability": 0.05,
-    "Maintainability": 0.03,
+    "Maintainability": 0.08,
 }
 
 _DIMENSION_META: Dict[str, Dict[str, str]] = {
@@ -114,11 +113,6 @@ _DIMENSION_META: Dict[str, Dict[str, str]] = {
     "Performance": {
         "icon": "Zap",
         "color": "#f97316",
-        "source": "TechDebtService",
-    },
-    "Testing": {
-        "icon": "TestTube",
-        "color": "#06b6d4",
         "source": "TechDebtService",
     },
     "Security": {
@@ -332,7 +326,6 @@ class HealthIntelligenceService:
                 "Knowledge": prev_snapshot.score_knowledge or overall,
                 "Documentation": prev_snapshot.score_documentation or overall,
                 "Performance": prev_snapshot.score_performance or overall,
-                "Testing": prev_snapshot.score_testing or overall,
                 "Security": prev_snapshot.score_security or overall,
                 "Developer Experience": prev_snapshot.score_developer_experience
                 or overall,
@@ -405,7 +398,6 @@ class HealthIntelligenceService:
             "Knowledge": snapshot.score_knowledge or 70.0,
             "Documentation": snapshot.score_documentation or 70.0,
             "Performance": snapshot.score_performance or 70.0,
-            "Testing": snapshot.score_testing or 70.0,
             "Security": snapshot.score_security or 70.0,
             "Developer Experience": snapshot.score_developer_experience or 70.0,
             "Scalability": snapshot.score_scalability or 70.0,
@@ -930,7 +922,6 @@ class HealthIntelligenceService:
                     "Knowledge": s.score_knowledge or 0,
                     "Documentation": s.score_documentation or 0,
                     "Performance": s.score_performance or 0,
-                    "Testing": s.score_testing or 0,
                     "Security": s.score_security or 0,
                     "Developer Experience": s.score_developer_experience or 0,
                     "Scalability": s.score_scalability or 0,

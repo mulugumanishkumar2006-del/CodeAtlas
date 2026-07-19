@@ -4,16 +4,15 @@ from typing import Dict, Tuple
 
 _WEIGHTS: Dict[str, float] = {
     "Architecture": 0.15,
-    "Technical Debt": 0.12,
+    "Technical Debt": 0.15,
     "Reliability": 0.12,
     "Knowledge": 0.10,
     "Documentation": 0.10,
-    "Performance": 0.08,
-    "Testing": 0.10,
-    "Security": 0.08,
-    "Developer Experience": 0.07,
+    "Performance": 0.10,
+    "Security": 0.10,
+    "Developer Experience": 0.05,
     "Scalability": 0.05,
-    "Maintainability": 0.03,
+    "Maintainability": 0.08,
 }
 
 

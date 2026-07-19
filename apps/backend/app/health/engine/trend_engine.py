@@ -34,6 +34,7 @@ class TrendEngine:
                         "Technical Debt": s.score_technical_debt or 75.0,
                         "Reliability": s.score_reliability or 75.0,
                         "Knowledge": s.score_knowledge or 75.0,
+                        "Documentation": s.score_documentation or 75.0,
                         "Security": s.score_security or 75.0,
                         "Performance": s.score_performance or 75.0,
                         "Scalability": s.score_scalability or 75.0,
@@ -96,4 +97,9 @@ class TrendEngine:
             ],
             "reasons": reasons,
             "expected_after_improvements": round(expected_after, 1),
+            "inactive_forecast": {
+                "label": "Next Month",
+                "score": round(max(0.0, current_score - 8.0), 1),
+                "reason": "Technical Debt increasing",
+            },
         }

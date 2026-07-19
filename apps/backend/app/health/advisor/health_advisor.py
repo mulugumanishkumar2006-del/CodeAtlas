@@ -18,23 +18,23 @@ class HealthAdvisor:
 
         # Rule 1: Architecture coupling is high / score is warning
         arch_score = scores.get("Architecture", 80.0)
-        if arch_score < 90:
+        if arch_score < 95:
             recommendations_list.append(
                 {
                     "recommendation": "Reduce Coupling",
-                    "improvement": 3.0,
+                    "improvement": 2.0,
                     "priority": "HIGH",
                     "estimated_effort": "Medium",
                 }
             )
 
         # Rule 2: Low testing score
-        testing_score = scores.get("Testing", 60.0)
-        if testing_score < 75:
+        testing_score = scores.get("Testing", 60.0) or scores.get("Documentation", 65.0)
+        if testing_score < 85:
             recommendations_list.append(
                 {
                     "recommendation": "Improve Testing",
-                    "improvement": 2.0,
+                    "improvement": 3.0,
                     "priority": "HIGH",
                     "estimated_effort": "Medium",
                 }
@@ -42,11 +42,11 @@ class HealthAdvisor:
 
         # Rule 3: Low documentation
         doc_score = scores.get("Documentation", 65.0)
-        if doc_score < 75:
+        if doc_score < 85:
             recommendations_list.append(
                 {
-                    "recommendation": "Document APIs",
-                    "improvement": 2.0,
+                    "recommendation": "Improve Docs",
+                    "improvement": 1.0,
                     "priority": "MEDIUM",
                     "estimated_effort": "Low",
                 }
@@ -54,7 +54,7 @@ class HealthAdvisor:
 
         # Rule 4: Technical debt is warnings / Payment refactoring opportunity
         debt_score = scores.get("Technical Debt", 70.0)
-        if debt_score < 90:
+        if debt_score < 95:
             recommendations_list.append(
                 {
                     "recommendation": "Split Payment",

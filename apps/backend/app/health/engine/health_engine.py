@@ -73,7 +73,6 @@ class HealthEngine:
             "Knowledge": knowledge_score,
             "Documentation": doc_score,
             "Performance": perf_score,
-            "Testing": testing_score,
             "Security": security_data["score"],
             "Developer Experience": dev_exp,
             "Scalability": scalability_data["score"],

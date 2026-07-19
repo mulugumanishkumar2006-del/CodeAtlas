@@ -144,7 +144,7 @@ def test_reports_generation(db_session):
     }
     cto_data = CtoReportGenerator.generate(db_session, "test_repo_id", scores)
     assert "Database" in cto_data["critical_issues"]
-    assert "Caching" in cto_data["top_opportunities"]
+    assert "Redis" in cto_data["top_opportunities"]
     assert cto_data["architecture_drift"] == "Low"
 
 
