@@ -276,3 +276,118 @@ class IncidentSimulationResponse(BaseModel):
     user_impact: str
     recovery_path: List[str]
     estimated_downtime: str
+
+
+# --- Software City / Digital Twin schemas (Phase 15) ---
+
+
+class SoftwareCityRoom(BaseModel):
+    id: str
+    name: str
+    is_async: bool = False
+
+
+class SoftwareCityBuilding(BaseModel):
+    id: str
+    name: str
+    type: str  # Class, Interface, File
+    rooms: List[SoftwareCityRoom] = []
+    height_meters: float  # Represents size/complexity
+    technical_debt_traffic_level: str  # LOW, MEDIUM, HIGH, CRITICAL
+    danger_zone_bugs_count: int = 0
+    documentation_quality: float = 0.0
+
+
+class SoftwareCityNeighborhood(BaseModel):
+    id: str
+    name: str
+    buildings: List[SoftwareCityBuilding] = []
+
+
+class SoftwareCityDistrict(BaseModel):
+    id: str
+    name: str
+    neighborhoods: List[SoftwareCityNeighborhood] = []
+    health_score: float = 100.0
+
+
+class SoftwareCityRoad(BaseModel):
+    id: str
+    name: str
+    source_id: str
+    target_id: str
+    traffic_level: str  # LOW, MEDIUM, HIGH, CRITICAL
+
+
+class SoftwareCityHighway(BaseModel):
+    id: str
+    source_id: str
+    target_id: str
+    type: str
+    traffic_level: str  # LOW, MEDIUM, HIGH, CRITICAL
+
+
+class SoftwareCityPowerStation(BaseModel):
+    id: str
+    name: str
+    db_type: str
+    tables_count: int
+    health_status: str  # OPERATIONAL, DEGRADED, OFFLINE
+
+
+class SoftwareCityRailwayStation(BaseModel):
+    id: str
+    name: str
+    queue_count: int
+    health_status: str
+
+
+class SoftwareCityWarehouse(BaseModel):
+    id: str
+    name: str
+    cache_type: str
+    hit_rate: float
+    health_status: str
+
+
+class SoftwareCityCitizen(BaseModel):
+    name: str
+    role: str
+    contributions_count: int
+    active_building_ids: List[str] = []
+
+
+class SoftwareCityAirport(BaseModel):
+    id: str
+    name: str
+    status: str  # SUCCESS, FAILED, RUNNING
+
+
+class SoftwareCityControlTower(BaseModel):
+    id: str
+    name: str
+    active_alerts_count: int
+    health_status: str
+
+
+class SoftwareCityUtilityPlant(BaseModel):
+    id: str
+    name: str
+    resource_type: str
+    status: str
+
+
+class SoftwareCityResponse(BaseModel):
+    city_name: str
+    districts: List[SoftwareCityDistrict] = []
+    roads: List[SoftwareCityRoad] = []
+    highways: List[SoftwareCityHighway] = []
+    power_stations: List[SoftwareCityPowerStation] = []
+    railway_stations: List[SoftwareCityRailwayStation] = []
+    warehouses: List[SoftwareCityWarehouse] = []
+    citizens: List[SoftwareCityCitizen] = []
+    airports: List[SoftwareCityAirport] = []
+    control_towers: List[SoftwareCityControlTower] = []
+    utility_plants: List[SoftwareCityUtilityPlant] = []
+    overall_health: float = 100.0
+    congestion_index: float = 0.0

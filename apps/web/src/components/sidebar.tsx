@@ -16,6 +16,7 @@ import {
                         BookOpen,
                         Clock,
                         Cpu,
+                        Map,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -35,6 +36,7 @@ const navigation: NavigationItem[] = [
                                                 isHeader: true,
                         },
                         { name: 'Overview', href: '/', icon: LayoutDashboard },
+                        { name: 'Software City', href: '/software-city', icon: Map },
                         { name: 'Architecture', href: '/architecture', icon: Layers },
                         { name: 'Knowledge', href: '/knowledge', icon: BookOpen },
                         { name: 'Reliability', href: '/reliability', icon: HeartPulse },

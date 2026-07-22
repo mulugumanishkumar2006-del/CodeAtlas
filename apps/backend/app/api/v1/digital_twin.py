@@ -12,6 +12,8 @@ from app.models.digital_twin import (
     SimulationResult,
     SimulationScenario,
 )
+from app.models.graph_node import GraphNode
+from app.models.graph_relationship import GraphRelationship
 from app.models.repository import Repository
 from app.models.user import User
 from app.schemas.digital_twin import (
@@ -33,11 +35,13 @@ from app.schemas.digital_twin import (
     SimulationRunRequest,
     SimulationScenarioCreate,
     SimulationScenarioResponse,
+    SoftwareCityResponse,
     WhatIfRequest,
     WhatIfResponse,
 )
 from app.services.digital_twin_engine import DigitalTwinEngine
 from app.services.simulation_algorithms import SimulationAlgorithms
+from app.services.software_city_service import SoftwareCityService
 
 router = APIRouter()
 
@@ -637,3 +641,106 @@ def simulate_incident_scenario(
             ],
             estimated_downtime="30 minutes",
         )
+
+
+@router.get(
+    "/repositories/{repo_id}/digital-twin/software-city",
+    response_model=SoftwareCityResponse,
+    summary="Get repository structure mapped as a Software City digital twin",
+    tags=["digital_twin"],
+)
+def get_software_city_twin(
+    repo_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    validate_repository_access(repo_id, db, user)
+    return SoftwareCityService.get_city_layout(db, repo_id)
+
+
+@router.post(
+    "/repositories/{repo_id}/digital-twin/git-push",
+    status_code=status.HTTP_200_OK,
+    tags=["digital_twin"],
+)
+def simulate_git_push_event(
+    repo_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    validate_repository_access(repo_id, db, user)
+
+    # Insert a virtual pushed file node
+    import uuid
+
+    node_id = f"pushed_node_{uuid.uuid4().hex[:6]}"
+
+    pushed_node = GraphNode(
+        id=node_id,
+        repository_id=repo_id,
+        type="File",
+        name="pushed_feature_module.py",
+        properties={
+            "path": "apps/backend/app/services/pushed_feature_module.py",
+            "size_bytes": 4500,
+            "is_virtual": True,
+        },
+    )
+    db.add(pushed_node)
+
+    # Hook it to an existing node
+    existing_node = (
+        db.query(GraphNode)
+        .filter(GraphNode.repository_id == repo_id, GraphNode.type == "Class")
+        .first()
+    )
+
+    if existing_node:
+        pushed_rel = GraphRelationship(
+            id=f"pushed_rel_{uuid.uuid4().hex[:6]}",
+            repository_id=repo_id,
+            source_id=node_id,
+            target_id=existing_node.id,
+            type="IMPORTS",
+            properties={"is_virtual": True},
+        )
+        db.add(pushed_rel)
+
+    db.commit()
+    return {
+        "status": "success",
+        "message": "GitHub push event processed. Code base analysis generated, knowledge graph updated, digital twin restructured.",
+    }
+
+
+@router.post(
+    "/repositories/{repo_id}/digital-twin/reset-simulation",
+    status_code=status.HTTP_200_OK,
+    tags=["digital_twin"],
+)
+def reset_digital_twin_simulation(
+    repo_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    validate_repository_access(repo_id, db, user)
+
+    nodes = db.query(GraphNode).filter(GraphNode.repository_id == repo_id).all()
+    for n in nodes:
+        if n.properties and n.properties.get("is_virtual"):
+            db.delete(n)
+
+    rels = (
+        db.query(GraphRelationship)
+        .filter(GraphRelationship.repository_id == repo_id)
+        .all()
+    )
+    for r in rels:
+        if r.properties and r.properties.get("is_virtual"):
+            db.delete(r)
+
+    db.commit()
+    return {
+        "status": "success",
+        "message": "Simulation states and virtual nodes reset.",
+    }
