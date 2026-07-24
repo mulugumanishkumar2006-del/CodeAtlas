@@ -95,7 +95,35 @@ Analyze these details and output a complete CTO Analysis JSON matching this form
     "architectural_standards": ["str"],
     "target_module_layout": {{"str": "str"}},
     "migration_execution_script": "str",
-    "refactoring_blueprints": "str"
+    "refactoring_blueprints": "str",
+    "multi_year_vision": [
+      {{
+        "phase": "str",
+        "timeline": "str",
+        "details": "str",
+        "outcomes": "str"
+      }}
+    ],
+    "innovation_opportunities": [
+      {{
+        "technology": "str",
+        "benefit": "str",
+        "effort": "str",
+        "impact": "str",
+        "confidence": "str"
+      }}
+    ],
+    "explainable_recommendations": [
+      {{
+        "title": "str",
+        "why": "str",
+        "benefits": "str",
+        "tradeoffs": "str",
+        "risks": "str",
+        "effort": "str",
+        "confidence": "str"
+      }}
+    ]
   }}
 }}
 

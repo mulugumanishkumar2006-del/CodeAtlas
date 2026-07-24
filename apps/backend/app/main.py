@@ -7,6 +7,7 @@ from app.api.v1 import (
     architect,
     architecture_drift,
     auth,
+    council_router,
     digital_twin,
     evolution,
     graph,
@@ -93,4 +94,9 @@ app.include_router(
     ai_cto_router.router,
     prefix=settings.API_V1_STR,
     tags=["ai_cto"],
+)
+app.include_router(
+    council_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["council"],
 )

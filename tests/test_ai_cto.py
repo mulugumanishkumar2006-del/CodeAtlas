@@ -145,6 +145,9 @@ def test_cto_strategic_analysis_suite():
         assert "mile_001" in [m["id"] for m in data["roadmap"]["milestones"]]
         assert data["executive_report"]["projected_budget_impact_usd"] < 0
         assert len(data["engineering_report"]["architectural_standards"]) > 0
+        assert len(data["engineering_report"]["multi_year_vision"]) > 0
+        assert len(data["engineering_report"]["innovation_opportunities"]) > 0
+        assert len(data["engineering_report"]["explainable_recommendations"]) > 0
 
         # 2. Test GET /repositories/{repo_id}/cto/roadmap
         res = client.get(f"/api/v1/repositories/{repo_id}/cto/roadmap")
@@ -165,6 +168,35 @@ def test_cto_strategic_analysis_suite():
         assert res.status_code == 200
         risks = res.json()
         assert len(risks) > 0
+
+        # 5. Test POST /repositories/{repo_id}/cto/chat (Feature 28)
+        res = client.post(
+            f"/api/v1/repositories/{repo_id}/cto/chat",
+            json={"message": "How do we reduce deployment time?"},
+        )
+        assert res.status_code == 200
+        chat_res = res.json()
+        assert "reply" in chat_res
+        assert len(chat_res["actionable_steps"]) > 0
+
+        # 6. Test GET /repositories/{repo_id}/cto/history (Feature 29)
+        res = client.get(f"/api/v1/repositories/{repo_id}/cto/history")
+        assert res.status_code == 200
+        history_list = res.json()
+        assert len(history_list) > 0
+
+        # 7. Test GET /repositories/{repo_id}/cto/history/compare (Feature 29)
+        res = client.get(f"/api/v1/repositories/{repo_id}/cto/history/compare")
+        assert res.status_code == 200
+        compare_res = res.json()
+        assert "latest_version" in compare_res
+
+        # 8. Test POST /repositories/{repo_id}/cto/continuous-reevaluate (Feature 30)
+        res = client.post(f"/api/v1/repositories/{repo_id}/cto/continuous-reevaluate")
+        assert res.status_code == 200
+        cont_res = res.json()
+        assert cont_res["status"] == "success"
+        assert len(cont_res["pipeline_logs"]) > 0
 
     finally:
         app.dependency_overrides.clear()

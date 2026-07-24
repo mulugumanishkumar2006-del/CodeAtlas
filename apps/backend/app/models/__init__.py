@@ -16,6 +16,8 @@ from app.models.architecture import (
     ComplianceHistory,
     GovernancePolicy,
 )
+from app.models.council_decision_memory import CouncilDecisionMemory
+from app.models.cto_strategy_history import CTOStrategyHistory
 from app.models.digital_twin import DigitalTwinChange, DigitalTwinSession
 from app.models.evolution import CommitSnapshot, ComponentSnapshot
 from app.models.file import File

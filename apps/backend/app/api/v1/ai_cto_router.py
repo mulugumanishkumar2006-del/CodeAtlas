@@ -127,3 +127,86 @@ def get_cto_risks(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve CTO risk profile: {str(e)}",
         )
+
+
+class CTOChatMessageRequest(BaseModel):
+    message: str = Field(..., description="User query to AI CTO")
+    history: Optional[List[dict]] = Field(
+        default=[], description="Previous conversation turns"
+    )
+
+
+@router.post(
+    "/repositories/{repo_id}/cto/chat",
+    summary="Natural language conversation with AI CTO (Feature 28)",
+)
+def chat_with_cto(
+    repo_id: str,
+    req: CTOChatMessageRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    _validate_repo(repo_id, db, user)
+    try:
+        return cto_orchestrator.chat(
+            db=db,
+            repo_id=repo_id,
+            message=req.message,
+            conversation_history=req.history,
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"AI CTO Chat error: {str(e)}",
+        )
+
+
+@router.get(
+    "/repositories/{repo_id}/cto/history",
+    summary="Retrieve historical CTO recommendations and snapshots (Feature 29)",
+)
+def get_cto_history(
+    repo_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)
+):
+    _validate_repo(repo_id, db, user)
+    try:
+        return cto_orchestrator.get_strategy_history(db=db, repo_id=repo_id)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve CTO strategy history: {str(e)}",
+        )
+
+
+@router.get(
+    "/repositories/{repo_id}/cto/history/compare",
+    summary="Compare strategy versions and progress metrics (Feature 29)",
+)
+def compare_cto_history(
+    repo_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)
+):
+    _validate_repo(repo_id, db, user)
+    try:
+        return cto_orchestrator.compare_strategy_versions(db=db, repo_id=repo_id)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to compare CTO strategy history: {str(e)}",
+        )
+
+
+@router.post(
+    "/repositories/{repo_id}/cto/continuous-reevaluate",
+    summary="Trigger Continuous AI CTO re-evaluation pipeline (Feature 30)",
+)
+def trigger_continuous_reevaluation(
+    repo_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)
+):
+    _validate_repo(repo_id, db, user)
+    try:
+        return cto_orchestrator.run_continuous_reevaluation(db=db, repo_id=repo_id)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Continuous CTO re-evaluation error: {str(e)}",
+        )

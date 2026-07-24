@@ -22,6 +22,7 @@ import {
                         Play,
                         Sparkles,
                         Server,
+                        Users,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTour } from '@/context/tour-context';
@@ -63,6 +64,7 @@ const navigation: NavigationItem[] = [
                                                 icon: Sparkles,
                         },
                         { name: 'AI CTO', href: '/ai-cto', icon: Settings },
+                        { name: 'AI Engineering Council', href: '/council', icon: Users },
                         { name: 'Enterprise Twin', href: '/enterprise-twin', icon: Server },
                         {
                                                 name: '🧭 Interactive Tour',
