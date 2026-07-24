@@ -67,14 +67,23 @@ class RepositoryMemoryEngine:
         for node in self.nodes:
             node_id = node["id"]
             if node_id not in added_node_ids:
-                db_node = GraphNode(
-                    id=node_id,
-                    repository_id=self.repo_id,
-                    type=node["type"],
-                    name=node["name"],
-                    properties=node["properties"],
+                existing_node = (
+                    db.query(GraphNode)
+                    .filter(
+                        GraphNode.id == node_id,
+                        GraphNode.repository_id == self.repo_id,
+                    )
+                    .first()
                 )
-                db.add(db_node)
+                if not existing_node:
+                    db_node = GraphNode(
+                        id=node_id,
+                        repository_id=self.repo_id,
+                        type=node["type"],
+                        name=node["name"],
+                        properties=node["properties"],
+                    )
+                    db.add(db_node)
                 added_node_ids.add(node_id)
 
         db.commit()
@@ -100,15 +109,25 @@ class RepositoryMemoryEngine:
                 is not None
             )
             if source_exists and target_exists:
-                db_rel = GraphRelationship(
-                    id=rel.get("id", str(uuid.uuid4())),
-                    repository_id=self.repo_id,
-                    source_id=rel["source_id"],
-                    target_id=rel["target_id"],
-                    type=rel["type"],
-                    properties=rel["properties"],
+                rel_id = rel.get("id", str(uuid.uuid4()))
+                existing_rel = (
+                    db.query(GraphRelationship)
+                    .filter(
+                        GraphRelationship.id == rel_id,
+                        GraphRelationship.repository_id == self.repo_id,
+                    )
+                    .first()
                 )
-                db.add(db_rel)
+                if not existing_rel:
+                    db_rel = GraphRelationship(
+                        id=rel_id,
+                        repository_id=self.repo_id,
+                        source_id=rel["source_id"],
+                        target_id=rel["target_id"],
+                        type=rel["type"],
+                        properties=rel["properties"],
+                    )
+                    db.add(db_rel)
 
         db.commit()
 

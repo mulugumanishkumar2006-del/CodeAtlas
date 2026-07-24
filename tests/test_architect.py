@@ -18,6 +18,7 @@ from fastapi.testclient import TestClient
 
 def test_architect_recommendations_and_advisors():
     # Ensure database tables are created cleanly
+
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
 

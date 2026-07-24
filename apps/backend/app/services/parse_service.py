@@ -377,8 +377,8 @@ class ParseService:
                             GraphRelationship(
                                 id=str(uuid.uuid4()),
                                 repository_id=repo_id,
-                                source_id=file_node_id,
-                                target_id=sym_id,
+                                source_id=scope_id(file_node_id),
+                                target_id=scope_id(sym_id),
                                 type=GraphRelationshipType.OWNS.value,
                                 properties={"label": f"owns {sym.name}"},
                             )
@@ -388,8 +388,8 @@ class ParseService:
                             GraphRelationship(
                                 id=str(uuid.uuid4()),
                                 repository_id=repo_id,
-                                source_id=sym_id,
-                                target_id=file_node_id,
+                                source_id=scope_id(sym_id),
+                                target_id=scope_id(file_node_id),
                                 type=GraphRelationshipType.BELONGS_TO.value,
                                 properties={"label": f"belongs to {path}"},
                             )
@@ -401,8 +401,8 @@ class ParseService:
                             GraphRelationship(
                                 id=str(uuid.uuid4()),
                                 repository_id=repo_id,
-                                source_id=parent_id,
-                                target_id=sym_id,
+                                source_id=scope_id(parent_id),
+                                target_id=scope_id(sym_id),
                                 type=GraphRelationshipType.OWNS.value,
                                 properties={"label": f"owns {sym.name}"},
                             )
@@ -412,8 +412,8 @@ class ParseService:
                             GraphRelationship(
                                 id=str(uuid.uuid4()),
                                 repository_id=repo_id,
-                                source_id=sym_id,
-                                target_id=parent_id,
+                                source_id=scope_id(sym_id),
+                                target_id=scope_id(parent_id),
                                 type=GraphRelationshipType.BELONGS_TO.value,
                                 properties={"label": f"belongs to {sym.parent_name}"},
                             )
@@ -433,8 +433,8 @@ class ParseService:
                             GraphRelationship(
                                 id=str(uuid.uuid4()),
                                 repository_id=repo_id,
-                                source_id=file_node_id,
-                                target_id=sym_id,
+                                source_id=scope_id(file_node_id),
+                                target_id=scope_id(sym_id),
                                 type=GraphRelationshipType.EXPOSES.value,
                                 properties={"label": f"exposes {sym.name}"},
                             )
@@ -572,8 +572,8 @@ class ParseService:
                             GraphRelationship(
                                 id=str(uuid.uuid4()),
                                 repository_id=repo_id,
-                                source_id=f"file::{path}",
-                                target_id=cache_id,
+                                source_id=scope_id(f"file::{path}"),
+                                target_id=scope_id(cache_id),
                                 type=GraphRelationshipType.CONNECTS_TO.value,
                                 properties={"label": "connects to Redis Cache"},
                             )
@@ -606,8 +606,8 @@ class ParseService:
                                 GraphRelationship(
                                     id=str(uuid.uuid4()),
                                     repository_id=repo_id,
-                                    source_id=sym_id,
-                                    target_id=queue_node_id,
+                                    source_id=scope_id(sym_id),
+                                    target_id=scope_id(queue_node_id),
                                     type=GraphRelationshipType.CONSUMES.value,
                                     properties={
                                         "label": f"consumes task queue for {sym.name}"

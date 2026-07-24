@@ -17,6 +17,9 @@ from fastapi.testclient import TestClient
 
 @pytest.fixture(scope="module")
 def db_session():
+    from app.core.database import Base, engine
+
+    Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     try:
         yield db

@@ -865,13 +865,15 @@ def process_data_task():
 
     # Assert Ontology Mapping
     # File node should have type = "Module"
-    file_node = next((n for n in nodes if n["id"] == "file::app/main.py"), None)
+    file_node = next(
+        (n for n in nodes if n["id"] == f"file::{repo_id}::app/main.py"), None
+    )
     assert file_node is not None
     assert file_node["type"] == "Module"
     assert file_node["properties"].get("raw_type") == "File"
 
     # Folder node should have type = "Domain"
-    folder_node = next((n for n in nodes if n["id"] == "folder::app"), None)
+    folder_node = next((n for n in nodes if n["id"] == f"folder::{repo_id}::app"), None)
     assert folder_node is not None
     assert folder_node["type"] == "Domain"
     assert folder_node["properties"].get("raw_type") == "Folder"
@@ -930,7 +932,7 @@ def process_data_task():
         (
             r
             for r in relationships
-            if r["source_id"] == "file::app/main.py"
+            if r["source_id"] == f"file::{repo_id}::app/main.py"
             and r["target_id"] == f"env::{repo_id}::API_KEY"
             and r["type"] == "USES"
         ),
@@ -943,7 +945,7 @@ def process_data_task():
         (
             r
             for r in relationships
-            if r["source_id"] == "file::app/main.py"
+            if r["source_id"] == f"file::{repo_id}::app/main.py"
             and r["target_id"] == f"cache::{repo_id}::redis"
             and r["type"] == "CONNECTS_TO"
         ),

@@ -29,6 +29,7 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engin
 @pytest.fixture(scope="module")
 def db_session():
     """Setup test database tables and yield a clean session."""
+
     Base.metadata.create_all(bind=engine)
     Base.metadata.create_all(bind=core_engine)
     db = TestingSessionLocal()

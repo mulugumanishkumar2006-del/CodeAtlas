@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # pyrefly: ignore [missing-import]
 from app.api.v1 import (
+    ai_cto_router,
     architect,
     architecture_drift,
     auth,
@@ -14,6 +15,7 @@ from app.api.v1 import (
     knowledge,
     reliability,
     repositories,
+    software_world,
     tech_debt,
 )
 
@@ -62,6 +64,9 @@ app.include_router(auth.router, prefix=settings.API_V1_STR, tags=["auth"])
 app.include_router(
     repositories.router, prefix=settings.API_V1_STR, tags=["repositories"]
 )
+app.include_router(
+    software_world.router, prefix=settings.API_V1_STR, tags=["software_world"]
+)
 app.include_router(graph.router, prefix=settings.API_V1_STR, tags=["graph"])
 app.include_router(evolution.router, prefix=settings.API_V1_STR, tags=["evolution"])
 app.include_router(
@@ -83,4 +88,9 @@ app.include_router(
     health_intelligence.router,
     prefix=settings.API_V1_STR,
     tags=["health_intelligence"],
+)
+app.include_router(
+    ai_cto_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["ai_cto"],
 )

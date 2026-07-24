@@ -18,6 +18,8 @@ from fastapi.testclient import TestClient
 
 
 def setup_mock_data():
+    app.dependency_overrides[get_current_user] = override_get_current_user
+
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     try:
@@ -86,7 +88,6 @@ def override_get_current_user():
     )
 
 
-app.dependency_overrides[get_current_user] = override_get_current_user
 client = TestClient(app)
 
 

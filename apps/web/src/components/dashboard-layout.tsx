@@ -8,6 +8,8 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@/components/ui/button';
 import { ProtectedRoute } from '@/components/protected-route';
 import { useAuth } from '@/context/auth-context';
+import { useTour } from '@/context/tour-context';
+import { AITourGuide } from '@/components/ai-tour-guide';
 
 interface DashboardLayoutProps {
                         children: React.ReactNode;
@@ -17,6 +19,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                         const [sidebarOpen, setSidebarOpen] = React.useState(false);
                         const pathname = usePathname();
                         const { user, logout } = useAuth();
+                        const { isTourActive, stopTour } = useTour();
 
                         const isAuthPage = pathname?.startsWith('/login');
 
@@ -118,6 +121,14 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                                                                                                                         </main>
                                                                                                 </div>
                                                                         </div>
+                                                                        <AITourGuide
+                                                                                                isActive={
+                                                                                                                        isTourActive
+                                                                                                }
+                                                                                                onClose={
+                                                                                                                        stopTour
+                                                                                                }
+                                                                        />
                                                 </ProtectedRoute>
                         );
 }

@@ -17,6 +17,7 @@ from fastapi.testclient import TestClient
 
 
 def setup_mock_data():
+
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     try:

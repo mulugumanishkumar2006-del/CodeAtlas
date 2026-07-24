@@ -309,6 +309,11 @@ class SoftwareCityDistrict(BaseModel):
     name: str
     neighborhoods: List[SoftwareCityNeighborhood] = []
     health_score: float = 100.0
+    engineering_cost: float = 0.0
+    maintenance_cost: float = 0.0
+    performance_cost: float = 0.0
+    cloud_cost: float = 0.0
+    knowledge_cost: float = 0.0
 
 
 class SoftwareCityRoad(BaseModel):

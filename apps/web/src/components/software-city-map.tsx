@@ -2116,18 +2116,150 @@ export function SoftwareCityMap({
                                                                                                 )
                                                                         );
                                                                         const w = baseWidth * zoom; // dynamic isometric half width
-                                                                        const h = b.height * zoom;
 
-                                                                        // Project top coordinate
+                                                                        // Classification (Feature 20 - Repository Pulse)
+                                                                        const isCriticalModule =
+                                                                                                b
+                                                                                                                        .entity
+                                                                                                                        .technical_debt_traffic_level ===
+                                                                                                                        'CRITICAL' ||
+                                                                                                (b
+                                                                                                                        .entity
+                                                                                                                        .danger_zone_bugs_count &&
+                                                                                                                        b
+                                                                                                                                                .entity
+                                                                                                                                                .danger_zone_bugs_count >
+                                                                                                                                                0);
+                                                                        const isBusyAPI =
+                                                                                                !isCriticalModule &&
+                                                                                                (b.name
+                                                                                                                        .toLowerCase()
+                                                                                                                        .includes(
+                                                                                                                                                'api'
+                                                                                                                        ) ||
+                                                                                                                        b.name
+                                                                                                                                                .toLowerCase()
+                                                                                                                                                .includes(
+                                                                                                                                                                        'controller'
+                                                                                                                                                ) ||
+                                                                                                                        b
+                                                                                                                                                .entity
+                                                                                                                                                .technical_debt_traffic_level ===
+                                                                                                                                                'HIGH' ||
+                                                                                                                        b
+                                                                                                                                                .entity
+                                                                                                                                                .technical_debt_traffic_level ===
+                                                                                                                                                'MEDIUM');
+                                                                        const isHealthyService =
+                                                                                                !isCriticalModule &&
+                                                                                                !isBusyAPI;
+
+                                                                        const pulseSpeed =
+                                                                                                isCriticalModule
+                                                                                                                        ? 0.15
+                                                                                                                        : isBusyAPI
+                                                                                                                          ? 0.08
+                                                                                                                          : 0.02;
+                                                                        const pulseAmp =
+                                                                                                isCriticalModule
+                                                                                                                        ? 0.04
+                                                                                                                        : isBusyAPI
+                                                                                                                          ? 0.02
+                                                                                                                          : 0.01;
+
+                                                                        const heightFactor =
+                                                                                                1.0 +
+                                                                                                Math.sin(
+                                                                                                                        animationTick *
+                                                                                                                                                pulseSpeed
+                                                                                                ) *
+                                                                                                                        pulseAmp;
+                                                                        const breathingHeight =
+                                                                                                b.height *
+                                                                                                heightFactor;
+                                                                        const h =
+                                                                                                breathingHeight *
+                                                                                                zoom;
+
+                                                                        // Project top coordinate using breathingHeight
                                                                         const topPt = project(
                                                                                                 b.x,
                                                                                                 b.y,
-                                                                                                b.height
+                                                                                                breathingHeight
                                                                         );
 
                                                                         const isHovered =
                                                                                                 hoveredEntity?.id ===
                                                                                                 bId;
+
+                                                                        // Draw glow halo (Feature 20)
+                                                                        ctx.save();
+                                                                        const haloPulse = Math.abs(
+                                                                                                Math.sin(
+                                                                                                                        animationTick *
+                                                                                                                                                pulseSpeed
+                                                                                                )
+                                                                        );
+                                                                        const haloRadiusMultiplier =
+                                                                                                isCriticalModule
+                                                                                                                        ? 1.8 +
+                                                                                                                          haloPulse *
+                                                                                                                                                  0.4
+                                                                                                                        : isBusyAPI
+                                                                                                                          ? 1.5 +
+                                                                                                                            haloPulse *
+                                                                                                                                                    0.3
+                                                                                                                          : 1.2 +
+                                                                                                                            haloPulse *
+                                                                                                                                                    0.2;
+                                                                        const rx =
+                                                                                                w *
+                                                                                                haloRadiusMultiplier;
+                                                                        const ry =
+                                                                                                w *
+                                                                                                0.5 *
+                                                                                                haloRadiusMultiplier;
+
+                                                                        ctx.beginPath();
+                                                                        ctx.ellipse(
+                                                                                                basePt.x,
+                                                                                                basePt.y +
+                                                                                                                        w *
+                                                                                                                                                0.5,
+                                                                                                rx,
+                                                                                                ry,
+                                                                                                0,
+                                                                                                0,
+                                                                                                Math.PI *
+                                                                                                                        2
+                                                                        );
+
+                                                                        let haloFillStyle =
+                                                                                                'rgba(16, 185, 129, 0.08)'; // Emerald/Green
+                                                                        let haloStrokeStyle =
+                                                                                                'rgba(16, 185, 129, 0.25)';
+                                                                        if (isCriticalModule) {
+                                                                                                haloFillStyle = `rgba(239, 68, 68, ${0.12 + haloPulse * 0.08})`;
+                                                                                                haloStrokeStyle = `rgba(239, 68, 68, ${0.4 + haloPulse * 0.2})`;
+                                                                        } else if (isBusyAPI) {
+                                                                                                haloFillStyle = `rgba(6, 182, 212, ${0.08 + haloPulse * 0.06})`;
+                                                                                                haloStrokeStyle = `rgba(6, 182, 212, ${0.3 + haloPulse * 0.15})`;
+                                                                        } else {
+                                                                                                haloFillStyle = `rgba(16, 185, 129, ${0.05 + haloPulse * 0.03})`;
+                                                                                                haloStrokeStyle = `rgba(16, 185, 129, ${0.18 + haloPulse * 0.07})`;
+                                                                        }
+
+                                                                        ctx.fillStyle =
+                                                                                                haloFillStyle;
+                                                                        ctx.fill();
+                                                                        ctx.strokeStyle =
+                                                                                                haloStrokeStyle;
+                                                                        ctx.lineWidth =
+                                                                                                isCriticalModule
+                                                                                                                        ? 2.0
+                                                                                                                        : 1.2;
+                                                                        ctx.stroke();
+                                                                        ctx.restore();
 
                                                                         // Apply base outline shadow
                                                                         ctx.fillStyle = `rgba(0, 0, 0, ${0.15 * opacity})`;

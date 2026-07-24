@@ -4,6 +4,7 @@ import './globals.css';
 import { ThemeProvider } from '@/components/theme-provider';
 import { DashboardLayout } from '@/components/dashboard-layout';
 import { AuthProvider } from '@/context/auth-context';
+import { TourProvider } from '@/context/tour-context';
 
 const geistSans = Geist({
                         variable: '--font-geist-sans',
@@ -33,18 +34,20 @@ export default function RootLayout({
                                                 >
                                                                         <body className="min-h-full flex flex-col">
                                                                                                 <AuthProvider>
-                                                                                                                        <ThemeProvider
-                                                                                                                                                attribute="class"
-                                                                                                                                                defaultTheme="system"
-                                                                                                                                                enableSystem
-                                                                                                                                                disableTransitionOnChange
-                                                                                                                        >
-                                                                                                                                                <DashboardLayout>
-                                                                                                                                                                        {
-                                                                                                                                                                                                children
-                                                                                                                                                                        }
-                                                                                                                                                </DashboardLayout>
-                                                                                                                        </ThemeProvider>
+                                                                                                                        <TourProvider>
+                                                                                                                                                <ThemeProvider
+                                                                                                                                                                        attribute="class"
+                                                                                                                                                                        defaultTheme="system"
+                                                                                                                                                                        enableSystem
+                                                                                                                                                                        disableTransitionOnChange
+                                                                                                                                                >
+                                                                                                                                                                        <DashboardLayout>
+                                                                                                                                                                                                {
+                                                                                                                                                                                                                        children
+                                                                                                                                                                                                }
+                                                                                                                                                                        </DashboardLayout>
+                                                                                                                                                </ThemeProvider>
+                                                                                                                        </TourProvider>
                                                                                                 </AuthProvider>
                                                                         </body>
                                                 </html>

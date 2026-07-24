@@ -17,8 +17,14 @@ import {
                         Clock,
                         Cpu,
                         Map,
+                        Globe,
+                        Compass,
+                        Play,
+                        Sparkles,
+                        Server,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useTour } from '@/context/tour-context';
 
 interface NavigationItem {
                         name: string;
@@ -36,7 +42,10 @@ const navigation: NavigationItem[] = [
                                                 isHeader: true,
                         },
                         { name: 'Overview', href: '/', icon: LayoutDashboard },
+                        { name: 'Command Center', href: '/command-center', icon: BarChart3 },
                         { name: 'Software City', href: '/software-city', icon: Map },
+                        { name: 'Software World', href: '/software-world', icon: Globe },
+                        { name: 'Repository DNA & Avatar', href: '/repository-dna', icon: Brain },
                         { name: 'Architecture', href: '/architecture', icon: Layers },
                         { name: 'Knowledge', href: '/knowledge', icon: BookOpen },
                         { name: 'Reliability', href: '/reliability', icon: HeartPulse },
@@ -47,6 +56,19 @@ const navigation: NavigationItem[] = [
                                                 icon: ShieldAlert,
                         },
                         { name: 'AI Architect', href: '/architect', icon: Cpu },
+                        { name: 'Architecture Presenter', href: '/presentation', icon: Play },
+                        {
+                                                name: 'AI Scenario Simulator',
+                                                href: '/scenario-simulator',
+                                                icon: Sparkles,
+                        },
+                        { name: 'AI CTO', href: '/ai-cto', icon: Settings },
+                        { name: 'Enterprise Twin', href: '/enterprise-twin', icon: Server },
+                        {
+                                                name: '🧭 Interactive Tour',
+                                                href: '#tour',
+                                                icon: Compass,
+                        },
                         {
                                                 name: '⭐ Health Diagnostics',
                                                 href: '/health-intelligence',
@@ -75,6 +97,7 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                         const pathname = usePathname();
                         const searchParams = useSearchParams();
                         const currentTab = searchParams?.get('tab');
+                        const { startTour } = useTour();
 
                         return (
                                                 <>
@@ -166,11 +189,20 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                                                                                                                                                                                                                         href={
                                                                                                                                                                                                                                                 item.href
                                                                                                                                                                                                                         }
-                                                                                                                                                                                                                        onClick={() =>
+                                                                                                                                                                                                                        onClick={(
+                                                                                                                                                                                                                                                e
+                                                                                                                                                                                                                        ) => {
                                                                                                                                                                                                                                                 setIsOpen(
                                                                                                                                                                                                                                                                         false
-                                                                                                                                                                                                                                                )
-                                                                                                                                                                                                                        }
+                                                                                                                                                                                                                                                );
+                                                                                                                                                                                                                                                if (
+                                                                                                                                                                                                                                                                        item.href ===
+                                                                                                                                                                                                                                                                        '#tour'
+                                                                                                                                                                                                                                                ) {
+                                                                                                                                                                                                                                                                        e.preventDefault();
+                                                                                                                                                                                                                                                                        startTour();
+                                                                                                                                                                                                                                                }
+                                                                                                                                                                                                                        }}
                                                                                                                                                                                                                         className={cn(
                                                                                                                                                                                                                                                 'group flex items-center rounded-md transition-all duration-150',
                                                                                                                                                                                                                                                 item.isSub

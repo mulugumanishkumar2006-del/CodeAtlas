@@ -17,6 +17,7 @@ from fastapi.testclient import TestClient
 
 def test_reliability_prediction_and_dashboard():
     # Ensure database tables are created cleanly
+
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
 

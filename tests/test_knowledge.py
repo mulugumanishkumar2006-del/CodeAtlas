@@ -33,6 +33,7 @@ from fastapi.testclient import TestClient
 
 def test_knowledge_detection_and_dashboard():
     # Ensure database tables are created cleanly in sqlite
+
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
 

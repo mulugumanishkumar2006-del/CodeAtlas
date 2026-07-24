@@ -21,10 +21,12 @@ class Neo4jClient:
             print(f"Connected to Neo4j database at {self.url} successfully!")
         except Exception as e:
             print(f"Failed to connect to Neo4j database at {self.url}: {e}")
+            self.driver = None
 
     def close(self):
         if self.driver:
             self.driver.close()
+            self.driver = None
             print("Neo4j database connection closed.")
 
     def get_session(self):

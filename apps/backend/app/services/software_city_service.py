@@ -572,6 +572,50 @@ class SoftwareCityService:
             )
         )
 
+        # Calculate economy costs for each district (Feature 19)
+        for dist in districts_dict.values():
+            buildings_list = []
+            for nh in dist.neighborhoods:
+                buildings_list.extend(nh.buildings)
+
+            if not buildings_list:
+                # Deterministic fallback values based on district name hash
+                name_hash = sum(ord(char) for char in dist.name)
+                dist.engineering_cost = float((name_hash % 10) * 15000 + 45000)
+                dist.maintenance_cost = float((name_hash % 7) * 5000 + 12000)
+                dist.performance_cost = float((name_hash % 5) * 3000 + 4000)
+                dist.cloud_cost = float((name_hash % 8) * 4000 + 8000)
+                dist.knowledge_cost = float((name_hash % 6) * 6000 + 10000)
+            else:
+                tot_height = sum(b.height_meters for b in buildings_list)
+                tot_bugs = sum(b.danger_zone_bugs_count for b in buildings_list)
+                avg_doc = sum(b.documentation_quality for b in buildings_list) / len(
+                    buildings_list
+                )
+
+                dist.engineering_cost = round(tot_height * 780.0, 2)
+
+                debt_weight = 0.0
+                for b in buildings_list:
+                    if b.technical_debt_traffic_level == "CRITICAL":
+                        debt_weight += 9000
+                    elif b.technical_debt_traffic_level == "HIGH":
+                        debt_weight += 4500
+                    elif b.technical_debt_traffic_level == "MEDIUM":
+                        debt_weight += 1500
+                    else:
+                        debt_weight += 300
+                dist.maintenance_cost = round(debt_weight + (tot_bugs * 1250.0), 2)
+
+                tot_rooms = sum(len(b.rooms) for b in buildings_list)
+                dist.performance_cost = round(
+                    (tot_rooms * 320.0) + (tot_height * 8.5), 2
+                )
+
+                dist.cloud_cost = round(tot_height * 64.20, 2)
+
+                dist.knowledge_cost = round((100.0 - avg_doc) * 980.0, 2)
+
         # Calculate aggregations
         dist_list = list(districts_dict.values())
         overall_health = (
