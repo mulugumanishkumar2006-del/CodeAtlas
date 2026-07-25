@@ -567,9 +567,16 @@ def orphan_function():
 def test_neo4j_and_knowledge_graph_builder(client):
     import shutil
 
-    from app.core.config import settings
     from app.core.neo4j_client import neo4j_client
-    from app.services.parse_service import ParseService
+
+    # Skip if Neo4j is not reachable
+    try:
+        session = neo4j_client.get_session()
+        if session is None:
+            pytest.skip("Neo4j is not available in this environment")
+        session.close()
+    except Exception:
+        pytest.skip("Neo4j is not available in this environment")
 
     # 1. Setup mock repository files on disk matching services, tables, routers, libs, envs
     repo_id = "test_graph_repo"
