@@ -85,12 +85,38 @@ export default function FutureIntelligencePage() {
     { period: '24 Months', cost: '$14,200 / mo', drivers: 'Multi-region Redundancy & Traffic Surges' },
   ];
 
+  const repoFutureHorizons = [
+    { period: '6 Months', forecast: '+12.4% LOC', warning: 'Auth Vault token validation throughput saturation at 15K QPS' },
+    { period: '1 Year', forecast: '+28.5% LOC', warning: 'Legacy Payment Gateway DB pool exhaustion under 2x surge' },
+    { period: '3 Years', forecast: '+84.0% LOC', warning: 'Monolithic relational DB schema write IOPS saturation requiring sharding' },
+    { period: '5 Years', forecast: '+185.0% LOC', warning: 'Core monolith architecture exceeds maintainability SLA thresholds' },
+  ];
+
+  const techDebtSimulationTrajectory = [
+    { label: 'Current', debt: 18, color: 'bg-emerald-500' },
+    { label: '6 Months', debt: 31, color: 'bg-amber-500' },
+    { label: '1 Year', debt: 52, color: 'bg-orange-500' },
+    { label: '3 Years', debt: 74, color: 'bg-rose-500' },
+    { label: '5 Years', debt: 88, color: 'bg-rose-700' },
+  ];
+
+  const teamGrowthPlannerData = {
+    total: 18,
+    roles: [
+      { role: 'Software Engineers', count: 8, icon: 'Devs' },
+      { role: 'SRE Engineers', count: 4, icon: 'SRE' },
+      { role: 'QA Automation', count: 3, icon: 'QA' },
+      { role: 'Platform Team', count: 3, icon: 'Platform' },
+    ],
+  };
+
   const handleRunFutureAnalysis = () => {
     setAnalyzing(true);
     setTimeout(() => {
       setAnalyzing(false);
     }, 500);
   };
+
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-8 space-y-8">
@@ -275,32 +301,52 @@ export default function FutureIntelligencePage() {
           </div>
         </div>
 
-        {/* Track 4: Growth AI & Cost Trajectory */}
+        {/* Track 4: Growth AI & Team Planner */}
         <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
           <div className="flex items-center justify-between border-b border-slate-800 pb-3">
             <h2 className="text-base font-extrabold text-white flex items-center gap-2">
-              <DollarSign className="w-5 h-5 text-emerald-400" /> Growth AI: Engineering Cost & Team Trajectory
+              <Users className="w-5 h-5 text-indigo-400" /> Team Growth Planner (18 Headcount Needed)
             </h2>
-            <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded">
-              24M COST FORECAST
+            <span className="text-xs font-bold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2.5 py-0.5 rounded">
+              HIRING TRAJECTORY
             </span>
           </div>
 
-          <div className="space-y-2.5">
-            {growthCostTrajectory.map((item, idx) => (
-              <div key={idx} className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex justify-between items-center text-xs">
-                <div>
-                  <div className="font-extrabold text-white">{item.period} Horizon</div>
-                  <div className="text-[11px] text-slate-400">{item.drivers}</div>
-                </div>
-                <div className="text-right">
-                  <span className="font-extrabold text-emerald-400 text-sm">{item.cost}</span>
-                </div>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            {teamGrowthPlannerData.roles.map((r, idx) => (
+              <div key={idx} className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex justify-between items-center">
+                <span className="text-slate-300 font-medium">{r.role}</span>
+                <span className="font-extrabold text-indigo-400 text-sm">+{r.count}</span>
               </div>
             ))}
           </div>
         </div>
       </div>
+
+      {/* Item 3: Technical Debt Growth Simulator */}
+      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <h2 className="text-base font-extrabold text-white flex items-center gap-2">
+            <Activity className="w-5 h-5 text-amber-400" /> Technical Debt Growth Simulator
+          </h2>
+          <span className="text-xs font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-0.5 rounded">
+            FUTURE DEBT SIMULATION
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 text-center">
+          {techDebtSimulationTrajectory.map((step, idx) => (
+            <div key={idx} className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-2">
+              <span className="text-xs text-slate-400 font-semibold block">{step.label}</span>
+              <span className="text-2xl font-extrabold text-white">{step.debt}%</span>
+              <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                <div className={`${step.color} h-full rounded-full`} style={{ width: `${step.debt}%` }}></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
+

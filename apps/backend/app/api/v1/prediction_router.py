@@ -6,15 +6,45 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.prediction_engine.architecture_evolution import ArchitectureEvolutionPredictor
 from app.prediction_engine.architecture_forecast import ArchitectureForecastAI
 from app.prediction_engine.growth_ai import GrowthAI
 from app.prediction_engine.incident_ai import IncidentAI
+from app.prediction_engine.incident_predictor import IncidentPredictionAI
+from app.prediction_engine.repo_future_forecast import RepoFutureForecastEngine
+from app.prediction_engine.team_growth_planner import TeamGrowthPlanner
 from app.prediction_engine.tech_debt_ai import TechnicalDebtAI
+from app.prediction_engine.tech_debt_growth import TechDebtGrowthSimulator
 from app.prediction_engine.timeline import FutureEngineeringTimeline
 
 router = APIRouter(
     prefix="/prediction", tags=["Engineering Prediction Engine (Future Intelligence)"]
 )
+
+
+@router.get("/repo-future-forecast")
+def get_repo_future_forecast(db: Session = Depends(get_db)) -> Dict[str, Any]:
+    return RepoFutureForecastEngine().forecast_repo_future(db)
+
+
+@router.get("/architecture-evolution")
+def get_architecture_evolution(db: Session = Depends(get_db)) -> Dict[str, Any]:
+    return ArchitectureEvolutionPredictor().forecast_architecture_evolution(db)
+
+
+@router.get("/tech-debt-growth")
+def get_tech_debt_growth(db: Session = Depends(get_db)) -> Dict[str, Any]:
+    return TechDebtGrowthSimulator().simulate_tech_debt_growth(db)
+
+
+@router.get("/incident-predictions")
+def get_incident_predictions(db: Session = Depends(get_db)) -> Dict[str, Any]:
+    return IncidentPredictionAI().predict_incidents(db)
+
+
+@router.get("/team-growth-planner")
+def get_team_growth_planner(db: Session = Depends(get_db)) -> Dict[str, Any]:
+    return TeamGrowthPlanner().plan_team_growth(db)
 
 
 @router.get("/architecture-forecast")
