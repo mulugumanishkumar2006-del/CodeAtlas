@@ -7,15 +7,33 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.intelligence_network.network_graph import ArchitectureKnowledgeGraph
+from app.intelligence_network.pattern_advisor import AIPatternAdvisor
 from app.intelligence_network.pattern_extraction import PatternExtractionEngine
+from app.intelligence_network.pattern_library import ArchitecturePatternLibrary
 from app.intelligence_network.recommendation_engine import (
     GlobalPatternRecommendationEngine,
 )
 from app.intelligence_network.repo_intel_engine import RepositoryIntelligenceEngine
+from app.intelligence_network.similarity_engine import RepositorySimilarityEngine
 
 router = APIRouter(
     prefix="/network", tags=["Engineering Intelligence Network (The Software Internet)"]
 )
+
+
+@router.get("/pattern-library")
+def detect_patterns(db: Session = Depends(get_db)) -> Dict[str, Any]:
+    return ArchitecturePatternLibrary().detect_patterns(db)
+
+
+@router.get("/similar-repositories")
+def find_similar_repositories(db: Session = Depends(get_db)) -> List[Dict[str, Any]]:
+    return RepositorySimilarityEngine().find_similar_repositories(db)
+
+
+@router.get("/pattern-advisor")
+def get_pattern_recommendations(db: Session = Depends(get_db)) -> List[Dict[str, Any]]:
+    return AIPatternAdvisor().get_pattern_recommendations(db)
 
 
 @router.get("/overview")

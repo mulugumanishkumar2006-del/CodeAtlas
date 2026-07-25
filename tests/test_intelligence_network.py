@@ -5,10 +5,13 @@ import os
 import pytest
 from app.core.database import Base, get_db
 from app.intelligence_network import (
+    AIPatternAdvisor,
     ArchitectureKnowledgeGraph,
+    ArchitecturePatternLibrary,
     GlobalPatternRecommendationEngine,
     PatternExtractionEngine,
     RepositoryIntelligenceEngine,
+    RepositorySimilarityEngine,
 )
 from app.main import app
 from fastapi.testclient import TestClient
@@ -56,6 +59,15 @@ def test_intelligence_network_engines():
         )
         assert "12,450" in rec["global_insight"]
         assert rec["confidence_score"] == 98.6
+
+        lib = ArchitecturePatternLibrary().detect_patterns(db)
+        assert len(lib["detected_patterns"]) == 4
+
+        sim = RepositorySimilarityEngine().find_similar_repositories(db)
+        assert len(sim) == 2
+
+        adv = AIPatternAdvisor().get_pattern_recommendations(db)
+        assert len(adv) == 3
     finally:
         db.close()
 
@@ -70,3 +82,6 @@ def test_intelligence_network_api():
         ).status_code
         == 200
     )
+    assert client.get("/api/v1/network/pattern-library").status_code == 200
+    assert client.get("/api/v1/network/similar-repositories").status_code == 200
+    assert client.get("/api/v1/network/pattern-advisor").status_code == 200

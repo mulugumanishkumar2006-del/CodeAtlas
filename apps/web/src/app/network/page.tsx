@@ -160,7 +160,67 @@ export default function IntelligenceNetworkPage() {
             </div>
           </div>
         ))}
+      {/* Items 2 & 3: Architecture Pattern Detector & Repository Similarity Engine */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Item 2: Architecture Pattern Detector */}
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
+              <Layers className="w-5 h-5 text-indigo-400" /> Architecture Pattern Detector
+            </h3>
+            <span className="text-xs font-bold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2.5 py-0.5 rounded">
+              4 ACTIVE PATTERNS DETECTED
+            </span>
+          </div>
+
+          <div className="space-y-3 text-xs">
+            <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1">
+              <div className="flex justify-between items-center">
+                <span className="font-extrabold text-white">Event Driven Architecture (EDA)</span>
+                <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">98.4% CONFIDENCE</span>
+              </div>
+              <p className="text-slate-400">Kafka message consumers in orders-fulfillment service and auth audit streams.</p>
+            </div>
+            <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1">
+              <div className="flex justify-between items-center">
+                <span className="font-extrabold text-white">Clean Architecture / Hexagonal</span>
+                <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">96.5% CONFIDENCE</span>
+              </div>
+              <p className="text-slate-400">Strict isolation of domain entities, ports, and adapters across app layers.</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Item 3: Repository Similarity Engine */}
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
+              <Globe className="w-5 h-5 text-cyan-400" /> Repository Similarity Engine
+            </h3>
+            <span className="text-xs font-bold text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-0.5 rounded">
+              TOP 2 MATCHES
+            </span>
+          </div>
+
+          <div className="space-y-3 text-xs">
+            <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1">
+              <div className="flex justify-between items-center">
+                <span className="font-extrabold text-white">uber/order-gateway-service</span>
+                <span className="text-[10px] font-bold text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded">96.4% MATCH</span>
+              </div>
+              <p className="text-slate-300">Takeaway: Scaled this topology to 120,000 QPS adding gRPC connection pooling.</p>
+            </div>
+            <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1">
+              <div className="flex justify-between items-center">
+                <span className="font-extrabold text-white">stripe/billing-ledger-core</span>
+                <span className="text-[10px] font-bold text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded">94.1% MATCH</span>
+              </div>
+              <p className="text-slate-300">Takeaway: Uses partition-based idempotency keys to guarantee zero duplicate charges.</p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
+
