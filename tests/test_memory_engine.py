@@ -7,7 +7,9 @@ from app.core.database import Base, get_db
 from app.main import app
 from app.memory_engine import (
     ADRManager,
+    AIEngineeringHistorian,
     AIMemoryEngine,
+    DeveloperOnboardingAI,
     EngineeringMemoryGraph,
     HistoricalContextRecall,
     IncidentMemoryEngine,
@@ -79,6 +81,15 @@ def test_memory_engines():
 
         meetings = MeetingIntelligenceEngine().get_meeting_intelligence(db)
         assert len(meetings) >= 2
+
+        hist = AIEngineeringHistorian().explain_subsystem_history(db, "Auth")
+        assert len(hist["timeline"]) == 4
+
+        story = AIEngineeringHistorian().generate_system_story(db, "CodeAtlas Core")
+        assert len(story["chapters"]) == 4
+
+        onboard = DeveloperOnboardingAI().get_onboarding_guide(db, "Backend Engineer")
+        assert len(onboard["essential_context_modules"]) == 3
     finally:
         db.close()
 
@@ -99,3 +110,17 @@ def test_memory_api_endpoints():
     assert client.get("/api/v1/memory/pr-intelligence").status_code == 200
     assert client.get("/api/v1/memory/incident-memory").status_code == 200
     assert client.get("/api/v1/memory/meeting-intelligence").status_code == 200
+    assert (
+        client.get("/api/v1/memory/engineering-historian?subsystem=Auth").status_code
+        == 200
+    )
+    assert (
+        client.get("/api/v1/memory/system-story?system_name=CodeAtlas").status_code
+        == 200
+    )
+    assert (
+        client.get(
+            "/api/v1/memory/developer-onboarding?role=Backend%20Engineer"
+        ).status_code
+        == 200
+    )

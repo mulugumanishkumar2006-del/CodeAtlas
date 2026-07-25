@@ -326,14 +326,48 @@ export default function EngineeringBrainPage() {
             </span>
           </div>
 
-          <div className="space-y-3 text-xs">
-            <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-1">
-              <div className="flex justify-between items-center">
-                <span className="font-extrabold text-white">INC-882 • DB Connection Pool Lockout</span>
-                <span className="text-[10px] font-bold text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded">SEV-1</span>
-              </div>
-              <p className="text-slate-300">Root Cause: Fulfillment status updates locked rows during 2.5x traffic surge.</p>
-              <div className="text-[11px] text-emerald-400 font-semibold">Lesson: Never run batch updates inside HTTP request handler transactions.</div>
+      {/* Items 8, 10, 11: AI Engineering Historian & Onboarding */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Item 8: AI Engineering Historian */}
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h2 className="text-base font-extrabold text-white flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-amber-400" /> AI Engineering Historian
+            </h2>
+            <span className="text-xs font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-0.5 rounded">
+              "WHY DOES AUTH LOOK LIKE THIS?"
+            </span>
+          </div>
+
+          <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2 text-xs">
+            <div className="font-extrabold text-white text-sm">Auth Subsystem Provenance</div>
+            <p className="text-slate-300 leading-relaxed">
+              Evolved from a monolithic session handler in 2025 into an autonomous gRPC Auth Token Vault in Q1 2026 following a 14,000 DB req/sec latency spike.
+            </p>
+            <div className="flex flex-wrap gap-2 border-t border-slate-800 pt-2 text-[10px]">
+              <span className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2 py-0.5 rounded">PR #145</span>
+              <span className="bg-rose-500/10 text-rose-400 border border-rose-500/20 px-2 py-0.5 rounded">INC-741</span>
+              <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded">ADR 002</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Item 11: Developer Onboarding AI */}
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h2 className="text-base font-extrabold text-white flex items-center gap-2">
+              <Users className="w-5 h-5 text-cyan-400" /> Developer Onboarding AI Tutor
+            </h2>
+            <span className="text-xs font-bold text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-0.5 rounded">
+              1.5 WEEKS TO AUTONOMY
+            </span>
+          </div>
+
+          <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2 text-xs">
+            <div className="font-extrabold text-white">Interactive History Curriculum</div>
+            <p className="text-slate-300">Teaches new engineers project architecture, historical landmines, and design trade-offs in minutes using the graph.</p>
+            <div className="text-[11px] text-cyan-400 font-semibold border-t border-slate-800 pt-2">
+              Prevented Landmine: DB connection pool exhaustion during synchronous batch jobs.
             </div>
           </div>
         </div>
@@ -341,4 +375,5 @@ export default function EngineeringBrainPage() {
     </div>
   );
 }
+
 
