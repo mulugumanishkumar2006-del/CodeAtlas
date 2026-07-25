@@ -18,6 +18,7 @@ from app.api.v1 import (
     health_intelligence,
     knowledge,
     memory_router,
+    network_router,
     prediction_router,
     reality_router,
     reliability,
@@ -149,4 +150,9 @@ app.include_router(
     memory_router.router,
     prefix=settings.API_V1_STR,
     tags=["memory"],
+)
+app.include_router(
+    network_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["network"],
 )
