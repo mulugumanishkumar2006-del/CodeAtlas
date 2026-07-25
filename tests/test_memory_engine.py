@@ -13,11 +13,14 @@ from app.memory_engine import (
     AIMemoryEngine,
     DeploymentIntelligenceEngine,
     DeveloperOnboardingAI,
+    EngineeringEncyclopediaEngine,
     EngineeringMemoryGraph,
+    ExecutiveMemoryEngine,
     HistoricalContextRecall,
     IncidentMemoryEngine,
     MeetingIntelligenceEngine,
     PRIntelligenceEngine,
+    SystemBiographyEngine,
 )
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -108,6 +111,17 @@ def test_memory_engines():
 
         search = AIEngineeringLibrarian().librarian_search(db, "FastAPI")
         assert len(search["matches"]) >= 2
+
+        encyclopedia = EngineeringEncyclopediaEngine().get_encyclopedia_overview(db)
+        assert len(encyclopedia["terms_glossary"]) == 3
+
+        exec_report = ExecutiveMemoryEngine().generate_executive_history_report(db)
+        assert "CTO & VP of Engineering" in exec_report["prepared_for"]
+
+        bio = SystemBiographyEngine().get_service_biography(
+            db, "Authentication Service"
+        )
+        assert len(bio["biography"]["life_story_stages"]) == 9
     finally:
         db.close()
 
@@ -147,3 +161,11 @@ def test_memory_api_endpoints():
     assert client.get("/api/v1/memory/dependency-history").status_code == 200
     assert client.get("/api/v1/memory/knowledge-heatmap").status_code == 200
     assert client.get("/api/v1/memory/librarian-search?q=FastAPI").status_code == 200
+    assert (
+        client.get(
+            "/api/v1/memory/system-biography?service_name=Authentication%20Service"
+        ).status_code
+        == 200
+    )
+    assert client.get("/api/v1/memory/encyclopedia").status_code == 200
+    assert client.get("/api/v1/memory/executive-history").status_code == 200

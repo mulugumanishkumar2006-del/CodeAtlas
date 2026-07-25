@@ -9,6 +9,8 @@ from app.core.database import get_db
 from app.memory_engine.decision_comparator import AIDecisionComparator
 from app.memory_engine.decision_logger import ADRManager
 from app.memory_engine.deployment_intelligence import DeploymentIntelligenceEngine
+from app.memory_engine.encyclopedia_engine import EngineeringEncyclopediaEngine
+from app.memory_engine.executive_memory import ExecutiveMemoryEngine
 from app.memory_engine.historian_engine import AIEngineeringHistorian
 from app.memory_engine.historical_context import HistoricalContextRecall
 from app.memory_engine.incident_memory import IncidentMemoryEngine
@@ -18,10 +20,30 @@ from app.memory_engine.memory_engine import AIMemoryEngine
 from app.memory_engine.memory_graph import EngineeringMemoryGraph
 from app.memory_engine.onboarding_memory import DeveloperOnboardingAI
 from app.memory_engine.pr_intelligence import PRIntelligenceEngine
+from app.memory_engine.system_biography import SystemBiographyEngine
 
 router = APIRouter(
     prefix="/memory", tags=["Engineering Memory Graph (The Engineering Brain)"]
 )
+
+
+@router.get("/system-biography")
+def get_service_biography(
+    service_name: str = "Authentication Service", db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    return SystemBiographyEngine().get_service_biography(db, service_name)
+
+
+@router.get("/encyclopedia")
+def get_encyclopedia_overview(db: Session = Depends(get_db)) -> Dict[str, Any]:
+    return EngineeringEncyclopediaEngine().get_encyclopedia_overview(db)
+
+
+@router.get("/executive-history")
+def generate_executive_history_report(
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    return ExecutiveMemoryEngine().generate_executive_history_report(db)
 
 
 @router.get("/decision-comparator")

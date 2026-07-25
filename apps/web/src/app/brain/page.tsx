@@ -21,6 +21,7 @@ import {
 
 export default function EngineeringBrainPage() {
   const [queryInput, setQueryInput] = useState('Why did we choose Kafka instead of RabbitMQ?');
+  const [selectedService, setSelectedService] = useState<'Authentication Service' | 'Payment Gateway'>('Authentication Service');
   const [activeQueryResult, setActiveQueryResult] = useState<{
     question: string;
     answer: string;
@@ -36,6 +37,40 @@ export default function EngineeringBrainPage() {
     ],
     confidence: 98.2,
   });
+
+  const serviceBiographies: Record<string, { title: string; tagline: string; stages: { stage: number; title: string; detail: string; badge: string }[] }> = {
+    'Authentication Service': {
+      title: 'Authentication Service',
+      tagline: 'The Identity & Security Guardian of CodeAtlas',
+      stages: [
+        { stage: 1, title: 'Created (Aug 2025)', detail: 'Monolithic auth module inside FastAPI baseline core.', badge: 'INCEPTION' },
+        { stage: 2, title: 'Reason (Why it Exists)', detail: 'Centralized session verification & stateless JWT issuance.', badge: 'PURPOSE' },
+        { stage: 3, title: 'First Deployment (Sept 2025)', detail: 'Deployed to AWS EKS cluster on single Postgres node.', badge: 'DEPLOY' },
+        { stage: 4, title: 'Major Refactor (Jan 2026)', detail: 'PR #145 added Redis L2 cache, bypassing 14K DB queries/sec.', badge: 'REFACTOR' },
+        { stage: 5, title: 'Incidents (Jan 2026)', detail: 'INC-741 Token Latency Spike (SEV-2) resolved in 12m.', badge: 'INCIDENT' },
+        { stage: 6, title: 'Performance Changes', detail: 'p95 latency reduced from 140ms down to 18ms.', badge: 'PERFORMANCE' },
+        { stage: 7, title: 'Security Updates (Feb 2026)', detail: 'Upgraded JWT signing keys to RS256 with automated rotation.', badge: 'SECURITY' },
+        { stage: 8, title: 'Current Health', detail: '99.99% Uptime, 98.4/100 Health Score, 0 active CVE risks.', badge: 'HEALTH' },
+        { stage: 9, title: 'Future Predictions', detail: 'Requires gRPC Token Vault decoupling within 12m for 45K QPS.', badge: 'FUTURE' },
+      ],
+    },
+    'Payment Gateway': {
+      title: 'Payment Gateway',
+      tagline: 'Financial Transaction Processing Core',
+      stages: [
+        { stage: 1, title: 'Created (Sept 2025)', detail: 'Monolithic payment processor created for Stripe integration.', badge: 'INCEPTION' },
+        { stage: 2, title: 'Reason (Why it Exists)', detail: 'Secure checkout transactions and multi-currency billing.', badge: 'PURPOSE' },
+        { stage: 3, title: 'First Deployment (Oct 2025)', detail: 'Deployed on AWS EKS with single DB connection pool.', badge: 'DEPLOY' },
+        { stage: 4, title: 'Major Refactor (Feb 2026)', detail: 'PR #182 split monolithic orders & payment schema.', badge: 'REFACTOR' },
+        { stage: 5, title: 'Incidents (Feb 2026)', detail: 'INC-882 DB row lock lockout during 2.5x surge.', badge: 'INCIDENT' },
+        { stage: 6, title: 'Performance Changes', detail: 'Throughput increased from 1,200 QPS to 8,500 QPS.', badge: 'PERFORMANCE' },
+        { stage: 7, title: 'Security Updates (Mar 2026)', detail: 'PCI-DSS compliance audit passed with zero findings.', badge: 'SECURITY' },
+        { stage: 8, title: 'Current Health', detail: '82.4/100 Saturation Score (Evolution Required).', badge: 'HEALTH' },
+        { stage: 9, title: 'Future Predictions', detail: 'Must split into standalone microservice in Q3 2027.', badge: 'FUTURE' },
+      ],
+    },
+  };
+
 
   const presetQuestions = [
     'Why did we choose Kafka instead of RabbitMQ?',
@@ -130,11 +165,69 @@ export default function EngineeringBrainPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3 bg-slate-900 border border-slate-800 px-4 py-2 rounded-xl text-xs">
-          <ShieldCheck className="w-4 h-4 text-emerald-400" />
-          <span className="text-slate-300 font-bold">1,420 Memory Nodes Indexed</span>
+      {/* WOW FEATURE: Interactive Engineering Brain - Biography of a Software System */}
+      <div className="bg-gradient-to-br from-purple-950/90 via-slate-900 to-indigo-950/90 border border-purple-500/40 rounded-2xl p-6 shadow-2xl space-y-6 relative overflow-hidden">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between border-b border-purple-500/20 pb-4 gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-0.5 rounded bg-purple-500/20 text-purple-300 font-extrabold text-[11px] border border-purple-500/30 uppercase tracking-widest">
+                🌟 WOW Feature
+              </span>
+              <h2 className="text-xl font-extrabold text-white flex items-center gap-2">
+                <BookOpen className="w-6 h-6 text-purple-400 animate-pulse" /> Biography of a Software System
+              </h2>
+            </div>
+            <p className="text-slate-300 text-xs mt-1">
+              Select any microservice to open its complete 9-stage lifecycle story across inception, rationale, refactors, incidents, health, and future predictions.
+            </p>
+          </div>
+
+          {/* Service Selector */}
+          <div className="flex gap-1.5 bg-slate-950/80 p-1.5 rounded-xl border border-slate-800">
+            {(['Authentication Service', 'Payment Gateway'] as const).map((svc) => (
+              <button
+                key={svc}
+                onClick={() => setSelectedService(svc)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all border ${
+                  selectedService === svc
+                    ? 'bg-purple-600 border-purple-400 text-white shadow-lg shadow-purple-600/40 scale-105'
+                    : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {svc}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 9-Stage Life Story Timeline */}
+        <div className="bg-slate-950/90 rounded-xl border border-purple-500/30 p-6 space-y-4">
+          <div className="flex justify-between items-center text-xs border-b border-slate-800 pb-3">
+            <div>
+              <h3 className="text-base font-extrabold text-white">{serviceBiographies[selectedService].title}</h3>
+              <p className="text-purple-400 text-xs">{serviceBiographies[selectedService].tagline}</p>
+            </div>
+            <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-lg border border-emerald-500/20">
+              IMMUTABLE LIFE PROVENANCE
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {serviceBiographies[selectedService].stages.map((stg) => (
+              <div key={stg.stage} className="bg-slate-900/90 p-3.5 rounded-xl border border-slate-800 space-y-1.5 hover:border-purple-500/40 transition-all">
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] font-extrabold text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/20">
+                    STAGE {stg.stage} • {stg.badge}
+                  </span>
+                </div>
+                <div className="font-extrabold text-white text-xs">{stg.title}</div>
+                <p className="text-[11px] text-slate-300 leading-tight">{stg.detail}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
+
 
       {/* Interactive Q&A Search */}
       <div className="bg-gradient-to-br from-purple-950/40 via-slate-900 to-indigo-950/40 border border-purple-500/30 rounded-2xl p-6 shadow-2xl space-y-6">
