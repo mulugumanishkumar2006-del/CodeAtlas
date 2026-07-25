@@ -129,10 +129,25 @@ export default function FutureIntelligencePage() {
     { tech: 'PyYAML v5.3.1', status: 'Critical CVE Vulnerability', action: 'Upgrade to PyYAML >= 6.0 immediately' },
   ];
 
-  const refactoringDeadlines = [
-    { module: 'legacy-payment-service', deadline: 'Q4 2026 (4 Months left)', urgency: 'CRITICAL', score: 42.0 },
-    { module: 'analytics-batch-worker', deadline: 'Q2 2027 (10 Months left)', urgency: 'MEDIUM', score: 58.4 },
+  const scalingTimelineData = [
+    { tier: '100K Users', state: 'Single Postgres + Redis 3-node + Monolith', status: 'Baseline' },
+    { tier: '500K Users', state: 'Postgres Read Replicas + Redis 6-node', status: '6 Months' },
+    { tier: '1M Users', state: 'Extract Checkout & Auth Microservices', status: '12 Months' },
+    { tier: '5M Users', state: 'Multi-Region Sharded Postgres + Edge CDN', status: '24 Months' },
+    { tier: '50M Users', state: 'Global Autonomous Event Mesh + AI Agents', status: '5 Years' },
   ];
+
+  const experimentComparison = {
+    optionA: { name: 'Option A: Monolith + Read Replicas', qps: '38,000 QPS', latency: '140ms p95', cost: '$12K' },
+    optionB: { name: 'Option B: Microservices + Event Bus', qps: '180,000 QPS', latency: '18ms p95', cost: '$84K' },
+    verdict: 'Option B Recommended for scale > 1M users',
+  };
+
+  const monolithRiskData = {
+    score: 82.4,
+    verdict: 'EVOLUTION REQUIRED WITHIN 12 MONTHS',
+    coupling: '88/100 Payment Domain Coupling',
+  };
 
   const handleRunFutureAnalysis = () => {
     setAnalyzing(true);
@@ -140,6 +155,7 @@ export default function FutureIntelligencePage() {
       setAnalyzing(false);
     }, 500);
   };
+
 
 
 
@@ -436,37 +452,87 @@ export default function FutureIntelligencePage() {
           </div>
         </div>
 
-        {/* Item 13: Refactoring Deadline Predictor */}
+      {/* Item 14: Scaling Timeline (100K -> 50M Users) */}
+      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <h2 className="text-base font-extrabold text-white flex items-center gap-2">
+            <TrendingUp className="w-5 h-5 text-emerald-400" /> Scaling Timeline Roadmap (100K ➔ 50M Users)
+          </h2>
+          <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded">
+            CAPACITY FORECAST
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+          {scalingTimelineData.map((item, idx) => (
+            <div key={idx} className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="font-extrabold text-white text-sm">{item.tier}</span>
+                <span className="text-[10px] font-bold text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20">
+                  {item.status}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-300 leading-tight">{item.state}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Item 17 & 18: Monolith Risk & AI Experiment Simulator */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Item 17: Monolith Risk Predictor */}
         <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
           <div className="flex items-center justify-between border-b border-slate-800 pb-3">
             <h2 className="text-base font-extrabold text-white flex items-center gap-2">
-              <Clock className="w-5 h-5 text-amber-400" /> Refactoring Deadline Predictor
+              <Layers className="w-5 h-5 text-amber-400" /> Monolith Risk & Evolution Predictor
             </h2>
             <span className="text-xs font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-0.5 rounded">
-              OPTIMAL REFACTOR WINDOW
+              82.4 / 100 SATURATION
+            </span>
+          </div>
+
+          <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2 text-xs">
+            <div className="font-extrabold text-rose-400">{monolithRiskData.verdict}</div>
+            <p className="text-slate-300">{monolithRiskData.coupling}</p>
+            <p className="text-slate-400 border-t border-slate-800 pt-2">
+              Modular Monolith exceeds capacity at 45K QPS. Extract Payment & Checkout context into standalone microservices.
+            </p>
+          </div>
+        </div>
+
+        {/* Item 18: AI Experiment Simulator */}
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h2 className="text-base font-extrabold text-white flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-indigo-400" /> AI Experiment Simulator (Option A vs B)
+            </h2>
+            <span className="text-xs font-bold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2.5 py-0.5 rounded">
+              ARCH BENCHMARK
             </span>
           </div>
 
           <div className="space-y-2 text-xs">
-            {refactoringDeadlines.map((item, idx) => (
-              <div key={idx} className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex justify-between items-center">
-                <div>
-                  <div className="font-bold text-white">{item.module}</div>
-                  <div className="text-[11px] text-slate-400">Current Maintainability: {item.score}</div>
-                </div>
-                <div className="text-right">
-                  <span className="text-xs font-extrabold text-rose-400 block">{item.deadline}</span>
-                  <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded inline-block mt-0.5">
-                    {item.urgency} URGENCY
-                  </span>
-                </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
+                <div className="font-bold text-white mb-1">{experimentComparison.optionA.name}</div>
+                <div className="text-slate-400">Throughput: <strong className="text-amber-400">{experimentComparison.optionA.qps}</strong></div>
+                <div className="text-slate-400">Cost: <strong className="text-emerald-400">{experimentComparison.optionA.cost}</strong></div>
               </div>
-            ))}
+              <div className="bg-slate-950 p-3 rounded-xl border border-indigo-500/40 shadow-md">
+                <div className="font-bold text-indigo-400 mb-1">{experimentComparison.optionB.name}</div>
+                <div className="text-slate-400">Throughput: <strong className="text-emerald-400">{experimentComparison.optionB.qps}</strong></div>
+                <div className="text-slate-400">Latency: <strong className="text-emerald-400">{experimentComparison.optionB.latency}</strong></div>
+              </div>
+            </div>
+            <div className="text-center font-bold text-emerald-400 bg-emerald-500/10 p-2 rounded-lg border border-emerald-500/20">
+              {experimentComparison.verdict}
+            </div>
           </div>
         </div>
       </div>
     </div>
   );
 }
+
 
 

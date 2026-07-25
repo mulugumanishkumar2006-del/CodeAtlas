@@ -7,19 +7,26 @@ from app.core.database import Base, get_db
 from app.main import app
 from app.prediction_engine import (
     AIArchitectureEvolutionAdvisor,
+    AIExperimentSimulator,
+    AIStrategicPlannerEngine,
     ArchitectureEvolutionPredictor,
     ArchitectureForecastAI,
     CloudCostForecastEngine,
     DependencyFutureRiskPredictor,
+    EngineeringCalendarPredictor,
     FailureChainSimulator,
+    FutureDependencyGraphEngine,
     FutureEngineeringTimeline,
     GrowthAI,
     IncidentAI,
     IncidentPredictionAI,
     KnowledgeDecayPredictor,
+    MaintainabilityForecastEngine,
+    MonolithRiskPredictor,
     PerformancePredictionEngine,
     RefactoringDeadlinePredictor,
     RepoFutureForecastEngine,
+    ScalingTimelineEngine,
     TeamGrowthPlanner,
     TechDebtGrowthSimulator,
     TechnicalDebtAI,
@@ -114,6 +121,27 @@ def test_prediction_engines():
 
         ref_dl = RefactoringDeadlinePredictor().predict_refactoring_deadlines(db)
         assert len(ref_dl["optimal_refactoring_windows"]) >= 2
+
+        scale_tl = ScalingTimelineEngine().forecast_scaling_timeline(db)
+        assert len(scale_tl["scale_tiers"]) == 5
+
+        strat_plan = AIStrategicPlannerEngine().generate_roadmaps(db)
+        assert "one_year_roadmap" in strat_plan
+
+        maint_fc = MaintainabilityForecastEngine().forecast_maintainability(db)
+        assert len(maint_fc["overall_maintainability_trend"]) == 4
+
+        mono_risk = MonolithRiskPredictor().predict_monolith_risk(db)
+        assert mono_risk["monolith_saturation_score"] == 82.4
+
+        exp_sim = AIExperimentSimulator().simulate_experiment(db)
+        assert "option_a" in exp_sim["comparison"]
+
+        fut_dep = FutureDependencyGraphEngine().forecast_future_dependency_graph(db)
+        assert fut_dep["nodes_count_projected_12m"] == 42
+
+        eng_cal = EngineeringCalendarPredictor().predict_engineering_calendar(db)
+        assert len(eng_cal["milestones_and_windows"]) == 4
     finally:
         db.close()
 
@@ -138,3 +166,10 @@ def test_prediction_api_endpoints():
     assert client.get("/api/v1/prediction/simulate-failure-chain").status_code == 200
     assert client.get("/api/v1/prediction/knowledge-decay").status_code == 200
     assert client.get("/api/v1/prediction/refactoring-deadlines").status_code == 200
+    assert client.get("/api/v1/prediction/scaling-timeline").status_code == 200
+    assert client.get("/api/v1/prediction/ai-strategic-roadmap").status_code == 200
+    assert client.get("/api/v1/prediction/maintainability-forecast").status_code == 200
+    assert client.get("/api/v1/prediction/monolith-risk").status_code == 200
+    assert client.get("/api/v1/prediction/experiment-simulator").status_code == 200
+    assert client.get("/api/v1/prediction/future-dependency-graph").status_code == 200
+    assert client.get("/api/v1/prediction/engineering-calendar").status_code == 200
