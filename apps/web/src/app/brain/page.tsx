@@ -366,8 +366,54 @@ export default function EngineeringBrainPage() {
           <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2 text-xs">
             <div className="font-extrabold text-white">Interactive History Curriculum</div>
             <p className="text-slate-300">Teaches new engineers project architecture, historical landmines, and design trade-offs in minutes using the graph.</p>
+      {/* Items 13 & 19: AI Decision Comparator & Knowledge Heatmap */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Item 13: AI Decision Comparator */}
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h2 className="text-base font-extrabold text-white flex items-center gap-2">
+              <Zap className="w-5 h-5 text-indigo-400" /> AI Decision Comparator (ADR vs Reality)
+            </h2>
+            <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded">
+              88% ALIGNMENT
+            </span>
+          </div>
+
+          <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2 text-xs">
+            <div className="font-extrabold text-white">ADR 004 vs Current Architecture</div>
+            <p className="text-slate-300">Original Intent: Use Kafka for 100% of event streams across services.</p>
+            <p className="text-amber-400">Current Reality: Kafka handles 92% of events; legacy RabbitMQ handles payment retry queue.</p>
             <div className="text-[11px] text-cyan-400 font-semibold border-t border-slate-800 pt-2">
-              Prevented Landmine: DB connection pool exhaustion during synchronous batch jobs.
+              Recommendation: Migrate 8% payment retry queue off RabbitMQ to unify on Kafka.
+            </div>
+          </div>
+        </div>
+
+        {/* Item 19: Knowledge Heatmap */}
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h2 className="text-base font-extrabold text-white flex items-center gap-2">
+              <Layers className="w-5 h-5 text-rose-400" /> Documentation & Knowledge Heatmap
+            </h2>
+            <span className="text-xs font-bold text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2.5 py-0.5 rounded">
+              POORLY DOCUMENTED
+            </span>
+          </div>
+
+          <div className="space-y-2 text-xs">
+            <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex justify-between items-center">
+              <div>
+                <div className="font-bold text-white">legacy-payment-gateway/crypto_utils.py</div>
+                <div className="text-[11px] text-rose-400">Documentation Coverage: 24% (Departed Contributor Risk)</div>
+              </div>
+              <span className="text-[10px] font-bold text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded">HIGH RISK</span>
+            </div>
+            <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex justify-between items-center">
+              <div>
+                <div className="font-bold text-white">analytics-worker/batch_aggregator.py</div>
+                <div className="text-[11px] text-amber-400">Documentation Coverage: 38.5%</div>
+              </div>
+              <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded">MEDIUM RISK</span>
             </div>
           </div>
         </div>
@@ -375,5 +421,6 @@ export default function EngineeringBrainPage() {
     </div>
   );
 }
+
 
 

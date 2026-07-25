@@ -7,8 +7,11 @@ from app.core.database import Base, get_db
 from app.main import app
 from app.memory_engine import (
     ADRManager,
+    AIDecisionComparator,
     AIEngineeringHistorian,
+    AIEngineeringLibrarian,
     AIMemoryEngine,
+    DeploymentIntelligenceEngine,
     DeveloperOnboardingAI,
     EngineeringMemoryGraph,
     HistoricalContextRecall,
@@ -90,6 +93,21 @@ def test_memory_engines():
 
         onboard = DeveloperOnboardingAI().get_onboarding_guide(db, "Backend Engineer")
         assert len(onboard["essential_context_modules"]) == 3
+
+        comp = AIDecisionComparator().compare_decisions_vs_reality(db)
+        assert len(comp) >= 2
+
+        deploy = DeploymentIntelligenceEngine().get_deployment_history(db)
+        assert len(deploy) >= 2
+
+        dep_hist = DeploymentIntelligenceEngine().get_dependency_history(db)
+        assert len(dep_hist["historical_timeline"]) == 3
+
+        heatmap = AIEngineeringLibrarian().get_knowledge_heatmap(db)
+        assert len(heatmap["poorly_documented_modules"]) >= 2
+
+        search = AIEngineeringLibrarian().librarian_search(db, "FastAPI")
+        assert len(search["matches"]) >= 2
     finally:
         db.close()
 
@@ -124,3 +142,8 @@ def test_memory_api_endpoints():
         ).status_code
         == 200
     )
+    assert client.get("/api/v1/memory/decision-comparator").status_code == 200
+    assert client.get("/api/v1/memory/deployment-intelligence").status_code == 200
+    assert client.get("/api/v1/memory/dependency-history").status_code == 200
+    assert client.get("/api/v1/memory/knowledge-heatmap").status_code == 200
+    assert client.get("/api/v1/memory/librarian-search?q=FastAPI").status_code == 200

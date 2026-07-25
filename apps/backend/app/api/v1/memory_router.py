@@ -6,10 +6,13 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.memory_engine.decision_comparator import AIDecisionComparator
 from app.memory_engine.decision_logger import ADRManager
+from app.memory_engine.deployment_intelligence import DeploymentIntelligenceEngine
 from app.memory_engine.historian_engine import AIEngineeringHistorian
 from app.memory_engine.historical_context import HistoricalContextRecall
 from app.memory_engine.incident_memory import IncidentMemoryEngine
+from app.memory_engine.librarian_engine import AIEngineeringLibrarian
 from app.memory_engine.meeting_intelligence import MeetingIntelligenceEngine
 from app.memory_engine.memory_engine import AIMemoryEngine
 from app.memory_engine.memory_graph import EngineeringMemoryGraph
@@ -19,6 +22,33 @@ from app.memory_engine.pr_intelligence import PRIntelligenceEngine
 router = APIRouter(
     prefix="/memory", tags=["Engineering Memory Graph (The Engineering Brain)"]
 )
+
+
+@router.get("/decision-comparator")
+def compare_decisions(db: Session = Depends(get_db)) -> List[Dict[str, Any]]:
+    return AIDecisionComparator().compare_decisions_vs_reality(db)
+
+
+@router.get("/deployment-intelligence")
+def get_deployment_history(db: Session = Depends(get_db)) -> List[Dict[str, Any]]:
+    return DeploymentIntelligenceEngine().get_deployment_history(db)
+
+
+@router.get("/dependency-history")
+def get_dependency_history(db: Session = Depends(get_db)) -> Dict[str, Any]:
+    return DeploymentIntelligenceEngine().get_dependency_history(db)
+
+
+@router.get("/knowledge-heatmap")
+def get_knowledge_heatmap(db: Session = Depends(get_db)) -> Dict[str, Any]:
+    return AIEngineeringLibrarian().get_knowledge_heatmap(db)
+
+
+@router.get("/librarian-search")
+def librarian_search(
+    q: str = "FastAPI", db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    return AIEngineeringLibrarian().librarian_search(db, q)
 
 
 @router.get("/graph-snapshot")
