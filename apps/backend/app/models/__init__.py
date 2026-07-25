@@ -18,9 +18,14 @@ from app.models.architecture import (
 )
 from app.models.autonomous_task import AutonomousTask
 from app.models.codeatlas_os import (
+    AIDecisionLog,
+    EngineeringMemoryItem,
+    EngineeringTimelineEvent,
     OSKernelSession,
+    PlatformPlugin,
     ToolAdapterIntegration,
     UniversalQueryEvent,
+    UniversalSearchIndex,
 )
 from app.models.council_decision_memory import CouncilDecisionMemory
 from app.models.cto_strategy_history import CTOStrategyHistory
