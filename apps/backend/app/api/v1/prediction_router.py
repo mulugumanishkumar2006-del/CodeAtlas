@@ -13,9 +13,12 @@ from app.prediction_engine.architecture_forecast import ArchitectureForecastAI
 from app.prediction_engine.cloud_cost_forecast import CloudCostForecastEngine
 from app.prediction_engine.dependency_risk import DependencyFutureRiskPredictor
 from app.prediction_engine.engineering_calendar import EngineeringCalendarPredictor
+from app.prediction_engine.engineering_time_machine import EngineeringTimeMachineEngine
 from app.prediction_engine.experiment_simulator import AIExperimentSimulator
+from app.prediction_engine.explainable_predictions import ExplainablePredictionsEngine
 from app.prediction_engine.failure_chain_simulator import FailureChainSimulator
 from app.prediction_engine.future_dependency_graph import FutureDependencyGraphEngine
+from app.prediction_engine.future_digital_twin import FutureDigitalTwinEngine
 from app.prediction_engine.growth_ai import GrowthAI
 from app.prediction_engine.incident_ai import IncidentAI
 from app.prediction_engine.incident_predictor import IncidentPredictionAI
@@ -35,6 +38,23 @@ from app.prediction_engine.timeline import FutureEngineeringTimeline
 router = APIRouter(
     prefix="/prediction", tags=["Engineering Prediction Engine (Future Intelligence)"]
 )
+
+
+@router.get("/future-digital-twin")
+def get_future_digital_twin(db: Session = Depends(get_db)) -> Dict[str, Any]:
+    return FutureDigitalTwinEngine().generate_future_digital_twin(db)
+
+
+@router.get("/explainable-predictions")
+def get_explainable_predictions(db: Session = Depends(get_db)) -> Dict[str, Any]:
+    return ExplainablePredictionsEngine().generate_explainable_predictions(db)
+
+
+@router.get("/time-machine-state")
+def get_time_machine_state(
+    target_horizon: str = "1_year", db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    return EngineeringTimeMachineEngine().travel_to_future(db, target_horizon)
 
 
 @router.get("/scaling-timeline")

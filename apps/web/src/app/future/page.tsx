@@ -21,7 +21,70 @@ import {
 
 export default function FutureIntelligencePage() {
   const [activeHorizon, setActiveHorizon] = useState<string>('6m');
+  const [timeMachineHorizon, setTimeMachineHorizon] = useState<string>('1_year');
   const [analyzing, setAnalyzing] = useState(false);
+
+  const timeMachineSnapshots: Record<string, { label: string; buildings: { name: string; height: number; glow: string; color: string }[]; traffic: string; microservices: number; viability: string }> = {
+    today: {
+      label: 'Today',
+      buildings: [
+        { name: 'Auth Service', height: 45, glow: 'border-slate-700', color: 'bg-emerald-500' },
+        { name: 'Payment Gateway', height: 60, glow: 'border-slate-700', color: 'bg-emerald-500' },
+        { name: 'Checkout API', height: 50, glow: 'border-slate-700', color: 'bg-emerald-500' },
+        { name: 'Analytics Worker', height: 30, glow: 'border-slate-700', color: 'bg-emerald-500' },
+      ],
+      traffic: 'LOW (18.5K QPS)',
+      microservices: 4,
+      viability: '93.5%',
+    },
+    '6_months': {
+      label: '6 Months',
+      buildings: [
+        { name: 'Auth Service', height: 65, glow: 'border-amber-500/80 shadow-amber-500/30', color: 'bg-amber-500' },
+        { name: 'Payment Gateway', height: 85, glow: 'border-amber-500 shadow-amber-500/40', color: 'bg-amber-500' },
+        { name: 'Checkout API', height: 70, glow: 'border-slate-700', color: 'bg-emerald-500' },
+        { name: 'Analytics Worker', height: 45, glow: 'border-amber-500/50', color: 'bg-amber-500' },
+      ],
+      traffic: 'MODERATE (28K QPS)',
+      microservices: 5,
+      viability: '84.0%',
+    },
+    '1_year': {
+      label: '1 Year',
+      buildings: [
+        { name: 'Auth Service', height: 95, glow: 'border-rose-500 shadow-rose-500/50', color: 'bg-rose-500' },
+        { name: 'Payment Gateway (Legacy)', height: 110, glow: 'border-rose-600 shadow-rose-600/60 ring-2 ring-rose-500', color: 'bg-rose-600' },
+        { name: 'Checkout Microservice (New)', height: 40, glow: 'border-indigo-500 shadow-indigo-500/50', color: 'bg-indigo-500' },
+        { name: 'Analytics Worker', height: 60, glow: 'border-amber-500', color: 'bg-amber-500' },
+      ],
+      traffic: 'HIGH (45K QPS Cap Limit)',
+      microservices: 6,
+      viability: '74.2%',
+    },
+    '3_years': {
+      label: '3 Years',
+      buildings: [
+        { name: 'Auth Token Vault (gRPC)', height: 130, glow: 'border-indigo-500 shadow-indigo-500/50', color: 'bg-indigo-500' },
+        { name: 'Checkout Microservice', height: 110, glow: 'border-indigo-500', color: 'bg-indigo-500' },
+        { name: 'Sharded Postgres Cluster', height: 140, glow: 'border-cyan-500 shadow-cyan-500/50', color: 'bg-cyan-500' },
+      ],
+      traffic: 'OPTIMIZED (120K QPS)',
+      microservices: 8,
+      viability: '88.5%',
+    },
+    '5_years': {
+      label: '5 Years',
+      buildings: [
+        { name: 'Autonomous Mesh Core', height: 180, glow: 'border-purple-500 shadow-purple-500/60 ring-2 ring-purple-500', color: 'bg-purple-500' },
+        { name: 'Global Edge Gateway', height: 160, glow: 'border-cyan-500 shadow-cyan-500/50', color: 'bg-cyan-500' },
+        { name: 'Sharded Postgres Cluster', height: 170, glow: 'border-indigo-500', color: 'bg-indigo-500' },
+      ],
+      traffic: 'AUTONOMOUS (450K QPS)',
+      microservices: 12,
+      viability: '95.0%',
+    },
+  };
+
 
   const futureTimeline = [
     {
@@ -191,6 +254,78 @@ export default function FutureIntelligencePage() {
           Run 2-Year Predictive Simulation
         </button>
       </div>
+
+      {/* ULTIMATE WOW FEATURE: Engineering Time Machine */}
+
+      <div className="bg-gradient-to-br from-indigo-950/90 via-slate-900 to-purple-950/90 border border-indigo-500/40 rounded-2xl p-6 shadow-2xl space-y-6 relative overflow-hidden">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between border-b border-indigo-500/20 pb-4 gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-0.5 rounded bg-purple-500/20 text-purple-300 font-extrabold text-[11px] border border-purple-500/30 uppercase tracking-widest">
+                🌟 Ultimate "Wow" Feature
+              </span>
+              <h2 className="text-xl font-extrabold text-white flex items-center gap-2">
+                <Clock className="w-6 h-6 text-indigo-400 animate-pulse" /> Engineering Time Machine (Software City Future Evolution)
+              </h2>
+            </div>
+            <p className="text-slate-300 text-xs mt-1">
+              Travel into the future. Watch buildings grow, roads congest, technical debt glow, and microservices spawn/sunset automatically.
+            </p>
+          </div>
+
+          {/* Time Scrubber Controls */}
+          <div className="flex gap-1.5 bg-slate-950/80 p-1.5 rounded-xl border border-slate-800">
+            {Object.keys(timeMachineSnapshots).map((horizonKey) => (
+              <button
+                key={horizonKey}
+                onClick={() => setTimeMachineHorizon(horizonKey)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all border ${
+                  timeMachineHorizon === horizonKey
+                    ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg shadow-indigo-600/40 scale-105'
+                    : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {timeMachineSnapshots[horizonKey].label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 3D Software City Evolutionary View */}
+        <div className="bg-slate-950/90 rounded-xl border border-indigo-500/30 p-6 space-y-6">
+          <div className="flex justify-between items-center text-xs">
+            <span className="text-slate-400 font-semibold">
+              Temporal Horizon: <strong className="text-indigo-400 font-extrabold">{timeMachineSnapshots[timeMachineHorizon].label} State</strong>
+            </span>
+            <div className="flex gap-4">
+              <span className="text-slate-400">Road Traffic: <strong className="text-amber-400">{timeMachineSnapshots[timeMachineHorizon].traffic}</strong></span>
+              <span className="text-slate-400">Active Services: <strong className="text-emerald-400">{timeMachineSnapshots[timeMachineHorizon].microservices}</strong></span>
+              <span className="text-slate-400">City Viability: <strong className="text-indigo-400">{timeMachineSnapshots[timeMachineHorizon].viability}</strong></span>
+            </div>
+          </div>
+
+          {/* Software City Building Skyline Visualizer */}
+          <div className="h-44 border-b border-slate-800 flex items-end justify-center gap-6 px-4 pb-2">
+            {timeMachineSnapshots[timeMachineHorizon].buildings.map((bld, idx) => (
+              <div key={idx} className="flex flex-col items-center gap-2 group relative">
+                {/* Tech Debt Glow Ring */}
+                <div
+                  className={`w-14 rounded-t-lg transition-all duration-700 border-2 ${bld.glow} ${bld.color} flex flex-col justify-end p-1.5 shadow-xl`}
+                  style={{ height: `${bld.height}px` }}
+                >
+                  <span className="text-[9px] font-extrabold text-white text-center leading-none drop-shadow">
+                    {bld.height}m
+                  </span>
+                </div>
+                <span className="text-[10px] font-bold text-slate-300 max-w-[80px] text-center leading-tight">
+                  {bld.name}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
 
       {/* 2-Year Future Engineering Timeline */}
       <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">

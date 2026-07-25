@@ -7,9 +7,12 @@ from app.prediction_engine.architecture_forecast import ArchitectureForecastAI
 from app.prediction_engine.cloud_cost_forecast import CloudCostForecastEngine
 from app.prediction_engine.dependency_risk import DependencyFutureRiskPredictor
 from app.prediction_engine.engineering_calendar import EngineeringCalendarPredictor
+from app.prediction_engine.engineering_time_machine import EngineeringTimeMachineEngine
 from app.prediction_engine.experiment_simulator import AIExperimentSimulator
+from app.prediction_engine.explainable_predictions import ExplainablePredictionsEngine
 from app.prediction_engine.failure_chain_simulator import FailureChainSimulator
 from app.prediction_engine.future_dependency_graph import FutureDependencyGraphEngine
+from app.prediction_engine.future_digital_twin import FutureDigitalTwinEngine
 from app.prediction_engine.growth_ai import GrowthAI
 from app.prediction_engine.incident_ai import IncidentAI
 from app.prediction_engine.incident_predictor import IncidentPredictionAI
@@ -52,4 +55,7 @@ __all__ = [
     "AIExperimentSimulator",
     "FutureDependencyGraphEngine",
     "EngineeringCalendarPredictor",
+    "FutureDigitalTwinEngine",
+    "ExplainablePredictionsEngine",
+    "EngineeringTimeMachineEngine",
 ]

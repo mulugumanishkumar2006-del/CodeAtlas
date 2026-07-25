@@ -14,8 +14,11 @@ from app.prediction_engine import (
     CloudCostForecastEngine,
     DependencyFutureRiskPredictor,
     EngineeringCalendarPredictor,
+    EngineeringTimeMachineEngine,
+    ExplainablePredictionsEngine,
     FailureChainSimulator,
     FutureDependencyGraphEngine,
+    FutureDigitalTwinEngine,
     FutureEngineeringTimeline,
     GrowthAI,
     IncidentAI,
@@ -142,6 +145,15 @@ def test_prediction_engines():
 
         eng_cal = EngineeringCalendarPredictor().predict_engineering_calendar(db)
         assert len(eng_cal["milestones_and_windows"]) == 4
+
+        fut_twin = FutureDigitalTwinEngine().generate_future_digital_twin(db)
+        assert fut_twin["future_twin_version"] == "3.0-PREDICTIVE-TWIN"
+
+        expl = ExplainablePredictionsEngine().generate_explainable_predictions(db)
+        assert expl["prediction_confidence_score"] == 96.4
+
+        time_mach = EngineeringTimeMachineEngine().travel_to_future(db, "1_year")
+        assert len(time_mach["snapshot"]["software_city_buildings"]) >= 3
     finally:
         db.close()
 
@@ -173,3 +185,11 @@ def test_prediction_api_endpoints():
     assert client.get("/api/v1/prediction/experiment-simulator").status_code == 200
     assert client.get("/api/v1/prediction/future-dependency-graph").status_code == 200
     assert client.get("/api/v1/prediction/engineering-calendar").status_code == 200
+    assert client.get("/api/v1/prediction/future-digital-twin").status_code == 200
+    assert client.get("/api/v1/prediction/explainable-predictions").status_code == 200
+    assert (
+        client.get(
+            "/api/v1/prediction/time-machine-state?target_horizon=1_year"
+        ).status_code
+        == 200
+    )
