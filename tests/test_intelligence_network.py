@@ -5,9 +5,12 @@ import os
 import pytest
 from app.core.database import Base, get_db
 from app.intelligence_network import (
+    AIArchitectureCoach,
     AIPatternAdvisor,
+    AntiPatternDetector,
     ArchitectureKnowledgeGraph,
     ArchitecturePatternLibrary,
+    EngineeringTrendDetector,
     GlobalPatternRecommendationEngine,
     PatternExtractionEngine,
     RepositoryIntelligenceEngine,
@@ -68,6 +71,15 @@ def test_intelligence_network_engines():
 
         adv = AIPatternAdvisor().get_pattern_recommendations(db)
         assert len(adv) == 3
+
+        trends = EngineeringTrendDetector().get_global_trends(db)
+        assert len(trends["categories"]) == 4
+
+        anti = AntiPatternDetector().detect_anti_patterns(db)
+        assert anti["health_score"] == 88.4
+
+        coach = AIArchitectureCoach().get_coach_guidance(db)
+        assert "Circuit Breaker" in coach["pattern_gaps"][0]["missing_pattern"]
     finally:
         db.close()
 
@@ -85,3 +97,6 @@ def test_intelligence_network_api():
     assert client.get("/api/v1/network/pattern-library").status_code == 200
     assert client.get("/api/v1/network/similar-repositories").status_code == 200
     assert client.get("/api/v1/network/pattern-advisor").status_code == 200
+    assert client.get("/api/v1/network/trends").status_code == 200
+    assert client.get("/api/v1/network/anti-patterns").status_code == 200
+    assert client.get("/api/v1/network/architecture-coach").status_code == 200

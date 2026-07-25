@@ -217,10 +217,62 @@ export default function IntelligenceNetworkPage() {
               </div>
               <p className="text-slate-300">Takeaway: Uses partition-based idempotency keys to guarantee zero duplicate charges.</p>
             </div>
+      {/* Items 9 & 10: Anti-Pattern Detector & AI Architecture Coach */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Item 9: Anti-Pattern Detector */}
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
+              <ShieldAlert className="w-5 h-5 text-rose-400" /> Anti-Pattern Detector
+            </h3>
+            <span className="text-xs font-bold text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2.5 py-0.5 rounded">
+              88.4 HEALTH SCORE
+            </span>
+          </div>
+
+          <div className="space-y-3 text-xs">
+            <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1 border-l-4 border-l-rose-500">
+              <div className="flex justify-between items-center">
+                <span className="font-extrabold text-white">God Object Pattern</span>
+                <span className="text-[10px] font-bold text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded">HIGH SEVERITY</span>
+              </div>
+              <div className="text-slate-400 font-mono text-[11px]">legacy-payment-gateway/monolith_handler.py (3,400 LOC)</div>
+              <p className="text-slate-300">Single module handles billing, refund processing, audit logging, and email notifications.</p>
+            </div>
+            <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1 border-l-4 border-l-amber-500">
+              <div className="flex justify-between items-center">
+                <span className="font-extrabold text-white">Circular Dependency Risk</span>
+                <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded">MEDIUM SEVERITY</span>
+              </div>
+              <p className="text-slate-300">Orders-Router ➔ Inventory-Service ➔ Orders-Router status loop.</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Item 10: AI Architecture Coach */}
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-amber-400" /> AI Architecture Coach
+            </h3>
+            <span className="text-xs font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-0.5 rounded">
+              INTERACTIVE RATIONALE
+            </span>
+          </div>
+
+          <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2 text-xs">
+            <div className="font-extrabold text-amber-300">Why Event-Driven Architecture over REST polling?</div>
+            <p className="text-slate-300 leading-relaxed">
+              REST polling causes 85% redundant DB queries during idle windows. Event-Driven messaging consumes zero CPU until an event arrives, preserving resource capacity for spike loads.
+            </p>
+            <div className="text-[11px] text-cyan-400 font-semibold border-t border-slate-800 pt-2">
+              Suggested Gap: Register Circuit Breaker pattern (Resilience4j) on external Stripe API calls.
+            </div>
           </div>
         </div>
       </div>
     </div>
   );
 }
+
 
