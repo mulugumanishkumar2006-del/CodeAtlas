@@ -1,0 +1,288 @@
+// apps/web/src/app/brain/page.tsx
+'use client';
+
+import React, { useState } from 'react';
+import {
+  Brain,
+  Search,
+  BookOpen,
+  GitBranch,
+  GitCommit,
+  Layers,
+  Sparkles,
+  HelpCircle,
+  FileText,
+  Clock,
+  Database,
+  ArrowRight,
+  ShieldCheck,
+  Zap,
+} from 'lucide-react';
+
+export default function EngineeringBrainPage() {
+  const [queryInput, setQueryInput] = useState('Why did we choose Kafka instead of RabbitMQ?');
+  const [activeQueryResult, setActiveQueryResult] = useState<{
+    question: string;
+    answer: string;
+    sources: { type: string; title: string; date: string }[];
+    confidence: number;
+  } | null>({
+    question: 'Why did we choose Kafka instead of RabbitMQ?',
+    answer:
+      'Kafka was chosen over RabbitMQ in ADR 004 (Nov 2025) because our event bus required strict log replayability for audit compliance and >100,000 QPS throughput during peak sales events, whereas RabbitMQ lacked native partition replay capabilities.',
+    sources: [
+      { type: 'ADR', title: 'ADR 004: Event Bus Architecture Selection', date: '2025-11-14' },
+      { type: 'MEETING_NOTES', title: 'Architecture Guild Q4 Review', date: '2025-11-12' },
+    ],
+    confidence: 98.2,
+  });
+
+  const presetQuestions = [
+    'Why did we choose Kafka instead of RabbitMQ?',
+    'Why was Orders split into two services?',
+    'Why did latency suddenly improve six months ago?',
+  ];
+
+  const handleAskQuestion = (qText: string) => {
+    setQueryInput(qText);
+    const qLower = qText.toLowerCase();
+
+    if (qLower.includes('kafka') || qLower.includes('rabbitmq')) {
+      setActiveQueryResult({
+        question: qText,
+        answer:
+          'Kafka was chosen over RabbitMQ in ADR 004 (Nov 2025) because our event bus required strict log replayability for audit compliance and >100,000 QPS throughput during peak sales events, whereas RabbitMQ lacked native partition replay capabilities.',
+        sources: [
+          { type: 'ADR', title: 'ADR 004: Event Bus Architecture Selection', date: '2025-11-14' },
+          { type: 'MEETING_NOTES', title: 'Architecture Guild Q4 Review', date: '2025-11-12' },
+        ],
+        confidence: 98.2,
+      });
+    } else if (qLower.includes('orders') || qLower.includes('split')) {
+      setActiveQueryResult({
+        question: qText,
+        answer:
+          'Orders was split into Orders-Router and Orders-Fulfillment in PR #182 (Feb 2026) to resolve database row lock contention on the primary Postgres cluster during peak order processing.',
+        sources: [
+          { type: 'PULL_REQUEST', title: 'PR #182: Microservice Extraction - Orders', date: '2026-02-10' },
+          { type: 'INCIDENT', title: 'INC-882: Order DB Lock Timeout', date: '2026-02-04' },
+        ],
+        confidence: 96.5,
+      });
+    } else {
+      setActiveQueryResult({
+        question: qText,
+        answer:
+          'Latency suddenly improved by 65% in Jan 2026 due to PR #145 deploying a Redis L2 write-through cache for user permissions, bypassing 14,000 DB queries/sec.',
+        sources: [
+          { type: 'COMMIT', title: 'feat(cache): Redis L2 Permission Cache (a1b2c3d4)', date: '2026-01-18' },
+          { type: 'METRICS', title: 'APM p95 Latency Reduction Benchmark', date: '2026-01-19' },
+        ],
+        confidence: 97.8,
+      });
+    }
+  };
+
+  const adrList = [
+    {
+      id: 'ADR-001',
+      title: 'Adoption of FastAPI & Next.js Stack',
+      status: 'ACCEPTED',
+      date: '2025-08-01',
+      rationale: 'High productivity, native async Python performance, and React Server Components.',
+    },
+    {
+      id: 'ADR-004',
+      title: 'Kafka Event Bus over RabbitMQ',
+      status: 'ACCEPTED',
+      date: '2025-11-14',
+      rationale: 'Log replayability, 100K+ QPS throughput capability, and offset tracking.',
+    },
+    {
+      id: 'ADR-009',
+      title: 'Modular Monolith to Microservices Transition Strategy',
+      status: 'ACCEPTED',
+      date: '2026-03-02',
+      rationale: 'Isolate high-frequency payment write IOPS into autonomous services.',
+    },
+  ];
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100 p-8 space-y-8">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between border-b border-slate-800 pb-6 gap-4">
+        <div>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2.5 bg-purple-600/20 border border-purple-500/30 rounded-xl text-purple-400">
+              <Brain className="w-8 h-8" />
+            </div>
+            <div>
+              <span className="text-xs font-semibold uppercase tracking-wider text-purple-400 bg-purple-500/10 px-2.5 py-0.5 rounded-md border border-purple-500/20">
+                Phase 23 • Engineering Memory Graph
+              </span>
+              <h1 className="text-3xl font-extrabold text-white tracking-tight mt-1">
+                The Permanent Engineering Brain
+              </h1>
+            </div>
+          </div>
+          <p className="text-slate-400 text-sm max-w-3xl">
+            Preserves permanent institutional memory across commits, PRs, architecture decisions (ADRs), incidents, meeting notes, and metric milestones. Never lose context again.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3 bg-slate-900 border border-slate-800 px-4 py-2 rounded-xl text-xs">
+          <ShieldCheck className="w-4 h-4 text-emerald-400" />
+          <span className="text-slate-300 font-bold">1,420 Memory Nodes Indexed</span>
+        </div>
+      </div>
+
+      {/* Interactive Q&A Search */}
+      <div className="bg-gradient-to-br from-purple-950/40 via-slate-900 to-indigo-950/40 border border-purple-500/30 rounded-2xl p-6 shadow-2xl space-y-6">
+        <div className="space-y-2">
+          <label className="text-sm font-extrabold text-purple-300 flex items-center gap-2">
+            <HelpCircle className="w-4 h-4 text-purple-400" /> Ask the Engineering Brain
+          </label>
+
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="w-5 h-5 text-slate-400 absolute left-3.5 top-3" />
+              <input
+                type="text"
+                value={queryInput}
+                onChange={(e) => setQueryInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAskQuestion(queryInput)}
+                placeholder="Ask any historical decision or architecture question..."
+                className="w-full bg-slate-950 border border-slate-800 focus:border-purple-500 text-slate-100 text-sm rounded-xl pl-11 pr-4 py-2.5 outline-none transition-all"
+              />
+            </div>
+            <button
+              onClick={() => handleAskQuestion(queryInput)}
+              className="bg-purple-600 hover:bg-purple-500 text-white font-extrabold px-6 py-2.5 rounded-xl text-xs transition-all flex items-center gap-2 shadow-lg shadow-purple-600/30"
+            >
+              <Sparkles className="w-4 h-4" /> Recall Memory
+            </button>
+          </div>
+        </div>
+
+        {/* Preset Sample Queries */}
+        <div className="flex flex-wrap gap-2 text-xs">
+          <span className="text-slate-400 self-center font-bold">Sample Queries:</span>
+          {presetQuestions.map((q, idx) => (
+            <button
+              key={idx}
+              onClick={() => handleAskQuestion(q)}
+              className="bg-slate-900 hover:bg-slate-800 border border-slate-700 text-purple-300 px-3 py-1 rounded-lg text-xs transition-all font-medium"
+            >
+              "{q}"
+            </button>
+          ))}
+        </div>
+
+        {/* Active Query Answer Card */}
+        {activeQueryResult && (
+          <div className="bg-slate-950/90 rounded-xl border border-purple-500/40 p-5 space-y-4 shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
+                <Brain className="w-4 h-4 text-purple-400" /> {activeQueryResult.question}
+              </h3>
+              <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded">
+                {activeQueryResult.confidence}% CONFIDENCE
+              </span>
+            </div>
+
+            <p className="text-xs text-slate-200 leading-relaxed bg-slate-900/60 p-3.5 rounded-lg border border-slate-800/80">
+              {activeQueryResult.answer}
+            </p>
+
+            <div className="space-y-1.5 text-xs">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                Preserved Evidence Sources:
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {activeQueryResult.sources.map((src, idx) => (
+                  <div key={idx} className="bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-lg flex items-center gap-2">
+                    <BookOpen className="w-3.5 h-3.5 text-purple-400" />
+                    <span className="font-bold text-white text-[11px]">{src.title}</span>
+                    <span className="text-[10px] text-slate-400">({src.date})</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Main Grid: ADRs & Memory Topology */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* ADR Explorer */}
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h2 className="text-base font-extrabold text-white flex items-center gap-2">
+              <FileText className="w-5 h-5 text-indigo-400" /> Architecture Decision Records (ADRs)
+            </h2>
+            <span className="text-xs font-bold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2.5 py-0.5 rounded">
+              DECISION REPOSITORY
+            </span>
+          </div>
+
+          <div className="space-y-3 text-xs">
+            {adrList.map((adr) => (
+              <div key={adr.id} className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <span className="font-extrabold text-indigo-400 text-xs">{adr.id} • {adr.title}</span>
+                  <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                    {adr.status}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-300 leading-tight">{adr.rationale}</p>
+                <div className="text-[10px] text-slate-500 text-right">Accepted: {adr.date}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Memory Graph Entity Breakdown */}
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h2 className="text-base font-extrabold text-white flex items-center gap-2">
+              <Layers className="w-5 h-5 text-purple-400" /> Indexed Memory Topology
+            </h2>
+            <span className="text-xs font-bold text-purple-400 bg-purple-500/10 border border-purple-500/20 px-2.5 py-0.5 rounded">
+              5,840 EDGES
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 text-xs">
+            <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-1">
+              <div className="text-slate-400 flex items-center gap-1.5">
+                <GitCommit className="w-4 h-4 text-emerald-400" /> Commits Indexed
+              </div>
+              <div className="text-xl font-extrabold text-white">840 Commits</div>
+            </div>
+
+            <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-1">
+              <div className="text-slate-400 flex items-center gap-1.5">
+                <GitBranch className="w-4 h-4 text-indigo-400" /> Pull Requests
+              </div>
+              <div className="text-xl font-extrabold text-white">320 PRs</div>
+            </div>
+
+            <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-1">
+              <div className="text-slate-400 flex items-center gap-1.5">
+                <FileText className="w-4 h-4 text-amber-400" /> ADRs Preserved
+              </div>
+              <div className="text-xl font-extrabold text-white">45 ADRs</div>
+            </div>
+
+            <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-1">
+              <div className="text-slate-400 flex items-center gap-1.5">
+                <Clock className="w-4 h-4 text-rose-400" /> Incidents Linked
+              </div>
+              <div className="text-xl font-extrabold text-white">28 Incidents</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

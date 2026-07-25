@@ -17,6 +17,7 @@ from app.api.v1 import (
     health,
     health_intelligence,
     knowledge,
+    memory_router,
     prediction_router,
     reality_router,
     reliability,
@@ -25,7 +26,6 @@ from app.api.v1 import (
     tech_debt,
     visual_router,
 )
-
 
 # pyrefly: ignore [missing-import]
 from app.core.config import settings
@@ -145,4 +145,8 @@ app.include_router(
     prefix=settings.API_V1_STR,
     tags=["prediction"],
 )
-
+app.include_router(
+    memory_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["memory"],
+)
