@@ -39,6 +39,7 @@ interface NavigationItem {
 
 const navigation: NavigationItem[] = [
                         { name: '🖥️ CodeAtlas OS Kernel', href: '/os', icon: Monitor },
+                        { name: '🌐 Engineering Reality Engine', href: '/reality', icon: Activity },
                         { name: '🌌 Visual Experience World', href: '/visual', icon: Globe },
                         {
                                                 name: '🏥 Health Intelligence',

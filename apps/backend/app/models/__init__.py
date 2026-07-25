@@ -64,6 +64,11 @@ from app.models.organization import (
     EnterpriseMetricSnapshot,
     Organization,
 )
+from app.models.reality_twin import (
+    IncidentSimulationRecord,
+    ProductionTelemetryMetric,
+    RealityTwinNode,
+)
 from app.models.relationship import Relationship
 from app.models.reliability import ReliabilityPrediction, ReliabilitySummary
 from app.models.repository import Repository

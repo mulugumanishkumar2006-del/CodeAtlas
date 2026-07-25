@@ -17,6 +17,7 @@ from app.api.v1 import (
     health,
     health_intelligence,
     knowledge,
+    reality_router,
     reliability,
     repositories,
     software_world,
@@ -131,4 +132,9 @@ app.include_router(
     visual_router.router,
     prefix=settings.API_V1_STR,
     tags=["visual"],
+)
+app.include_router(
+    reality_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["reality"],
 )
