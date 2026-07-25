@@ -110,12 +110,37 @@ export default function FutureIntelligencePage() {
     ],
   };
 
+  const perfPredictions = {
+    latency: '42ms ➔ 480ms p95',
+    dbStorage: '412 GB ➔ 1.45 TB (24m)',
+    cachePressure: '88.1% ➔ 98.5% (Eviction Alert)',
+    queueLag: '1,420 ➔ 18,400 msg backlog',
+  };
+
+  const failureChainSteps = [
+    { step: 1, svc: 'Postgres Primary DB', impact: 'Connection Pool Saturation (100%)', time: '0s' },
+    { step: 2, svc: 'legacy-payment-gateway', impact: 'Thread Exhaustion (1800ms p95)', time: '+4s' },
+    { step: 3, svc: 'checkout-api', impact: 'HTTP 504 Timeout & Circuit Trip', time: '+12s' },
+    { step: 4, svc: 'AWS ALB Ingress', impact: '14.2% HTTP 5xx Error Surge', time: '+25s' },
+  ];
+
+  const techObsolescenceItems = [
+    { tech: 'Python 3.8 / FastAPI v0.68', status: 'EOL October 2026', action: 'Migrate to Python 3.12 + FastAPI 0.110+' },
+    { tech: 'PyYAML v5.3.1', status: 'Critical CVE Vulnerability', action: 'Upgrade to PyYAML >= 6.0 immediately' },
+  ];
+
+  const refactoringDeadlines = [
+    { module: 'legacy-payment-service', deadline: 'Q4 2026 (4 Months left)', urgency: 'CRITICAL', score: 42.0 },
+    { module: 'analytics-batch-worker', deadline: 'Q2 2027 (10 Months left)', urgency: 'MEDIUM', score: 58.4 },
+  ];
+
   const handleRunFutureAnalysis = () => {
     setAnalyzing(true);
     setTimeout(() => {
       setAnalyzing(false);
     }, 500);
   };
+
 
 
   return (
@@ -323,30 +348,125 @@ export default function FutureIntelligencePage() {
         </div>
       </div>
 
-      {/* Item 3: Technical Debt Growth Simulator */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-          <h2 className="text-base font-extrabold text-white flex items-center gap-2">
-            <Activity className="w-5 h-5 text-amber-400" /> Technical Debt Growth Simulator
-          </h2>
-          <span className="text-xs font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-0.5 rounded">
-            FUTURE DEBT SIMULATION
-          </span>
+      {/* Item 6 & Item 11: Performance Prediction & Failure Chain Simulator */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Performance Prediction */}
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h2 className="text-base font-extrabold text-white flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-indigo-400" /> Performance Projections (API, DB, Cache, Queue)
+            </h2>
+            <span className="text-xs font-bold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2.5 py-0.5 rounded">
+              REALTIME METRICS
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2.5 text-xs">
+            <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
+              <span className="text-slate-400 block mb-1">API Latency p95</span>
+              <span className="font-extrabold text-amber-400">{perfPredictions.latency}</span>
+            </div>
+            <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
+              <span className="text-slate-400 block mb-1">Database Storage</span>
+              <span className="font-extrabold text-cyan-400">{perfPredictions.dbStorage}</span>
+            </div>
+            <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
+              <span className="text-slate-400 block mb-1">Cache Pressure</span>
+              <span className="font-extrabold text-rose-400">{perfPredictions.cachePressure}</span>
+            </div>
+            <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
+              <span className="text-slate-400 block mb-1">Queue Congestion</span>
+              <span className="font-extrabold text-orange-400">{perfPredictions.queueLag}</span>
+            </div>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 text-center">
-          {techDebtSimulationTrajectory.map((step, idx) => (
-            <div key={idx} className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-2">
-              <span className="text-xs text-slate-400 font-semibold block">{step.label}</span>
-              <span className="text-2xl font-extrabold text-white">{step.debt}%</span>
-              <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                <div className={`${step.color} h-full rounded-full`} style={{ width: `${step.debt}%` }}></div>
+        {/* Item 11: Failure Chain Simulator */}
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h2 className="text-base font-extrabold text-white flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-rose-400" /> Failure Chain Simulator (Cascading Outage)
+            </h2>
+            <span className="text-xs font-bold text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2.5 py-0.5 rounded">
+              CASCADING RISK
+            </span>
+          </div>
+
+          <div className="space-y-2 text-xs">
+            {failureChainSteps.map((step) => (
+              <div key={step.step} className="bg-slate-950 p-2.5 rounded-lg border border-slate-800 flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <span className="w-4 h-4 rounded-full bg-rose-500/20 text-rose-400 text-[10px] font-bold flex items-center justify-center">
+                    {step.step}
+                  </span>
+                  <span className="font-bold text-white">{step.svc}</span>
+                </div>
+                <div className="text-[11px] text-slate-300">
+                  {step.impact} <strong className="text-amber-400">({step.time})</strong>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Item 9 & 13: Tech Obsolescence & Refactoring Deadline Predictor */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Item 9: Technology Obsolescence Detector */}
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h2 className="text-base font-extrabold text-white flex items-center gap-2">
+              <Sliders className="w-5 h-5 text-cyan-400" /> Technology Obsolescence & EOL Detector
+            </h2>
+            <span className="text-xs font-bold text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-0.5 rounded">
+              SUPPORT SUNSET
+            </span>
+          </div>
+
+          <div className="space-y-2 text-xs">
+            {techObsolescenceItems.map((item, idx) => (
+              <div key={idx} className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1">
+                <div className="flex justify-between items-center">
+                  <span className="font-bold text-white">{item.tech}</span>
+                  <span className="text-[10px] font-bold text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded">{item.status}</span>
+                </div>
+                <div className="text-[11px] text-emerald-400">Recommended Action: {item.action}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Item 13: Refactoring Deadline Predictor */}
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h2 className="text-base font-extrabold text-white flex items-center gap-2">
+              <Clock className="w-5 h-5 text-amber-400" /> Refactoring Deadline Predictor
+            </h2>
+            <span className="text-xs font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-0.5 rounded">
+              OPTIMAL REFACTOR WINDOW
+            </span>
+          </div>
+
+          <div className="space-y-2 text-xs">
+            {refactoringDeadlines.map((item, idx) => (
+              <div key={idx} className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex justify-between items-center">
+                <div>
+                  <div className="font-bold text-white">{item.module}</div>
+                  <div className="text-[11px] text-slate-400">Current Maintainability: {item.score}</div>
+                </div>
+                <div className="text-right">
+                  <span className="text-xs font-extrabold text-rose-400 block">{item.deadline}</span>
+                  <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded inline-block mt-0.5">
+                    {item.urgency} URGENCY
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
   );
 }
+
 

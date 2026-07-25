@@ -6,16 +6,24 @@ import pytest
 from app.core.database import Base, get_db
 from app.main import app
 from app.prediction_engine import (
+    AIArchitectureEvolutionAdvisor,
     ArchitectureEvolutionPredictor,
     ArchitectureForecastAI,
+    CloudCostForecastEngine,
+    DependencyFutureRiskPredictor,
+    FailureChainSimulator,
     FutureEngineeringTimeline,
     GrowthAI,
     IncidentAI,
     IncidentPredictionAI,
+    KnowledgeDecayPredictor,
+    PerformancePredictionEngine,
+    RefactoringDeadlinePredictor,
     RepoFutureForecastEngine,
     TeamGrowthPlanner,
     TechDebtGrowthSimulator,
     TechnicalDebtAI,
+    TechObsolescenceDetector,
 )
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -82,6 +90,30 @@ def test_prediction_engines():
             team_plan["team_growth_plan"]["role_breakdown"]["software_engineers_needed"]
             == 8
         )
+
+        perf = PerformancePredictionEngine().predict_performance(db)
+        assert perf["prediction_status"] == "REALTIME_PERFORMANCE_FORECAST_READY"
+
+        cost_fc = CloudCostForecastEngine().forecast_cloud_costs(db)
+        assert len(cost_fc["horizons"]) == 3
+
+        arch_adv = AIArchitectureEvolutionAdvisor().suggest_architecture_evolution(db)
+        assert len(arch_adv["proactive_suggestions"]) >= 2
+
+        obs = TechObsolescenceDetector().detect_obsolescence(db)
+        assert len(obs["detected_obsolescence_risks"]) >= 2
+
+        dep_risk = DependencyFutureRiskPredictor().predict_dependency_risks(db)
+        assert len(dep_risk["dependencies_at_risk"]) >= 2
+
+        fail_chain = FailureChainSimulator().simulate_failure_chain(db)
+        assert len(fail_chain["cascading_trajectory"]) == 4
+
+        know = KnowledgeDecayPredictor().predict_knowledge_decay(db)
+        assert len(know["key_contributor_risk"]) >= 1
+
+        ref_dl = RefactoringDeadlinePredictor().predict_refactoring_deadlines(db)
+        assert len(ref_dl["optimal_refactoring_windows"]) >= 2
     finally:
         db.close()
 
@@ -98,3 +130,11 @@ def test_prediction_api_endpoints():
     assert client.get("/api/v1/prediction/tech-debt-growth").status_code == 200
     assert client.get("/api/v1/prediction/incident-predictions").status_code == 200
     assert client.get("/api/v1/prediction/team-growth-planner").status_code == 200
+    assert client.get("/api/v1/prediction/performance-prediction").status_code == 200
+    assert client.get("/api/v1/prediction/cloud-cost-forecast").status_code == 200
+    assert client.get("/api/v1/prediction/ai-architecture-evolution").status_code == 200
+    assert client.get("/api/v1/prediction/tech-obsolescence").status_code == 200
+    assert client.get("/api/v1/prediction/dependency-future-risk").status_code == 200
+    assert client.get("/api/v1/prediction/simulate-failure-chain").status_code == 200
+    assert client.get("/api/v1/prediction/knowledge-decay").status_code == 200
+    assert client.get("/api/v1/prediction/refactoring-deadlines").status_code == 200
