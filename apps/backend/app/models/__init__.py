@@ -16,6 +16,7 @@ from app.models.architecture import (
     ComplianceHistory,
     GovernancePolicy,
 )
+from app.models.autonomous_task import AutonomousTask
 from app.models.council_decision_memory import CouncilDecisionMemory
 from app.models.cto_strategy_history import CTOStrategyHistory
 from app.models.digital_twin import DigitalTwinChange, DigitalTwinSession

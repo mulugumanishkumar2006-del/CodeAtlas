@@ -7,6 +7,7 @@ from app.api.v1 import (
     architect,
     architecture_drift,
     auth,
+    autonomous_router,
     council_router,
     digital_twin,
     evolution,
@@ -99,4 +100,9 @@ app.include_router(
     council_router.router,
     prefix=settings.API_V1_STR,
     tags=["council"],
+)
+app.include_router(
+    autonomous_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["autonomous"],
 )

@@ -65,6 +65,7 @@ const navigation: NavigationItem[] = [
                         },
                         { name: 'AI CTO', href: '/ai-cto', icon: Settings },
                         { name: 'AI Engineering Council', href: '/council', icon: Users },
+                        { name: 'Autonomous Platform', href: '/autonomous', icon: Sparkles },
                         { name: 'Enterprise Twin', href: '/enterprise-twin', icon: Server },
                         {
                                                 name: '🧭 Interactive Tour',
