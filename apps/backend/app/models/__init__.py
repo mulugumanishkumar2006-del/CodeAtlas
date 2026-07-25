@@ -72,3 +72,8 @@ from app.models.setting import Setting
 from app.models.symbol import Symbol
 from app.models.tech_debt import HealthScore, RiskForecast, TechnicalDebtReport
 from app.models.user import User
+from app.models.visual_experience import (
+    AIDebateSession,
+    EngineeringAchievement,
+    ServiceHeartbeatLog,
+)

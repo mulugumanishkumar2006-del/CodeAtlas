@@ -21,6 +21,7 @@ from app.api.v1 import (
     repositories,
     software_world,
     tech_debt,
+    visual_router,
 )
 
 # pyrefly: ignore [missing-import]
@@ -125,4 +126,9 @@ app.include_router(
     codeatlas_os_router.router,
     prefix=settings.API_V1_STR,
     tags=["os"],
+)
+app.include_router(
+    visual_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["visual"],
 )
