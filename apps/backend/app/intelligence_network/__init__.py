@@ -2,6 +2,7 @@
 
 from app.intelligence_network.anti_pattern_detector import AntiPatternDetector
 from app.intelligence_network.architecture_coach import AIArchitectureCoach
+from app.intelligence_network.benchmark_suite import GlobalBenchmarkingSuite
 from app.intelligence_network.network_graph import ArchitectureKnowledgeGraph
 from app.intelligence_network.pattern_advisor import AIPatternAdvisor
 from app.intelligence_network.pattern_extraction import PatternExtractionEngine
@@ -24,4 +25,5 @@ __all__ = [
     "EngineeringTrendDetector",
     "AntiPatternDetector",
     "AIArchitectureCoach",
+    "GlobalBenchmarkingSuite",
 ]

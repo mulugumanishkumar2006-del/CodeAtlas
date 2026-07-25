@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.intelligence_network.anti_pattern_detector import AntiPatternDetector
 from app.intelligence_network.architecture_coach import AIArchitectureCoach
+from app.intelligence_network.benchmark_suite import GlobalBenchmarkingSuite
 from app.intelligence_network.network_graph import ArchitectureKnowledgeGraph
 from app.intelligence_network.pattern_advisor import AIPatternAdvisor
 from app.intelligence_network.pattern_extraction import PatternExtractionEngine
@@ -22,6 +23,11 @@ from app.intelligence_network.trend_detector import EngineeringTrendDetector
 router = APIRouter(
     prefix="/network", tags=["Engineering Intelligence Network (The Software Internet)"]
 )
+
+
+@router.get("/global-benchmarks")
+def run_global_benchmarks(db: Session = Depends(get_db)) -> Dict[str, Any]:
+    return GlobalBenchmarkingSuite().run_global_benchmarks(db)
 
 
 @router.get("/trends")

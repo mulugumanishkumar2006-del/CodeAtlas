@@ -269,10 +269,73 @@ export default function IntelligenceNetworkPage() {
               Suggested Gap: Register Circuit Breaker pattern (Resilience4j) on external Stripe API calls.
             </div>
           </div>
+      {/* Items 11–20: Global 10D Benchmarking Suite */}
+      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+            <CheckCircle2 className="w-5 h-5 text-emerald-400" /> Global 10D Benchmarking & Modernization Suite
+          </h3>
+          <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded">
+            TOP 5% GLOBAL RANK
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 text-xs">
+          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1">
+            <span className="font-extrabold text-cyan-400">11. Tech Migration</span>
+            <div className="text-white font-bold">REST ➔ gRPC</div>
+            <p className="text-[11px] text-slate-400">74.2% adoption in top high-QPS repos.</p>
+          </div>
+          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1">
+            <span className="font-extrabold text-indigo-400">12. API Design</span>
+            <div className="text-white font-bold">96.4 / 100</div>
+            <p className="text-[11px] text-slate-400">OpenAPI 3.1 Strict Schema (Top 5%).</p>
+          </div>
+          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1">
+            <span className="font-extrabold text-emerald-400">13. Database</span>
+            <div className="text-white font-bold">92.0% Efficiency</div>
+            <p className="text-[11px] text-slate-400">PgBouncer + Sub-2ms Read Latency.</p>
+          </div>
+          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1">
+            <span className="font-extrabold text-purple-400">14. Security Posture</span>
+            <div className="text-white font-bold">Top 2% Globally</div>
+            <p className="text-[11px] text-slate-400">RS256 JWT Rotation & zero vulnerabilities.</p>
+          </div>
+          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1">
+            <span className="font-extrabold text-amber-400">15. Testing Maturity</span>
+            <div className="text-white font-bold">94.8% Coverage</div>
+            <p className="text-[11px] text-slate-400">Exceeds 80.0% global average.</p>
+          </div>
+          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1">
+            <span className="font-extrabold text-rose-400">16. Doc Maturity</span>
+            <div className="text-white font-bold">88.5% Docstrings</div>
+            <p className="text-[11px] text-slate-400">Top 12% global documentation score.</p>
+          </div>
+          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1">
+            <span className="font-extrabold text-teal-400">17. Dependencies</span>
+            <div className="text-white font-bold">100% Up to Date</div>
+            <p className="text-[11px] text-slate-400">0 outdated dependencies.</p>
+          </div>
+          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1">
+            <span className="font-extrabold text-blue-400">18. Deployment</span>
+            <div className="text-white font-bold">GitOps Blue-Green</div>
+            <p className="text-[11px] text-slate-400">98/100 automation benchmark.</p>
+          </div>
+          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1">
+            <span className="font-extrabold text-sky-400">19. Cloud Arch</span>
+            <div className="text-white font-bold">AWS EKS Multi-AZ</div>
+            <p className="text-[11px] text-slate-400">92.4/100 cost efficiency.</p>
+          </div>
+          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1">
+            <span className="font-extrabold text-orange-400">20. Performance</span>
+            <div className="text-white font-bold">18ms / 45K QPS</div>
+            <p className="text-[11px] text-slate-400">Top 3% throughput globally.</p>
+          </div>
         </div>
       </div>
     </div>
   );
 }
+
 
 

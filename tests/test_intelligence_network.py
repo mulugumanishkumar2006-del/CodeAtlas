@@ -11,6 +11,7 @@ from app.intelligence_network import (
     ArchitectureKnowledgeGraph,
     ArchitecturePatternLibrary,
     EngineeringTrendDetector,
+    GlobalBenchmarkingSuite,
     GlobalPatternRecommendationEngine,
     PatternExtractionEngine,
     RepositoryIntelligenceEngine,
@@ -80,6 +81,9 @@ def test_intelligence_network_engines():
 
         coach = AIArchitectureCoach().get_coach_guidance(db)
         assert "Circuit Breaker" in coach["pattern_gaps"][0]["missing_pattern"]
+
+        bm = GlobalBenchmarkingSuite().run_global_benchmarks(db)
+        assert len(bm["dimensions"]) == 10
     finally:
         db.close()
 
@@ -100,3 +104,4 @@ def test_intelligence_network_api():
     assert client.get("/api/v1/network/trends").status_code == 200
     assert client.get("/api/v1/network/anti-patterns").status_code == 200
     assert client.get("/api/v1/network/architecture-coach").status_code == 200
+    assert client.get("/api/v1/network/global-benchmarks").status_code == 200
