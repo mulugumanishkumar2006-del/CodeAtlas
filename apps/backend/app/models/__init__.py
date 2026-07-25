@@ -17,6 +17,11 @@ from app.models.architecture import (
     GovernancePolicy,
 )
 from app.models.autonomous_task import AutonomousTask
+from app.models.codeatlas_os import (
+    OSKernelSession,
+    ToolAdapterIntegration,
+    UniversalQueryEvent,
+)
 from app.models.council_decision_memory import CouncilDecisionMemory
 from app.models.cto_strategy_history import CTOStrategyHistory
 from app.models.digital_twin import DigitalTwinChange, DigitalTwinSession
@@ -49,6 +54,11 @@ from app.models.memory_models import (
     RepositoryMemory,
 )
 from app.models.metric import Metric
+from app.models.organization import (
+    CrossRepoDependency,
+    EnterpriseMetricSnapshot,
+    Organization,
+)
 from app.models.relationship import Relationship
 from app.models.reliability import ReliabilityPrediction, ReliabilitySummary
 from app.models.repository import Repository

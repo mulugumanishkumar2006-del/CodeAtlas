@@ -20,6 +20,10 @@ class Repository(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     summary = Column(String, nullable=True)
     graph_version = Column(String, default="1.0.0", nullable=False)
+    organization_id = Column(
+        String(36), ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True
+    )
+    language = Column(String, nullable=True)
 
     owner = relationship("User", back_populates="repositories")
     jobs = relationship(

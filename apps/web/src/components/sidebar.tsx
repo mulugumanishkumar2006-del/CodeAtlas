@@ -23,6 +23,8 @@ import {
                         Sparkles,
                         Server,
                         Users,
+                        Building2,
+                        Monitor,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTour } from '@/context/tour-context';
@@ -36,6 +38,7 @@ interface NavigationItem {
 }
 
 const navigation: NavigationItem[] = [
+                        { name: '🖥️ CodeAtlas OS Kernel', href: '/os', icon: Monitor },
                         {
                                                 name: '🏥 Health Intelligence',
                                                 href: '/health-intelligence',
@@ -66,6 +69,7 @@ const navigation: NavigationItem[] = [
                         { name: 'AI CTO', href: '/ai-cto', icon: Settings },
                         { name: 'AI Engineering Council', href: '/council', icon: Users },
                         { name: 'Autonomous Platform', href: '/autonomous', icon: Sparkles },
+                        { name: 'Enterprise Portfolio', href: '/enterprise', icon: Building2 },
                         { name: 'Enterprise Twin', href: '/enterprise-twin', icon: Server },
                         {
                                                 name: '🧭 Interactive Tour',

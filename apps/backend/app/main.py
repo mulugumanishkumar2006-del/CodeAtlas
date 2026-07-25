@@ -8,8 +8,10 @@ from app.api.v1 import (
     architecture_drift,
     auth,
     autonomous_router,
+    codeatlas_os_router,
     council_router,
     digital_twin,
+    enterprise_router,
     evolution,
     graph,
     health,
@@ -105,4 +107,14 @@ app.include_router(
     autonomous_router.router,
     prefix=settings.API_V1_STR,
     tags=["autonomous"],
+)
+app.include_router(
+    enterprise_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["enterprise"],
+)
+app.include_router(
+    codeatlas_os_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["os"],
 )
