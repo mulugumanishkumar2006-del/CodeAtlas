@@ -25,9 +25,11 @@ from app.api.v1 import (
 
 # pyrefly: ignore [missing-import]
 from app.core.config import settings
+from app.core.exceptions import CodeAtlasException, codeatlas_exception_handler
 
 # pyrefly: ignore [missing-import]
 from app.core.logging import setup_logging
+from app.core.middleware import CorrelationAndLoggingMiddleware
 from app.core.neo4j_client import neo4j_client
 from app.health.api.health_router import router as health_advisor_router
 
@@ -52,6 +54,12 @@ def startup_event():
 def shutdown_event():
     neo4j_client.close()
 
+
+# Exception Handler
+app.add_exception_handler(CodeAtlasException, codeatlas_exception_handler)
+
+# Correlation & Logging Middleware
+app.add_middleware(CorrelationAndLoggingMiddleware)
 
 # CORS configuration
 app.add_middleware(

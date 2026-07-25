@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+                        name: codeatlas-backend
+                        namespace: codeatlas
+                        labels:
+                                                app: codeatlas-backend
+spec:
+                        replicas: 3
+                        selector:
+                                                matchLabels:
+                                                                        app: codeatlas-backend
+                        template:
+                                                metadata:
+                                                                        labels:
+                                                                                                app: codeatlas-backend
+                                                spec:
+                                                                        containers:
+                                                                                                - name: backend
+                                                                                                  image: ghcr.io/mulugumanishkumar2006-del/codeatlas-backend:latest
+                                                                                                  ports:
+                                                                                                                          - containerPort: 8000
+                                                                                                  envFrom:
+                                                                                                                          - secretRef:
+                                                                                                                                                    name: codeatlas-secrets
+                                                                                                  resources:
+                                                                                                                          requests:
+                                                                                                                                                  memory: '512Mi'
+                                                                                                                                                  cpu: '250m'
+                                                                                                                          limits:
+                                                                                                                                                  memory: '2Gi'
+                                                                                                                                                  cpu: '1000m'
+                                                                                                  livenessProbe:
+                                                                                                                          httpGet:
+                                                                                                                                                  path: /api/v1/health
+                                                                                                                                                  port: 8000
+                                                                                                                          initialDelaySeconds: 15
+                                                                                                                          periodSeconds: 20
+                                                                                                  readinessProbe:
+                                                                                                                          httpGet:
+                                                                                                                                                  path: /api/v1/health
+                                                                                                                                                  port: 8000
+                                                                                                                          initialDelaySeconds: 5
+                                                                                                                          periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+                        name: codeatlas-backend-svc
+                        namespace: codeatlas
+spec:
+                        type: ClusterIP
+                        selector:
+                                                app: codeatlas-backend
+                        ports:
+                                                - port: 8000
+                                                  targetPort: 8000
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+                        name: codeatlas-backend-hpa
+                        namespace: codeatlas
+spec:
+                        scaleTargetRef:
+                                                apiVersion: apps/v1
+                                                kind: Deployment
+                                                name: codeatlas-backend
+                        minReplicas: 3
+                        maxReplicas: 10
+                        metrics:
+                                                - type: Resource
+                                                  resource:
+                                                                          name: cpu
+                                                                          target:
+                                                                                                  type: Utilization
+                                                                                                  averageUtilization: 75
