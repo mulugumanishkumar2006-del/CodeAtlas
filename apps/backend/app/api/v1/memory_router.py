@@ -8,8 +8,11 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.memory_engine.decision_logger import ADRManager
 from app.memory_engine.historical_context import HistoricalContextRecall
+from app.memory_engine.incident_memory import IncidentMemoryEngine
+from app.memory_engine.meeting_intelligence import MeetingIntelligenceEngine
 from app.memory_engine.memory_engine import AIMemoryEngine
 from app.memory_engine.memory_graph import EngineeringMemoryGraph
+from app.memory_engine.pr_intelligence import PRIntelligenceEngine
 
 router = APIRouter(
     prefix="/memory", tags=["Engineering Memory Graph (The Engineering Brain)"]
@@ -39,3 +42,18 @@ def get_historical_recall(
     topic: str = "performance", db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     return HistoricalContextRecall().recall_historical_context(db, topic)
+
+
+@router.get("/pr-intelligence")
+def get_pr_intelligence(db: Session = Depends(get_db)) -> List[Dict[str, Any]]:
+    return PRIntelligenceEngine().get_pr_intelligence(db)
+
+
+@router.get("/incident-memory")
+def get_incident_memory(db: Session = Depends(get_db)) -> List[Dict[str, Any]]:
+    return IncidentMemoryEngine().get_incident_memory(db)
+
+
+@router.get("/meeting-intelligence")
+def get_meeting_intelligence(db: Session = Depends(get_db)) -> List[Dict[str, Any]]:
+    return MeetingIntelligenceEngine().get_meeting_intelligence(db)

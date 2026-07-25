@@ -283,6 +283,62 @@ export default function EngineeringBrainPage() {
           </div>
         </div>
       </div>
+
+      {/* Grid: PR Intelligence & Incident Memory */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* PR Intelligence */}
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h2 className="text-base font-extrabold text-white flex items-center gap-2">
+              <GitBranch className="w-5 h-5 text-indigo-400" /> Pull Request Intelligence
+            </h2>
+            <span className="text-xs font-bold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2.5 py-0.5 rounded">
+              MERGED KNOWLEDGE
+            </span>
+          </div>
+
+          <div className="space-y-3 text-xs">
+            <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-1">
+              <div className="flex justify-between items-center">
+                <span className="font-extrabold text-indigo-400">PR #182 • Orders Monolith Split</span>
+                <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">HIGH IMPACT</span>
+              </div>
+              <p className="text-slate-300">Eliminated DB row lock contention on primary Postgres cluster.</p>
+            </div>
+            <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-1">
+              <div className="flex justify-between items-center">
+                <span className="font-extrabold text-indigo-400">PR #145 • Redis L2 Cache</span>
+                <span className="text-[10px] font-bold text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded">MEDIUM IMPACT</span>
+              </div>
+              <p className="text-slate-300">Reduced DB query load by 14,000 req/sec, improving latency by 65%.</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Incident Memory */}
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h2 className="text-base font-extrabold text-white flex items-center gap-2">
+              <Clock className="w-5 h-5 text-rose-400" /> Incident Memory & Lessons
+            </h2>
+            <span className="text-xs font-bold text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2.5 py-0.5 rounded">
+              POST-MORTEM BRAIN
+            </span>
+          </div>
+
+          <div className="space-y-3 text-xs">
+            <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-1">
+              <div className="flex justify-between items-center">
+                <span className="font-extrabold text-white">INC-882 • DB Connection Pool Lockout</span>
+                <span className="text-[10px] font-bold text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded">SEV-1</span>
+              </div>
+              <p className="text-slate-300">Root Cause: Fulfillment status updates locked rows during 2.5x traffic surge.</p>
+              <div className="text-[11px] text-emerald-400 font-semibold">Lesson: Never run batch updates inside HTTP request handler transactions.</div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
+

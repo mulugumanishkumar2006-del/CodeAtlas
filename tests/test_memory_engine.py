@@ -10,6 +10,9 @@ from app.memory_engine import (
     AIMemoryEngine,
     EngineeringMemoryGraph,
     HistoricalContextRecall,
+    IncidentMemoryEngine,
+    MeetingIntelligenceEngine,
+    PRIntelligenceEngine,
 )
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -63,10 +66,19 @@ def test_memory_engines():
         assert "Redis L2" in latency_ans["answer"]
 
         adrs = ADRManager().list_architecture_decisions(db)
-        assert len(adrs) >= 3
+        assert len(adrs) >= 5
 
         context = HistoricalContextRecall().recall_historical_context(db, "performance")
         assert context["context_preservation_score"] == "98.4%"
+
+        prs = PRIntelligenceEngine().get_pr_intelligence(db)
+        assert len(prs) >= 2
+
+        incidents = IncidentMemoryEngine().get_incident_memory(db)
+        assert len(incidents) >= 2
+
+        meetings = MeetingIntelligenceEngine().get_meeting_intelligence(db)
+        assert len(meetings) >= 2
     finally:
         db.close()
 
@@ -84,3 +96,6 @@ def test_memory_api_endpoints():
         client.get("/api/v1/memory/historical-recall?topic=performance").status_code
         == 200
     )
+    assert client.get("/api/v1/memory/pr-intelligence").status_code == 200
+    assert client.get("/api/v1/memory/incident-memory").status_code == 200
+    assert client.get("/api/v1/memory/meeting-intelligence").status_code == 200
