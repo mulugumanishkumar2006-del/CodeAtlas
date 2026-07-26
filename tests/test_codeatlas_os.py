@@ -141,7 +141,7 @@ def test_codeatlas_os_api_endpoints():
     # 3. Integrations API
     integ_res = client.get("/api/v1/os/integrations")
     assert integ_res.status_code == 200
-    assert integ_res.json()["total_integrations"] == 7
+    assert integ_res.json()["total_integrations"] == 9
 
     # 4. Desktop API
     desktop_res = client.get("/api/v1/os/desktop")

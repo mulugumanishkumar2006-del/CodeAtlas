@@ -3,20 +3,37 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # pyrefly: ignore [missing-import]
 from app.api.v1 import (
+    aeo_boardroom_router,
+    aeo_planning_alloc_router,
+    aeo_portfolio_coord_router,
+    aeo_router,
+    agi_reasoning_router,
+    agi_simulation_insights_router,
+    agi_whiteboard_router,
     ai_cto_router,
     architect,
     architecture_drift,
     auth,
     autonomous_router,
+    benchmarking_router,
     codeatlas_os_router,
     council_router,
     digital_twin,
+    edg_features_1_5_router,
+    edg_features_6_10_router,
+    edg_features_11_15_router,
+    edg_lab_finale_router,
+    edg_organism_finale_router,
+    edg_router,
+    engineering_agi_router,
     enterprise_router,
     evolution,
+    evolution_atlas_router,
     graph,
     health,
     health_intelligence,
     knowledge,
+    knowledge_insights_router,
     memory_router,
     network_router,
     prediction_router,
@@ -24,6 +41,11 @@ from app.api.v1 import (
     reliability,
     repositories,
     software_world,
+    spe_features_1_5_router,
+    spe_features_6_10_router,
+    spe_features_11_15_router,
+    spe_lab_finale_router,
+    spe_router,
     tech_debt,
     visual_router,
 )
@@ -155,4 +177,114 @@ app.include_router(
     network_router.router,
     prefix=settings.API_V1_STR,
     tags=["network"],
+)
+app.include_router(
+    benchmarking_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["maturity_benchmarking"],
+)
+app.include_router(
+    knowledge_insights_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["knowledge_insights"],
+)
+app.include_router(
+    evolution_atlas_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["evolution_atlas_command"],
+)
+app.include_router(
+    engineering_agi_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["engineering_agi"],
+)
+app.include_router(
+    agi_reasoning_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["agi_reasoning"],
+)
+app.include_router(
+    agi_simulation_insights_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["agi_simulation_insights"],
+)
+app.include_router(
+    agi_whiteboard_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["agi_whiteboard"],
+)
+app.include_router(
+    aeo_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["aeo"],
+)
+app.include_router(
+    aeo_planning_alloc_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["aeo_planning"],
+)
+app.include_router(
+    aeo_portfolio_coord_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["aeo_portfolio"],
+)
+app.include_router(
+    aeo_boardroom_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["aeo_boardroom"],
+)
+app.include_router(
+    spe_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["spe"],
+)
+app.include_router(
+    spe_features_1_5_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["spe_primary"],
+)
+app.include_router(
+    spe_features_6_10_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["spe_secondary"],
+)
+app.include_router(
+    spe_features_11_15_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["spe_dynamics"],
+)
+app.include_router(
+    spe_lab_finale_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["spe_lab"],
+)
+app.include_router(
+    edg_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["edg"],
+)
+app.include_router(
+    edg_features_1_5_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["edg_primary"],
+)
+app.include_router(
+    edg_features_6_10_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["edg_secondary"],
+)
+app.include_router(
+    edg_features_11_15_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["edg_dynamics"],
+)
+app.include_router(
+    edg_lab_finale_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["edg_lab"],
+)
+app.include_router(
+    edg_organism_finale_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["edg_organism"],
 )

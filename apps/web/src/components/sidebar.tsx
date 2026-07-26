@@ -25,6 +25,11 @@ import {
                         Users,
                         Building2,
                         Monitor,
+                        Dna,
+                        Orbit,
+                        Atom,
+                        Palette,
+                        FlaskConical,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTour } from '@/context/tour-context';
@@ -38,6 +43,58 @@ interface NavigationItem {
 }
 
 const navigation: NavigationItem[] = [
+                        { name: '🧬 Engineering Digital Genome (EDG)', href: '/edg', icon: Dna },
+                        {
+                                                name: '🌌 Interactive Software Physics Lab 🌟',
+                                                href: '/spe-lab',
+                                                icon: Orbit,
+                        },
+                        { name: '⚛️ Software Physics Engine (SPE)', href: '/spe', icon: Atom },
+                        {
+                                                name: '🏛️ AI Engineering Boardroom 🌟',
+                                                href: '/aeo-boardroom',
+                                                icon: Users,
+                        },
+                        {
+                                                name: '🏢 Autonomous Engineering Org (AEO)',
+                                                href: '/aeo',
+                                                icon: Building2,
+                        },
+                        {
+                                                name: '🎨 AI Architecture Whiteboard 🌟',
+                                                href: '/agi-whiteboard',
+                                                icon: Palette,
+                        },
+                        {
+                                                name: '⚡ Simulation & Insights Lab',
+                                                href: '/agi-sim-insights',
+                                                icon: FlaskConical,
+                        },
+                        {
+                                                name: '🧠 Universal Reasoning Engine',
+                                                href: '/agi-reasoning',
+                                                icon: Brain,
+                        },
+                        {
+                                                name: '🚀 Phase 25 — Engineering AGI',
+                                                href: '/engineering-agi',
+                                                icon: Cpu,
+                        },
+                        {
+                                                name: '🌍 Software Evolution Atlas ⭐',
+                                                href: '/evolution-atlas',
+                                                icon: Globe,
+                        },
+                        {
+                                                name: '🧠 Knowledge & Insights',
+                                                href: '/knowledge-insights',
+                                                icon: Brain,
+                        },
+                        {
+                                                name: '⭐ Maturity Benchmarking',
+                                                href: '/benchmarking',
+                                                icon: BarChart3,
+                        },
                         { name: '🖥️ CodeAtlas OS Kernel', href: '/os', icon: Monitor },
                         { name: '🌐 Engineering Reality Engine', href: '/reality', icon: Activity },
                         { name: '🌌 Visual Experience World', href: '/visual', icon: Globe },

@@ -6,8 +6,9 @@ import sys
 # Add the backend app to sys.path so we can import directly
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "apps", "backend"))
 
+import pytest
 from app.api.v1.auth import get_current_user
-from app.core.database import Base, SessionLocal, engine
+from app.core.database import Base, get_db
 from app.main import app
 from app.models.graph_node import GraphNode
 from app.models.graph_relationship import GraphRelationship
@@ -15,14 +16,35 @@ from app.models.repository import Repository
 from app.models.repository_statistics import RepositoryStatistics
 from app.models.user import User
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+TEST_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./test_ai_cto_temp.db")
+engine = create_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})
+TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+@pytest.fixture(autouse=True)
+def setup_test_db():
+    Base.metadata.create_all(bind=engine)
+    yield
+    Base.metadata.drop_all(bind=engine)
+
+
+def override_get_db():
+    try:
+        db = TestingSessionLocal()
+        yield db
+    finally:
+        db.close()
+
+
+app.dependency_overrides[get_db] = override_get_db
+client = TestClient(app)
 
 
 def setup_mock_data():
-
-    Base.metadata.drop_all(bind=engine)
-    Base.metadata.create_all(bind=engine)
-
-    db = SessionLocal()
+    db = TestingSessionLocal()
     try:
         user_id = "test_cto_user_id"
         repo_id = "test_cto_repo_id"
@@ -110,7 +132,7 @@ def test_cto_strategic_analysis_suite():
 
     # Override auth helper
     def override_get_current_user():
-        test_db = SessionLocal()
+        test_db = TestingSessionLocal()
         try:
             return test_db.query(User).filter(User.id == "test_cto_user_id").first()
         finally:

@@ -580,7 +580,7 @@ def test_neo4j_and_knowledge_graph_builder(client):
 
     # 1. Setup mock repository files on disk matching services, tables, routers, libs, envs
     repo_id = "test_graph_repo"
-    cloned_dir = os.path.join(settings.CLONED_REPOS_DIR, repo_id)
+    cloned_dir = os.path.join(settings.CLONED_REPOS_DIR, repo_id)  # noqa: F821
     shutil.rmtree(cloned_dir, ignore_errors=True)
     os.makedirs(os.path.join(cloned_dir, "app"), exist_ok=True)
 
@@ -625,7 +625,7 @@ class UserDBModel:
     # 2. Parse repository
     db = SessionLocal()
     try:
-        parse_service = ParseService()
+        parse_service = ParseService()  # noqa: F821
         parse_service.parse_repository(db, repo_id)
     finally:
         db.close()
