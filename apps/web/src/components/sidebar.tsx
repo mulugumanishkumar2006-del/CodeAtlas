@@ -23,6 +23,7 @@ import {
                         Sparkles,
                         Server,
                         Users,
+                        Rocket,
                         Building2,
                         Monitor,
                         Dna,
@@ -43,6 +44,32 @@ interface NavigationItem {
 }
 
 const navigation: NavigationItem[] = [
+                        {
+                                                name: '🚀 Phase 33 — AI Release Commander (ARC) ⭐',
+                                                href: '/arc',
+                                                icon: Rocket,
+                        },
+                        {
+                                                name: '🔬 Phase 32 — Engineering Simulation Lab (ESL) ⭐',
+                                                href: '/esl',
+                                                icon: FlaskConical,
+                        },
+                        {
+                                                name: '🚀 Phase 31 — Autonomous Refactoring Engine (ARE) ⭐',
+                                                href: '/are',
+                                                icon: Cpu,
+                        },
+                        {
+                                                name: '🌍 Phase 30 — World Knowledge Graph (WSKG) ⭐',
+                                                href: '/wskg',
+                                                icon: Globe,
+                        },
+                        {
+                                                name: '🚀 Phase 29 — Autonomous Evolution (ASE) ⭐',
+                                                href: '/ase',
+                                                icon: Sparkles,
+                        },
+
                         { name: '🧬 Engineering Digital Genome (EDG)', href: '/edg', icon: Dna },
                         {
                                                 name: '🌌 Interactive Software Physics Lab 🌟',

@@ -1,15 +1,5 @@
-import os
-import sys
-
-# Override DATABASE_URL to use SQLite for isolated tests before importing anything else
-os.environ["DATABASE_URL"] = "sqlite:///./test_temp.db"
-
-# Add the backend app to sys.path so we can import directly
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "apps", "backend"))
-
 import pytest
 from app.core.database import Base, get_db
-from app.core.database import engine as core_engine
 from app.health.advisor.health_advisor import HealthAdvisor
 from app.health.engine.health_engine import HealthEngine
 from app.health.models.health import Recommendation
@@ -36,14 +26,12 @@ def db_session():
     """Setup test database tables and yield a clean session."""
 
     Base.metadata.create_all(bind=engine)
-    Base.metadata.create_all(bind=core_engine)
     db = TestingSessionLocal()
     try:
         yield db
     finally:
         db.close()
         Base.metadata.drop_all(bind=engine)
-        Base.metadata.drop_all(bind=core_engine)
 
 
 @pytest.fixture(scope="module")
@@ -67,7 +55,7 @@ def client(db_session):
     with TestClient(app) as c:
         yield c
 
-    app.dependency_overrides.clear()
+    pass
 
 
 def test_health_calculation_and_recommendations(db_session):

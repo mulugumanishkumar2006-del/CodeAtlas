@@ -1,9 +1,6 @@
 import os
 import sys
 
-# Override DATABASE_URL to use SQLite for isolated tests before importing anything else
-os.environ["DATABASE_URL"] = "sqlite:///./test_temp.db"
-
 # Add the backend app to sys.path so we can import directly
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "apps", "backend"))
 
@@ -18,7 +15,6 @@ from fastapi.testclient import TestClient
 def test_software_world_endpoint():
     # Setup SQLite clean db
 
-    Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
 
     user_id = "test_world_user_id"
@@ -117,4 +113,4 @@ def test_software_world_endpoint():
         assert "y" in mock_node
 
     finally:
-        app.dependency_overrides.clear()
+        pass

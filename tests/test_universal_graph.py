@@ -17,7 +17,7 @@ from app.models.repository import Repository
 from app.models.user import User
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="module", autouse=True)
 def db_session():
     db = SessionLocal()
     try:
@@ -79,7 +79,6 @@ def client(db_session):
 
     app.dependency_overrides[get_current_user] = override_get_current_user
     yield TestClient(app)
-    app.dependency_overrides.clear()
 
 
 def test_create_and_fetch_graph(client):

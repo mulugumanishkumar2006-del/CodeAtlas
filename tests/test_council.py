@@ -15,7 +15,6 @@ from fastapi.testclient import TestClient
 
 
 def setup_mock_data():
-    Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
 
     db = SessionLocal()
@@ -23,41 +22,58 @@ def setup_mock_data():
         user_id = "test_council_user_id"
         repo_id = "test_council_repo_id"
 
-        user = User(
-            id=user_id,
-            email="council_test@example.com",
-            username="council_test",
-            name="Council Tester",
-        )
-        db.add(user)
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            user = User(
+                id=user_id,
+                email="council_test@example.com",
+                username="council_test",
+                name="Council Tester",
+            )
+            db.add(user)
+            db.commit()
 
-        repo = Repository(
-            id=repo_id,
-            name="test-council-repo",
-            full_name="example/test-council-repo",
-            user_id=user_id,
-            clone_url="https://github.com/example/test-council-repo",
-        )
-        db.add(repo)
+        repo = db.query(Repository).filter(Repository.id == repo_id).first()
+        if not repo:
+            repo = Repository(
+                id=repo_id,
+                name="test-council-repo",
+                full_name="example/test-council-repo",
+                user_id=user_id,
+                clone_url="https://github.com/example/test-council-repo",
+            )
+            db.add(repo)
+            db.commit()
 
-        stats = RepositoryStatistics(
-            id="test_stats_id",
-            repository_id=repo_id,
-            total_files=35,
-            total_lines=2800,
-            average_complexity=4.8,
-            documentation_coverage=85.0,
+        stats = (
+            db.query(RepositoryStatistics)
+            .filter(RepositoryStatistics.id == "test_stats_id")
+            .first()
         )
-        db.add(stats)
+        if not stats:
+            stats = RepositoryStatistics(
+                id="test_stats_id",
+                repository_id=repo_id,
+                total_files=35,
+                total_lines=2800,
+                average_complexity=5.2,
+                documentation_coverage=82.0,
+            )
+            db.add(stats)
+            db.commit()
 
-        db.commit()
         return repo_id
     finally:
         db.close()
 
 
 def mock_get_current_user():
-    return {"id": "test_council_user_id", "username": "council_test"}
+    return User(
+        id="test_council_user_id",
+        username="council_test",
+        name="Council Tester",
+        email="council_test@example.com",
+    )
 
 
 app.dependency_overrides[get_current_user] = mock_get_current_user

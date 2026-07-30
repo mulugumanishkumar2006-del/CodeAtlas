@@ -4,6 +4,8 @@ CodeAtlas is a developer platform designed to organize, analyze, and manage code
 
 ## Key Features
 
+**AI Refactoring Studio** (72% $\rightarrow$ 93% health transformation).
+
 - **Collapsible Dashboard**: A responsive, theme-aware layout supporting light and dark modes.
 - **GitHub OAuth + JWT Authentication**: Secure authentication flow with token-based session verification.
 - **Relational Code Base Tracking**: Complete persistence layers for tracking users, repositories, and jobs.

@@ -3,9 +3,6 @@
 import os
 import sys
 
-# Override DATABASE_URL to use SQLite for isolated tests before importing anything else
-os.environ["DATABASE_URL"] = "sqlite:///./test_temp.db"
-
 # Add the backend app to sys.path so we can import directly
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "apps", "backend"))
 

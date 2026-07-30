@@ -16,10 +16,17 @@ from app.models.user import User
 from fastapi.testclient import TestClient
 
 
+def mock_get_current_user():
+    return User(id="123456", username="graph_tester", email="tester@example.com")
+
+
+app.dependency_overrides[get_current_user] = mock_get_current_user
+client = TestClient(app)
+
+
 def test_architect_recommendations_and_advisors():
     # Ensure database tables are created cleanly
 
-    Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
 
     # 1. Setup mock repository ID

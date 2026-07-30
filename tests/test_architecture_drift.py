@@ -18,6 +18,18 @@ from app.services.drift_detection_service import DriftDetectionService
 from fastapi.testclient import TestClient
 
 
+def mock_get_current_user():
+    return User(
+        id="12345",
+        username="arch_tester",
+        name="Arch Tester",
+        email="arch_tester@example.com",
+    )
+
+
+app.dependency_overrides[get_current_user] = mock_get_current_user
+
+
 def test_architecture_drift():
     # Ensure database tables are created for tests
     from app.core.database import Base, engine

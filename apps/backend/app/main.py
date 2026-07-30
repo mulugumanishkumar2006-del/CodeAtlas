@@ -11,8 +11,11 @@ from app.api.v1 import (
     agi_simulation_insights_router,
     agi_whiteboard_router,
     ai_cto_router,
+    arc_router,
     architect,
     architecture_drift,
+    are_router,
+    ase_router,
     auth,
     autonomous_router,
     benchmarking_router,
@@ -27,6 +30,7 @@ from app.api.v1 import (
     edg_router,
     engineering_agi_router,
     enterprise_router,
+    esl_router,
     evolution,
     evolution_atlas_router,
     graph,
@@ -48,6 +52,7 @@ from app.api.v1 import (
     spe_router,
     tech_debt,
     visual_router,
+    wskg_router,
 )
 
 # pyrefly: ignore [missing-import]
@@ -143,6 +148,18 @@ app.include_router(
     prefix=settings.API_V1_STR,
     tags=["autonomous"],
 )
+app.include_router(
+    ase_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["ase"],
+)
+app.include_router(
+    wskg_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["wskg"],
+)
+
+
 app.include_router(
     enterprise_router.router,
     prefix=settings.API_V1_STR,
@@ -287,4 +304,19 @@ app.include_router(
     edg_organism_finale_router.router,
     prefix=settings.API_V1_STR,
     tags=["edg_organism"],
+)
+app.include_router(
+    are_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["are"],
+)
+app.include_router(
+    esl_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["esl"],
+)
+app.include_router(
+    arc_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["arc"],
 )

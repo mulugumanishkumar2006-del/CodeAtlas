@@ -5,6 +5,17 @@ from app.health.models.health import (
     RepositoryHealth,
 )
 from app.models.activity import Activity
+from app.models.arc import (
+    APIBreakingChange,
+    CanaryRolloutPlan,
+    DatabaseMigrationValidation,
+    EnvironmentParityValidation,
+    MultiTeamApprovalWorkflow,
+    ReleaseChecklistItem,
+    ReleaseValidationSession,
+    RollbackStrategyPlan,
+    SLOValidationResult,
+)
 from app.models.architect import (
     ArchitectureDecisionGenerated,
     ArchitectureRecommendation,
@@ -15,6 +26,21 @@ from app.models.architecture import (
     ArchitectureViolation,
     ComplianceHistory,
     GovernancePolicy,
+)
+from app.models.are import (
+    ArchitectureDecisionRecord,
+    DecompositionCandidate,
+    ModernizationRoadmap,
+    RefactoringOpportunity,
+    RefactoringPlan,
+    RefactoringScanReport,
+    RefactoringSimulationRun,
+    RefactoringStudioSession,
+)
+from app.models.ase import (
+    EvolutionAuditLog,
+    EvolutionPlanItem,
+    EvolutionRoadmap,
 )
 from app.models.autonomous_task import AutonomousTask
 from app.models.codeatlas_os import (
@@ -30,6 +56,18 @@ from app.models.codeatlas_os import (
 from app.models.council_decision_memory import CouncilDecisionMemory
 from app.models.cto_strategy_history import CTOStrategyHistory
 from app.models.digital_twin import DigitalTwinChange, DigitalTwinSession
+from app.models.esl import (
+    ArchitectureSimResult,
+    BlackFridaySimResult,
+    DatabaseMigrationResult,
+    DependencyUpgradeResult,
+    DigitalEngineeringLabSession,
+    FailureScenarioResult,
+    InfrastructureSimResult,
+    SecurityAttackSimResult,
+    SimulationExperiment,
+    TeamGrowthSimResult,
+)
 from app.models.evolution import CommitSnapshot, ComponentSnapshot
 from app.models.file import File
 from app.models.graph_node import GraphNode
@@ -81,4 +119,14 @@ from app.models.visual_experience import (
     AIDebateSession,
     EngineeringAchievement,
     ServiceHeartbeatLog,
+)
+from app.models.wskg import (
+    WSKGCaseStudy,
+    WSKGEdge,
+    WSKGIngestionJob,
+    WSKGLearningPath,
+    WSKGNode,
+    WSKGReasoningQuery,
+    WSKGTechMigrationPath,
+    WSKGWorldAtlasNode,
 )

@@ -1,6 +1,5 @@
 # tests/test_prediction_engine.py
 
-import os
 
 import pytest
 from app.core.database import Base, get_db
@@ -39,7 +38,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-TEST_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./test_pred_temp.db")
+TEST_DATABASE_URL = "sqlite:///./test_pred_temp.db"
 engine = create_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

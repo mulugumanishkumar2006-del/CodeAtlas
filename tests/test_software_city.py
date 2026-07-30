@@ -1,6 +1,4 @@
 import os
-
-os.environ["DATABASE_URL"] = "sqlite:///./test_temp.db"
 import sys
 
 # Add the backend app to sys.path so we can import directly
