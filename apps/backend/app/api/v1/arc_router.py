@@ -3,20 +3,28 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.schemas.arc import (
+    AIIntelligenceResponse,
+    AIMissionControlResponse,
     APIBreakingChangeResponse,
+    BusinessIntelligenceResponse,
     CanaryRolloutPlanResponse,
     ControlTowerDataResponse,
     DatabaseMigrationValidationResponse,
+    DeploymentPlanningResponse,
     DisasterRecoveryReadinessResponse,
     EnvironmentParityResponse,
     ExecutiveSummaryResponse,
     GlobalControlCenterResponse,
     MultiTeamApprovalResponse,
+    PerformanceIntelligenceResponse,
+    ReleaseIntelligenceBreakdownResponse,
     ReleaseNotesResponse,
     ReleaseValidationRequest,
     ReleaseValidationResponse,
+    RiskAnalysisResponse,
     RollbackStrategyPlanResponse,
     SecretsAuditResponse,
+    SecurityIntelligenceResponse,
     SLOValidationResponse,
 )
 from app.services.arc_service import ARCService
@@ -322,6 +330,174 @@ def get_control_tower_data(
     """
     service = ARCService(db=db)
     res = service.get_control_tower_data(
+        repository_id=repository_id,
+        release_version=release_version,
+    )
+    return res
+
+
+@router.get(
+    "/arc/release-intelligence/{repository_id}",
+    response_model=ReleaseIntelligenceBreakdownResponse,
+    status_code=status.HTTP_200_OK,
+)
+def get_release_intelligence(
+    repository_id: str,
+    release_version: str = Query(default="v3.2.0"),
+    db: Session = Depends(get_db),
+):
+    """
+    ⭐ Enterprise Features 1–5: Release Intelligence (Score 0-100, Risk Predictor, Exec Summary, Confidence Engine, AI Approval)
+    """
+    service = ARCService(db=db)
+    res = service.get_release_intelligence(
+        repository_id=repository_id,
+        release_version=release_version,
+    )
+    return res
+
+
+@router.get(
+    "/arc/deployment-planning/{repository_id}",
+    response_model=DeploymentPlanningResponse,
+    status_code=status.HTTP_200_OK,
+)
+def get_deployment_planning(
+    repository_id: str,
+    release_version: str = Query(default="v3.2.0"),
+    db: Session = Depends(get_db),
+):
+    """
+    ⭐ Enterprise Features 6–10: Deployment Planning (Canary, Blue Green, Feature Flag, Calendar, Timeline)
+    """
+    service = ARCService(db=db)
+    res = service.get_deployment_planning(
+        repository_id=repository_id,
+        release_version=release_version,
+    )
+    return res
+
+
+@router.get(
+    "/arc/risk-analysis/{repository_id}",
+    response_model=RiskAnalysisResponse,
+    status_code=status.HTTP_200_OK,
+)
+def get_risk_analysis(
+    repository_id: str,
+    release_version: str = Query(default="v3.2.0"),
+    db: Session = Depends(get_db),
+):
+    """
+    ⭐ Enterprise Features 11–15: Risk Analysis (API Breaking Changes, DB Migration, Dependency Risk, Infra Readiness, Config Drift)
+    """
+    service = ARCService(db=db)
+    res = service.get_risk_analysis(
+        repository_id=repository_id,
+        release_version=release_version,
+    )
+    return res
+
+
+@router.get(
+    "/arc/performance-intelligence/{repository_id}",
+    response_model=PerformanceIntelligenceResponse,
+    status_code=status.HTTP_200_OK,
+)
+def get_performance_intelligence(
+    repository_id: str,
+    release_version: str = Query(default="v3.2.0"),
+    db: Session = Depends(get_db),
+):
+    """
+    ⭐ Enterprise Features 16–30: Performance Intelligence (Load, CPU, Memory, Latency, Cache, Queue, HPA, Connection Pool, Bottlenecks, Throughput)
+    """
+    service = ARCService(db=db)
+    res = service.get_performance_intelligence(
+        repository_id=repository_id,
+        release_version=release_version,
+    )
+    return res
+
+
+@router.get(
+    "/arc/security-intelligence/{repository_id}",
+    response_model=SecurityIntelligenceResponse,
+    status_code=status.HTTP_200_OK,
+)
+def get_security_intelligence(
+    repository_id: str,
+    release_version: str = Query(default="v3.2.0"),
+    db: Session = Depends(get_db),
+):
+    """
+    ⭐ Enterprise Features 31–45: Security Intelligence (Secrets, CVE, Dependencies, AuthN/AuthZ, JWT/OAuth, TLS, OWASP, IAM, Supply Chain)
+    """
+    service = ARCService(db=db)
+    res = service.get_security_intelligence(
+        repository_id=repository_id,
+        release_version=release_version,
+    )
+    return res
+
+
+@router.get(
+    "/arc/business-intelligence/{repository_id}",
+    response_model=BusinessIntelligenceResponse,
+    status_code=status.HTTP_200_OK,
+)
+def get_business_intelligence(
+    repository_id: str,
+    release_version: str = Query(default="v3.2.0"),
+    db: Session = Depends(get_db),
+):
+    """
+    ⭐ Enterprise Features 46–60: Business Intelligence (Impact, Revenue, SLA/SLO, Error Budget, ROI, Criticality, Notifications, Exec Dashboard, Trends)
+    """
+    service = ARCService(db=db)
+    res = service.get_business_intelligence(
+        repository_id=repository_id,
+        release_version=release_version,
+    )
+    return res
+
+
+@router.get(
+    "/arc/ai-intelligence/{repository_id}",
+    response_model=AIIntelligenceResponse,
+    status_code=status.HTTP_200_OK,
+)
+def get_ai_intelligence(
+    repository_id: str,
+    release_version: str = Query(default="v3.2.0"),
+    db: Session = Depends(get_db),
+):
+    """
+    ⭐ Enterprise Features 61–70: AI Intelligence & Global Release Control Center
+    """
+    service = ARCService(db=db)
+    res = service.get_ai_intelligence(
+        repository_id=repository_id,
+        release_version=release_version,
+    )
+    return res
+
+
+@router.get(
+    "/arc/mission-control/{repository_id}",
+    response_model=AIMissionControlResponse,
+    status_code=status.HTTP_200_OK,
+)
+def get_mission_control(
+    repository_id: str,
+    release_version: str = Query(default="v4.2"),
+    db: Session = Depends(get_db),
+):
+    """
+    🚀 WOW Feature: AI Mission Control (NASA-like deployment dashboard payload)
+    """
+    service = ARCService(db=db)
+    res = service.get_mission_control(
         repository_id=repository_id,
         release_version=release_version,
     )

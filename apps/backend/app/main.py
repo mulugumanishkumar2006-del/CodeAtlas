@@ -19,6 +19,7 @@ from app.api.v1 import (
     auth,
     autonomous_router,
     benchmarking_router,
+    caee_router,
     codeatlas_os_router,
     council_router,
     digital_twin,
@@ -28,6 +29,7 @@ from app.api.v1 import (
     edg_lab_finale_router,
     edg_organism_finale_router,
     edg_router,
+    edie_router,
     engineering_agi_router,
     enterprise_router,
     esl_router,
@@ -319,4 +321,14 @@ app.include_router(
     arc_router.router,
     prefix=settings.API_V1_STR,
     tags=["arc"],
+)
+app.include_router(
+    caee_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["caee"],
+)
+app.include_router(
+    edie_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["edie"],
 )

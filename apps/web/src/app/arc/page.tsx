@@ -90,8 +90,13 @@ export default function AIReleaseCommanderPage() {
                                                                                                                                                                                                                                                 Phase
                                                                                                                                                                                                                                                 33
                                                                                                                                                                                                                                                 —
-                                                                                                                                                                                                                                                60
+                                                                                                                                                                                                                                                70
+                                                                                                                                                                                                                                                Enterprise
                                                                                                                                                                                                                                                 Features
+                                                                                                                                                                                                                                                &
+                                                                                                                                                                                                                                                AI
+                                                                                                                                                                                                                                                Mission
+                                                                                                                                                                                                                                                Control
                                                                                                                                                                                                                         </span>
                                                                                                                                                                                                 </div>
                                                                                                                                                                                                 <p className="text-sm text-gray-400">
@@ -139,6 +144,96 @@ export default function AIReleaseCommanderPage() {
                                                                                                                                                                                                                           : 'Authorize Production Deployment'}
                                                                                                                                                                         </span>
                                                                                                                                                 </button>
+                                                                                                                        </div>
+                                                                                                </div>
+
+                                                                                                {/* NASA-like AI Mission Control Panel (WOW Feature) */}
+                                                                                                <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-emerald-950/80 border-2 border-emerald-500/40 rounded-2xl p-6 shadow-2xl space-y-4 font-mono">
+                                                                                                                        <div className="flex flex-col md:flex-row items-start md:items-center justify-between border-b border-emerald-500/20 pb-4 gap-2">
+                                                                                                                                                <div className="flex items-center space-x-3">
+                                                                                                                                                                        <div className="px-3 py-1 bg-emerald-500/20 border border-emerald-500/50 rounded-lg text-emerald-400 text-xs font-bold uppercase tracking-widest flex items-center space-x-2">
+                                                                                                                                                                                                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+                                                                                                                                                                                                <span>
+                                                                                                                                                                                                                        🚀
+                                                                                                                                                                                                                        AI
+                                                                                                                                                                                                                        MISSION
+                                                                                                                                                                                                                        CONTROL
+                                                                                                                                                                                                </span>
+                                                                                                                                                                        </div>
+                                                                                                                                                                        <h2 className="text-xl font-bold text-white tracking-wider">
+                                                                                                                                                                                                DEPLOY
+                                                                                                                                                                                                VERSION
+                                                                                                                                                                                                4.2
+                                                                                                                                                                        </h2>
+                                                                                                                                                </div>
+                                                                                                                                                <div className="text-xs text-emerald-400 bg-emerald-950/60 px-3 py-1.5 rounded-md border border-emerald-800/50 font-bold">
+                                                                                                                                                                        PRODUCTION
+                                                                                                                                                                        PREDICTION:
+                                                                                                                                                                        HEALTHY
+                                                                                                                                                                        ✓
+                                                                                                                                                </div>
+                                                                                                                        </div>
+
+                                                                                                                        <div className="grid grid-cols-2 md:grid-cols-6 gap-3 text-center">
+                                                                                                                                                <div className="bg-slate-900/90 border border-emerald-500/30 rounded-xl p-3">
+                                                                                                                                                                        <div className="text-[10px] text-gray-400 uppercase tracking-widest">
+                                                                                                                                                                                                Readiness
+                                                                                                                                                                        </div>
+                                                                                                                                                                        <div className="text-2xl font-bold text-emerald-400">
+                                                                                                                                                                                                96%
+                                                                                                                                                                        </div>
+                                                                                                                                                </div>
+                                                                                                                                                <div className="bg-slate-900/90 border border-emerald-500/30 rounded-xl p-3">
+                                                                                                                                                                        <div className="text-[10px] text-gray-400 uppercase tracking-widest">
+                                                                                                                                                                                                Risk
+                                                                                                                                                                                                Level
+                                                                                                                                                                        </div>
+                                                                                                                                                                        <div className="text-2xl font-bold text-emerald-300">
+                                                                                                                                                                                                LOW
+                                                                                                                                                                        </div>
+                                                                                                                                                </div>
+                                                                                                                                                <div className="bg-slate-900/90 border border-emerald-500/30 rounded-xl p-3">
+                                                                                                                                                                        <div className="text-[10px] text-gray-400 uppercase tracking-widest">
+                                                                                                                                                                                                Rollback
+                                                                                                                                                                                                Risk
+                                                                                                                                                                        </div>
+                                                                                                                                                                        <div className="text-2xl font-bold text-emerald-400">
+                                                                                                                                                                                                1%
+                                                                                                                                                                        </div>
+                                                                                                                                                </div>
+                                                                                                                                                <div className="bg-slate-900/90 border border-emerald-500/30 rounded-xl p-3">
+                                                                                                                                                                        <div className="text-[10px] text-gray-400 uppercase tracking-widest">
+                                                                                                                                                                                                Confidence
+                                                                                                                                                                        </div>
+                                                                                                                                                                        <div className="text-2xl font-bold text-indigo-400">
+                                                                                                                                                                                                98%
+                                                                                                                                                                        </div>
+                                                                                                                                                </div>
+                                                                                                                                                <div className="bg-slate-900/90 border border-emerald-500/30 rounded-xl p-3">
+                                                                                                                                                                        <div className="text-[10px] text-gray-400 uppercase tracking-widest">
+                                                                                                                                                                                                Deploy
+                                                                                                                                                                                                Time
+                                                                                                                                                                        </div>
+                                                                                                                                                                        <div className="text-2xl font-bold text-amber-400">
+                                                                                                                                                                                                8
+                                                                                                                                                                                                Mins
+                                                                                                                                                                        </div>
+                                                                                                                                                </div>
+                                                                                                                                                <div className="bg-slate-900/90 border border-emerald-500/30 rounded-xl p-3">
+                                                                                                                                                                        <div className="text-[10px] text-gray-400 uppercase tracking-widest">
+                                                                                                                                                                                                Strategy
+                                                                                                                                                                        </div>
+                                                                                                                                                                        <div className="text-xs font-bold text-emerald-300 mt-1">
+                                                                                                                                                                                                Canary
+                                                                                                                                                                                                5%
+                                                                                                                                                                                                →
+                                                                                                                                                                                                20%
+                                                                                                                                                                                                →
+                                                                                                                                                                                                50%
+                                                                                                                                                                                                →
+                                                                                                                                                                                                100%
+                                                                                                                                                                        </div>
+                                                                                                                                                </div>
                                                                                                                         </div>
                                                                                                 </div>
 

@@ -45,6 +45,11 @@ interface NavigationItem {
 
 const navigation: NavigationItem[] = [
                         {
+                                                name: '🧠 Phase 35 — Decision Intelligence Engine (EDIE) ⭐',
+                                                href: '/edie',
+                                                icon: Brain,
+                        },
+                        {
                                                 name: '🚀 Phase 33 — AI Release Commander (ARC) ⭐',
                                                 href: '/arc',
                                                 icon: Rocket,
