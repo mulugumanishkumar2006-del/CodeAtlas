@@ -4,6 +4,7 @@ from app.health.models.health import (
     Recommendation,
     RepositoryHealth,
 )
+from app.models.activity import Activity  # noqa: F401
 from app.models.arc import (
     APIBreakingChange,
     CanaryRolloutPlan,
@@ -42,6 +43,13 @@ from app.models.ase import (
     EvolutionRoadmap,
 )
 from app.models.autonomous_task import AutonomousTask
+from app.models.biie import (
+    BusinessCapability,
+    BusinessSystemConnector,
+    CostOfInactionForecast,
+    ExecutiveIntelligenceBrief,
+    ImpactAnalysisRecord,
+)
 from app.models.caee import (
     ArchitectureEvolutionSession,
     ArchitectureGapItem,
@@ -68,6 +76,13 @@ from app.models.edie import (
     DecisionValidationModel,
     EngineeringDecisionModel,
     FutureRecommendationModel,
+)
+from app.models.eskg import (
+    ESKGEdge,
+    ESKGImpactAnalysis,
+    ESKGNode,
+    ESKGReasoningQuery,
+    ESKGSnapshot,
 )
 from app.models.esl import (
     ArchitectureSimResult,
@@ -110,6 +125,20 @@ from app.models.memory_models import (
     RepositoryMemory,
 )
 from app.models.metric import Metric
+from app.models.oip import (
+    EngineeringMaturityScore,
+    EngineeringOrganization,
+    EngineeringTeam,
+    OIPAIOrgIntelligence,
+    OIPExecutiveDeepAnalytics,
+    OIPKnowledgeDeepAnalytics,
+    OIPKnowledgeSilo,
+    OIPPortfolioDeepAnalytics,
+    OIPRepositoryIntelligence,
+    OIPServiceBusinessCriticality,
+    OIPStrategicRecommendation,
+    OIPTeamDeepAnalytics,
+)
 from app.models.organization import (
     CrossRepoDependency,
     EnterpriseMetricSnapshot,

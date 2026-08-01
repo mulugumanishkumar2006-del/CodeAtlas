@@ -19,6 +19,12 @@ from app.api.v1 import (
     auth,
     autonomous_router,
     benchmarking_router,
+    biie_features_1_20_router,
+    biie_features_21_40_router,
+    biie_features_41_60_router,
+    biie_features_61_80_router,
+    biie_features_81_100_router,
+    biie_router,
     caee_router,
     codeatlas_os_router,
     council_router,
@@ -32,6 +38,7 @@ from app.api.v1 import (
     edie_router,
     engineering_agi_router,
     enterprise_router,
+    eskg_router,
     esl_router,
     evolution,
     evolution_atlas_router,
@@ -42,6 +49,7 @@ from app.api.v1 import (
     knowledge_insights_router,
     memory_router,
     network_router,
+    oip_router,
     prediction_router,
     reality_router,
     reliability,
@@ -331,4 +339,44 @@ app.include_router(
     edie_router.router,
     prefix=settings.API_V1_STR,
     tags=["edie"],
+)
+app.include_router(
+    oip_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["oip"],
+)
+app.include_router(
+    eskg_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["eskg"],
+)
+app.include_router(
+    biie_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["biie"],
+)
+app.include_router(
+    biie_features_1_20_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["biie_analytics"],
+)
+app.include_router(
+    biie_features_21_40_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["biie_economics"],
+)
+app.include_router(
+    biie_features_41_60_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["biie_risk"],
+)
+app.include_router(
+    biie_features_61_80_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["biie_ai_advisor"],
+)
+app.include_router(
+    biie_features_81_100_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["biie_command_center"],
 )

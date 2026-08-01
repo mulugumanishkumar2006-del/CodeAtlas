@@ -31,7 +31,10 @@ import {
                         Atom,
                         Palette,
                         FlaskConical,
+                        Network,
+                        DollarSign,
 } from 'lucide-react';
+
 import { cn } from '@/lib/utils';
 import { useTour } from '@/context/tour-context';
 
@@ -44,6 +47,22 @@ interface NavigationItem {
 }
 
 const navigation: NavigationItem[] = [
+                        {
+                                                name: '💼 Phase 38 — Business Impact Intelligence (BIIE) ⭐',
+                                                href: '/biie',
+                                                icon: DollarSign,
+                        },
+                        {
+                                                name: '🌐 Phase 37 — Enterprise Knowledge Graph (ESKG) ⭐',
+                                                href: '/eskg',
+                                                icon: Network,
+                        },
+
+                        {
+                                                name: '🚀 Phase 36 — Organization Intelligence (OIP) ⭐',
+                                                href: '/oip',
+                                                icon: Building2,
+                        },
                         {
                                                 name: '🧠 Phase 35 — Decision Intelligence Engine (EDIE) ⭐',
                                                 href: '/edie',
