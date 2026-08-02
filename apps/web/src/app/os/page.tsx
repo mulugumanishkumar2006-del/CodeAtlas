@@ -330,13 +330,11 @@ export default function CodeAtlasOSPage() {
                                                                         title: 'INC-819: Redis Session Memory Pressure Warning',
                                                                         details: 'Memory usage spiked to 88%. Auto-scaling group triggered node expansion.',
                                                                         severity: 'WARNING',
-                                                                        repo: 'auth-service-v1',
-                                                                        time: '2 days ago',
                                                 },
                                                 {
                                                                         type: 'ArchEvolution',
                                                                         title: 'Architecture Shift: Monolith to Event-Driven Mesh',
-                                                                        details: 'Phase 18 Autonomous Refactoring Engine migrated 3 modules to independent Go microservices.',
+                                                                        details: 'Autonomous Refactoring Engine migrated 3 modules to independent Go microservices.',
                                                                         severity: 'INFO',
                                                                         repo: 'legacy-monolith',
                                                                         time: '4 days ago',
@@ -535,7 +533,7 @@ export default function CodeAtlasOSPage() {
                                                                                                                         [
                                                                                                                                                 'Contains 3 CRITICAL CVEs (Snyk scan), 42% test coverage (Jenkins), and high tech debt score.',
                                                                                                                                                 'High revenue coupling makes this repository the top priority for Sprint 1.',
-                                                                                                                                                'Recommendation: Run Phase 18 Autonomous Security Patch Generator & Refactoring Engine.',
+                                                                                                                                                'Recommendation: Run Autonomous Security Patch Generator & Refactoring Engine.',
                                                                                                                         ];
                                                                                                 conf =
                                                                                                                         '99.0%';
@@ -572,7 +570,7 @@ export default function CodeAtlasOSPage() {
                                                                                                                         [
                                                                                                                                                 'Bottleneck 1: Database primary write node saturates IOPS at 60M users.',
                                                                                                                                                 'Bottleneck 2: Session storage in Auth Vault requires multi-region Redis cluster.',
-                                                                                                                                                'Recommendation: Execute Phase 18 Database Migration Engine for read-replica sharding.',
+                                                                                                                                                'Recommendation: Execute Database Migration Engine for read-replica sharding.',
                                                                                                                         ];
                                                                                                 conf =
                                                                                                                         '94.0%';

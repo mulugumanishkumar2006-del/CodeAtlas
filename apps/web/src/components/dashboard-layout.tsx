@@ -23,6 +23,30 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
                         const isAuthPage = pathname?.startsWith('/login');
 
+                        const getTitle = () => {
+                                                if (!pathname || pathname === '/')
+                                                                        return 'Dashboard';
+                                                if (pathname.startsWith('/repositories'))
+                                                                        return 'Repositories Workflow';
+                                                if (pathname.startsWith('/analyze'))
+                                                                        return 'Analyze Workflow';
+                                                if (pathname.startsWith('/architecture'))
+                                                                        return 'Architecture Workflow';
+                                                if (pathname.startsWith('/investigate'))
+                                                                        return 'Investigate Workflow';
+                                                if (pathname.startsWith('/simulate'))
+                                                                        return 'Simulate Workflow';
+                                                if (pathname.startsWith('/improve'))
+                                                                        return 'Improve Workflow';
+                                                if (pathname.startsWith('/monitor'))
+                                                                        return 'Monitor Workflow';
+                                                if (pathname.startsWith('/search'))
+                                                                        return 'Search Workflow';
+                                                if (pathname.startsWith('/settings'))
+                                                                        return 'Platform Settings';
+                                                return 'Software Intelligence Platform';
+                        };
+
                         if (isAuthPage) {
                                                 return <>{children}</>;
                         }
@@ -59,8 +83,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                                                                                                                                                                                                 <Menu className="h-5 w-5" />
                                                                                                                                                                         </Button>
                                                                                                                                                                         <h1 className="text-lg font-semibold tracking-tight text-foreground lg:text-xl">
-                                                                                                                                                                                                Control
-                                                                                                                                                                                                Panel
+                                                                                                                                                                                                {getTitle()}
                                                                                                                                                                         </h1>
                                                                                                                                                 </div>
 

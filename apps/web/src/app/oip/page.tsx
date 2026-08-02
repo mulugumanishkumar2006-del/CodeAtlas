@@ -40,6 +40,9 @@ import {
                         Compass,
                         FileCode,
                         Shield,
+                        Globe,
+                        Bot,
+                        MessageSquare,
 } from 'lucide-react';
 
 interface OrgOverview {
@@ -170,6 +173,8 @@ export default function OrganizationIntelligencePage() {
                                                 | 'knowledge'
                                                 | 'business'
                                                 | 'strategy'
+                                                | 'earth'
+                                                | 'ai-org'
                         >('executive');
 
                         const [searchQuery, setSearchQuery] = useState('');

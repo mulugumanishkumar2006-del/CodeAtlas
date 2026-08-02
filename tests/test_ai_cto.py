@@ -221,3 +221,150 @@ def test_cto_strategic_analysis_suite():
     reeval = res.json()
     assert reeval["status"] == "success"
     assert len(reeval["pipeline_logs"]) >= 4
+
+    # 9. Test Phase 39 Strategic Decisions embedded in analysis
+    assert "strategic_decisions" in data
+    sd = data["strategic_decisions"]
+    assert "scaling_100m" in sd
+    assert "technology_replacement" in sd
+    assert "kubernetes_adoption" in sd
+    assert "team_allocation" in sd
+    assert "investment_planning" in sd
+    assert "microservices_migration" in sd
+    assert "tech_debt_budget" in sd
+    assert "five_year_vision" in sd
+
+    # 10. Test GET /repositories/{repo_id}/cto/strategic-decisions (Phase 39)
+    res = client.get(f"/api/v1/repositories/{repo_id}/cto/strategic-decisions")
+    assert res.status_code == 200
+    strat_data = res.json()
+    assert "scaling_100m" in strat_data
+    assert (
+        strat_data["scaling_100m"]["question"]
+        == "Can our architecture handle 100 million users?"
+    )
+    assert len(strat_data["technology_replacement"]["technologies_to_replace"]) > 0
+    assert "should_adopt" in strat_data["kubernetes_adoption"]
+
+    # 11. Test POST /repositories/{repo_id}/cto/simulate-scale (Phase 39)
+    res = client.post(
+        f"/api/v1/repositories/{repo_id}/cto/simulate-scale",
+        json={"target_users": 100000000, "target_requests_per_sec": 50000},
+    )
+    assert res.status_code == 200
+    sim_res = res.json()
+    assert sim_res["goals"]["target_users"] == 100000000
+    assert "scenario_simulation" in sim_res
+    assert "scaling_100m_analysis" in sim_res
+
+    # 12. Test Feature 1: Enhanced AI CTO Chat with structured 50M scaling details
+    res = client.post(
+        f"/api/v1/repositories/{repo_id}/cto/chat",
+        json={"message": "How should we prepare our platform for 50 million users?"},
+    )
+    assert res.status_code == 200
+    chat_50m = res.json()
+    assert "structured_details" in chat_50m
+    assert len(chat_50m["structured_details"]["infra_recommendations"]) > 0
+
+    # 13. Test Feature 2: GET /repositories/{repo_id}/cto/engineering-strategy
+    res = client.get(f"/api/v1/repositories/{repo_id}/cto/engineering-strategy")
+    assert res.status_code == 200
+    strat_res = res.json()
+    assert "strategy_1_year" in strat_res
+    assert "strategy_3_year" in strat_res
+    assert "strategy_5_year" in strat_res
+
+    # 14. Test Feature 3: GET /repositories/{repo_id}/cto/engineering-vision-2030
+    res = client.get(f"/api/v1/repositories/{repo_id}/cto/engineering-vision-2030")
+    assert res.status_code == 200
+    vis_res = res.json()
+    assert vis_res["title"] == "CodeAtlas Engineering Vision 2030"
+    assert "pillars" in vis_res
+
+    # 15. Test Feature 5: POST /repositories/{repo_id}/cto/strategic-advisor
+    res = client.post(
+        f"/api/v1/repositories/{repo_id}/cto/strategic-advisor",
+        json={"decision_key": "monolith_vs_microservices"},
+    )
+    assert res.status_code == 200
+    trade_res = res.json()
+    assert "decision" in trade_res
+    assert len(trade_res["tradeoffs"]) > 0
+
+    # 16. Test Features 6–25: GET /repositories/{repo_id}/cto/technology-intelligence
+    res = client.get(f"/api/v1/repositories/{repo_id}/cto/technology-intelligence")
+    assert res.status_code == 200
+    intel_res = res.json()
+    assert "technology_lifecycle" in intel_res
+    assert "framework_replacement" in intel_res
+    assert "language_migration" in intel_res
+    assert "cloud_strategy" in intel_res
+    assert "ai_adoption" in intel_res
+    assert "security_roadmap" in intel_res
+
+    # 17. Test Features 26–50: GET /repositories/{repo_id}/cto/growth-intelligence
+    res = client.get(f"/api/v1/repositories/{repo_id}/cto/growth-intelligence")
+    assert res.status_code == 200
+    growth_res = res.json()
+    assert "team_scaling_planner" in growth_res
+    assert "hiring_recommendations" in growth_res
+    assert "skill_gap_analysis" in growth_res
+    assert "productivity_forecasting" in growth_res
+    assert "burnout_risk_indicators" in growth_res
+    assert "global_engineering_score" in growth_res
+    assert "strategic_okrs" in growth_res
+
+    # 18. Test Features 51–75: GET /repositories/{repo_id}/cto/engineering-economics
+    res = client.get(f"/api/v1/repositories/{repo_id}/cto/engineering-economics")
+    assert res.status_code == 200
+    econ_res = res.json()
+    assert "engineering_roi" in econ_res
+    assert "technical_debt_cost" in econ_res
+    assert "cloud_cost_forecasting" in econ_res
+    assert "finops_recommendations" in econ_res
+    assert "cloud_waste_detection" in econ_res
+    assert "carbon_footprint" in econ_res
+    assert "investment_confidence_score" in econ_res
+
+    # 19. Test Features 76–100: GET /repositories/{repo_id}/cto/future-intelligence
+    res = client.get(f"/api/v1/repositories/{repo_id}/cto/future-intelligence")
+    assert res.status_code == 200
+    fut_res = res.json()
+    assert "ten_year_architecture_forecast" in fut_res
+    assert "technology_trend_prediction" in fut_res
+    assert "future_skill_demand" in fut_res
+    assert "ai_native_architecture" in fut_res
+    assert "engineering_resilience_score" in fut_res
+    assert "cto_strategic_memory" in fut_res
+
+    # 20. Test Features 101–119: GET /repositories/{repo_id}/cto/global-executive
+    res = client.get(f"/api/v1/repositories/{repo_id}/cto/global-executive")
+    assert res.status_code == 200
+    exec_res = res.json()
+    assert "board_meeting_report" in exec_res
+    assert "cto_weekly_brief" in exec_res
+    assert "technology_radar" in exec_res
+    assert "enterprise_risk_matrix" in exec_res
+    assert "engineering_war_room" in exec_res
+    assert "digital_cto_command_center" in exec_res
+
+    # 21. Test Signature Feature 120: POST /repositories/{repo_id}/cto/digital-command-center
+    res = client.post(
+        f"/api/v1/repositories/{repo_id}/cto/digital-command-center",
+        json={
+            "query_prompt": "Our company expects to grow from 1 million to 100 million users over the next five years. What should we do?"
+        },
+    )
+    assert res.status_code == 200
+    cmd_res = res.json()
+    assert cmd_res["current_architecture"] == "Modular Monolith"
+    assert cmd_res["health_score_pct"] == 82
+    assert len(cmd_res["recommended_roadmap"]) == 5
+    assert cmd_res["estimated_cost_usd_formatted"] == "$8.2M"
+    assert cmd_res["engineering_effort_months"] == 145
+    assert "99.99% Availability" in cmd_res["expected_benefits"]
+    assert "60% Faster Deployments" in cmd_res["expected_benefits"]
+    assert "40% Lower Technical Debt" in cmd_res["expected_benefits"]
+    assert "3× Scalability" in cmd_res["expected_benefits"]
+    assert cmd_res["confidence_score_pct"] == 94

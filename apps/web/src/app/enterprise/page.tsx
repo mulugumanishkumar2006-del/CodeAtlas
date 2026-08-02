@@ -214,7 +214,7 @@ export default function EnterprisePortfolioPage() {
                                                                         rank: 1,
                                                                         repo: 'legacy-payment-gateway',
                                                                         score: 96.5,
-                                                                        action: 'Execute Phase 18 Security Patch Generator & Refactoring Engine in Sprint 1.',
+                                                                        action: 'Execute Automated Security Patch & Refactoring Engine in Sprint 1.',
                                                 },
                                                 {
                                                                         rank: 2,

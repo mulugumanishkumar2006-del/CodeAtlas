@@ -16,6 +16,7 @@ from app.api.v1 import (
     architecture_drift,
     are_router,
     ase_router,
+    asip_router,
     auth,
     autonomous_router,
     benchmarking_router,
@@ -85,7 +86,10 @@ app = FastAPI(
 
 @app.on_event("startup")
 def startup_event():
-    neo4j_client.connect()
+    try:
+        neo4j_client.connect()
+    except Exception as e:
+        print(f"Notice: Optional Neo4j graph connection skipped: {str(e)}")
     import app.models  # noqa: F401
     from app.core.database import Base, engine
 
@@ -94,7 +98,10 @@ def startup_event():
 
 @app.on_event("shutdown")
 def shutdown_event():
-    neo4j_client.close()
+    try:
+        neo4j_client.close()
+    except Exception:
+        pass
 
 
 # Exception Handler
@@ -148,6 +155,12 @@ app.include_router(
     prefix=settings.API_V1_STR,
     tags=["ai_cto"],
 )
+app.include_router(
+    asip_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["asip"],
+)
+
 app.include_router(
     council_router.router,
     prefix=settings.API_V1_STR,

@@ -6,8 +6,15 @@ import os
 import httpx
 from app.ai_cto.analyzers.bottleneck_detector import BottleneckDetector
 from app.ai_cto.analyzers.capacity_estimator import CapacityEstimator
+from app.ai_cto.analyzers.engineering_economics import EngineeringEconomicsEngine
+from app.ai_cto.analyzers.future_intelligence import FutureEngineeringIntelligenceEngine
+from app.ai_cto.analyzers.global_executive import GlobalExecutiveIntelligenceEngine
 from app.ai_cto.analyzers.growth_analyzer import GrowthAnalyzer
+from app.ai_cto.analyzers.growth_intelligence import EngineeringGrowthIntelligenceEngine
 from app.ai_cto.analyzers.roi_engine import ROIEngine
+from app.ai_cto.analyzers.strategic_intelligence import StrategicIntelligenceEngine
+from app.ai_cto.analyzers.technology_intelligence import TechnologyIntelligenceEngine
+from app.ai_cto.analyzers.tradeoff_advisor import TradeoffAdvisorEngine
 from app.ai_cto.planners.architecture_planner import ArchitecturePlanner
 from app.ai_cto.planners.cost_optimizer import CostOptimizer
 from app.ai_cto.planners.hiring_planner import HiringPlanner
@@ -15,6 +22,7 @@ from app.ai_cto.planners.migration_planner import MigrationPlanner
 from app.ai_cto.planners.risk_planner import RiskPlanner
 from app.ai_cto.planners.roadmap_generator import RoadmapGenerator
 from app.ai_cto.planners.scalability_planner import ScalabilityPlanner
+from app.ai_cto.planners.strategy_generator import EngineeringStrategyGenerator
 from app.ai_cto.prompts.strategy_prompts import ANALYZE_PROMPT_TEMPLATE, SYSTEM_PROMPT
 from app.ai_cto.reports.engineering_report import EngineeringReportGenerator
 from app.ai_cto.reports.executive_report import ExecutiveReportGenerator
@@ -33,8 +41,17 @@ class CTOOrchestrator:
         self.roi_engine = ROIEngine()
         self.bottleneck_detector = BottleneckDetector()
         self.capacity_estimator = CapacityEstimator()
+        self.strategic_intelligence = StrategicIntelligenceEngine()
+        self.technology_intelligence = TechnologyIntelligenceEngine()
+        self.tradeoff_advisor = TradeoffAdvisorEngine()
+        self.strategy_generator = EngineeringStrategyGenerator()
+        self.growth_intelligence = EngineeringGrowthIntelligenceEngine()
+        self.engineering_economics = EngineeringEconomicsEngine()
+        self.future_intelligence = FutureEngineeringIntelligenceEngine()
+        self.global_executive = GlobalExecutiveIntelligenceEngine()
 
         self.architecture_planner = ArchitecturePlanner()
+
         self.migration_planner = MigrationPlanner()
         self.scalability_planner = ScalabilityPlanner()
         self.hiring_planner = HiringPlanner()
@@ -243,6 +260,13 @@ class CTOOrchestrator:
             "predicted_latency_ms": sim_capacity["predicted_api_latency_ms"],
         }
 
+        strategic_decisions = self.strategic_intelligence.analyze_strategic_decisions(
+            db=db,
+            repo_id=repo_id,
+            target_users=target_users,
+            target_requests_per_sec=target_requests_per_sec,
+        )
+
         response = CTOAnalysisResponse(
             repository_id=repo_id,
             goals={
@@ -263,6 +287,7 @@ class CTOOrchestrator:
             predicted_bottlenecks=bottlenecks.get("predicted_bottlenecks", []),
             persona_reports=persona_reports,
             scenario_simulation=scenario_simulation,
+            strategic_decisions=strategic_decisions,
         )
 
         # Auto-save history snapshot if DB session provided
@@ -485,22 +510,60 @@ class CTOOrchestrator:
                 "How do we reduce deployment time?",
                 "What should we modernize first?",
             ]
-        else:
+        if (
+            "50 million" in msg_lower
+            or "50m" in msg_lower
+            or "scale" in msg_lower
+            or "million users" in msg_lower
+        ):
             reply = (
-                f"As AI CTO for repository #{repo_id}, I recommend focusing on scalable cloud infrastructure, "
-                f"reducing technical debt hotspots, and enforcing automated security checks. "
-                f"Repository currently has {total_files} active files with {doc_coverage:.1f}% documentation coverage."
+                f"STRATEGIC ROADMAP FOR 50 MILLION USERS (Repository #{repo_id}):\n\n"
+                f"1. **Roadmap**: Q3 2026: Containerize & deploy PgBouncer connection pool; Q4 2026: Provision Redis 7 distributed cache; Q2 2027: Shard database across 4 multi-region nodes.\n"
+                f"2. **Risks**: DB connection exhaustion at >20k RPS; worker thread starvation during burst traffic.\n"
+                f"3. **Timeline**: 12-16 weeks for full multi-region active-replica deployment.\n"
+                f"4. **Cost**: Projected infrastructure cost increase of +$1,850/mo offset by $4,200/mo serverless savings.\n"
+                f"5. **Required Engineers**: +4 Senior Engineers (2 Platform/K8s, 2 Backend/Data).\n"
+                f"6. **Infrastructure Recommendations**: AWS EKS / GCP GKE, CockroachDB / PostgreSQL Aurora, Redis Cluster, NATS JetStream.\n"
+                f"7. **Technology Recommendations**: gRPC protocol buffers for internal service calls, PyO3/Rust for AST parsing engine."
             )
             steps = [
-                "Review high-priority technical debt items in the Architecture tab",
-                "Evaluate multi-year engineering roadmap milestones",
-                "Optimize serverless concurrency and cloud hosting costs",
+                "Establish PgBouncer database connection pooling",
+                "Deploy Redis Cluster for session and read query caching",
+                "Set up Horizontal Pod Autoscaling (HPA) triggers in EKS/GKE",
+                "Migrate monolithic REST routes to gRPC microservice endpoints",
             ]
             followups = [
-                "How do we reduce deployment time?",
-                "What should we modernize first?",
-                "How can we support global users?",
+                "What is our estimated infrastructure budget impact for 50M users?",
+                "Which teams need more engineers to execute this roadmap?",
+                "Evaluate Monolith vs Microservices trade-offs for CodeAtlas",
             ]
+            structured_details = {
+                "roadmap": [
+                    "Q3 2026: PgBouncer pooling",
+                    "Q4 2026: Redis 7 Cluster",
+                    "Q2 2027: DB Sharding",
+                ],
+                "risks": ["DB Connection exhaustion", "Worker thread starvation"],
+                "timeline": "12-16 weeks",
+                "cost_usd_monthly": 1850.0,
+                "required_engineers": 4,
+                "infra_recommendations": [
+                    "AWS EKS",
+                    "CockroachDB",
+                    "Redis Cluster",
+                    "NATS JetStream",
+                ],
+                "tech_recommendations": [
+                    "gRPC Protocol Buffers",
+                    "PyO3 / Rust AST Engine",
+                ],
+            }
+            return {
+                "reply": reply,
+                "actionable_steps": steps,
+                "suggested_followups": followups,
+                "structured_details": structured_details,
+            }
 
         return {
             "reply": reply,
@@ -534,6 +597,45 @@ class CTOOrchestrator:
         return {
             "status": "success",
             "pipeline_logs": logs,
-            "version_created": history_item.version,
             "analysis": analysis,
         }
+
+    def get_engineering_strategy(self, db: Session, repo_id: str):
+        """Feature 2: Engineering Strategy Generator (1-Year, 3-Year, 5-Year Strategies)"""
+        return self.strategy_generator.generate_multiyear_strategy(db, repo_id)
+
+    def get_engineering_vision_2030(self, db: Session, repo_id: str):
+        """Feature 3: Engineering Vision Generator (Engineering Vision 2030)"""
+        return self.strategy_generator.generate_vision_2030(db, repo_id)
+
+    def evaluate_tradeoff_decision(
+        self, db: Session, repo_id: str, decision_key: str = "monolith_vs_microservices"
+    ):
+        """Feature 5: AI Strategic Advisor (Trade-off Decision Evaluator)"""
+        return self.tradeoff_advisor.evaluate_decision(db, repo_id, decision_key)
+
+    def get_technology_intelligence(self, db: Session, repo_id: str):
+        """Features 6–25: Technology Intelligence Engine"""
+        return self.technology_intelligence.analyze_technology_intelligence(db, repo_id)
+
+    def get_growth_intelligence(self, db: Session, repo_id: str):
+        """Features 26–50: Engineering Growth Intelligence Engine"""
+        return self.growth_intelligence.analyze_growth_intelligence(db, repo_id)
+
+    def get_engineering_economics(self, db: Session, repo_id: str):
+        """Features 51–75: Engineering Economics & FinOps Engine"""
+        return self.engineering_economics.analyze_engineering_economics(db, repo_id)
+
+    def get_future_intelligence(self, db: Session, repo_id: str):
+        """Features 76–100: Future Engineering Intelligence Engine"""
+        return self.future_intelligence.analyze_future_intelligence(db, repo_id)
+
+    def get_global_executive_intelligence(self, db: Session, repo_id: str):
+        """Features 101–120: Global Executive Intelligence Engine"""
+        return self.global_executive.analyze_global_executive(db, repo_id)
+
+    def run_digital_cto_command(
+        self, db: Session, repo_id: str, query_prompt: str = ""
+    ):
+        """Signature Feature 120: Digital CTO Command Center"""
+        return self.global_executive.run_digital_cto_command(db, repo_id, query_prompt)

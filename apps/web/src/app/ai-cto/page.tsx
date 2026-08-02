@@ -159,14 +159,48 @@ export default function AiCtoPage() {
                                                 React.useState<string>('serverless');
                         const [budgetReduction, setBudgetReduction] = React.useState<number>(20.0);
 
-                        // Active report tab: 'executive' | 'engineering' | 'roadmap' | 'chat' | 'history'
+                        // Active report tab: 'strategic' | 'personas' | 'strategy' | 'tradeoffs' | 'tech_intel' | 'growth' | 'economics' | 'future' | 'digital_cto' | 'executive' | 'engineering' | 'roadmap' | 'chat' | 'history'
                         const [activeTab, setActiveTab] = React.useState<
+                                                | 'strategic'
+                                                | 'personas'
+                                                | 'strategy'
+                                                | 'tradeoffs'
+                                                | 'tech_intel'
+                                                | 'growth'
+                                                | 'economics'
+                                                | 'future'
+                                                | 'digital_cto'
                                                 | 'executive'
                                                 | 'engineering'
                                                 | 'roadmap'
                                                 | 'chat'
                                                 | 'history'
-                        >('executive');
+                        >('strategic');
+
+                        // Features 1–120 States
+                        const [selectedPersona, setSelectedPersona] = React.useState<
+                                                | 'CTO'
+                                                | 'CEO'
+                                                | 'CIO'
+                                                | 'VP Engineering'
+                                                | 'Platform Teams'
+                        >('CTO');
+                        const [selectedDecisionKey, setSelectedDecisionKey] =
+                                                React.useState<string>('monolith_vs_microservices');
+                        const [tradeoffData, setTradeoffData] = React.useState<any>(null);
+                        const [strategyData, setStrategyData] = React.useState<any>(null);
+                        const [visionData, setVisionData] = React.useState<any>(null);
+                        const [techIntelData, setTechIntelData] = React.useState<any>(null);
+                        const [growthData, setGrowthData] = React.useState<any>(null);
+                        const [economicsData, setEconomicsData] = React.useState<any>(null);
+                        const [futureData, setFutureData] = React.useState<any>(null);
+                        const [globalExecData, setGlobalExecData] = React.useState<any>(null);
+                        const [digitalCtoData, setDigitalCtoData] = React.useState<any>(null);
+                        const [ctoPromptInput, setCtoPromptInput] = React.useState<string>(
+                                                'Our company expects to grow from 1 million to 100 million users over the next five years. What should we do?'
+                        );
+                        const [ctoPromptLoading, setCtoPromptLoading] =
+                                                React.useState<boolean>(false);
 
                         // AI CTO Chat & Continuous Pipeline States
                         const [chatInput, setChatInput] = React.useState<string>('');
@@ -286,8 +320,205 @@ export default function AiCtoPage() {
                                                 if (selectedRepoId && token) {
                                                                         triggerAnalysis();
                                                                         fetchHistoryAndComparison();
+                                                                        fetchFeatures1To25Data();
                                                 }
                         }, [selectedRepoId, token]);
+
+                        const fetchFeatures1To25Data = () => {
+                                                if (!selectedRepoId || !token) return;
+                                                // Fetch Strategy
+                                                fetch(
+                                                                        `/api/v1/repositories/${selectedRepoId}/cto/engineering-strategy`,
+                                                                        {
+                                                                                                headers: {
+                                                                                                                        Authorization: `Bearer ${token}`,
+                                                                                                },
+                                                                        }
+                                                )
+                                                                        .then((res) => res.json())
+                                                                        .then((data) =>
+                                                                                                setStrategyData(
+                                                                                                                        data
+                                                                                                )
+                                                                        )
+                                                                        .catch(console.error);
+
+                                                // Fetch Vision 2030
+                                                fetch(
+                                                                        `/api/v1/repositories/${selectedRepoId}/cto/engineering-vision-2030`,
+                                                                        {
+                                                                                                headers: {
+                                                                                                                        Authorization: `Bearer ${token}`,
+                                                                                                },
+                                                                        }
+                                                )
+                                                                        .then((res) => res.json())
+                                                                        .then((data) =>
+                                                                                                setVisionData(
+                                                                                                                        data
+                                                                                                )
+                                                                        )
+                                                                        .catch(console.error);
+
+                                                // Fetch Tech Intelligence 6-25
+                                                fetch(
+                                                                        `/api/v1/repositories/${selectedRepoId}/cto/technology-intelligence`,
+                                                                        {
+                                                                                                headers: {
+                                                                                                                        Authorization: `Bearer ${token}`,
+                                                                                                },
+                                                                        }
+                                                )
+                                                                        .then((res) => res.json())
+                                                                        .then((data) =>
+                                                                                                setTechIntelData(
+                                                                                                                        data
+                                                                                                )
+                                                                        )
+                                                                        .catch(console.error);
+
+                                                // Fetch Growth Intelligence 26-50
+                                                fetch(
+                                                                        `/api/v1/repositories/${selectedRepoId}/cto/growth-intelligence`,
+                                                                        {
+                                                                                                headers: {
+                                                                                                                        Authorization: `Bearer ${token}`,
+                                                                                                },
+                                                                        }
+                                                )
+                                                                        .then((res) => res.json())
+                                                                        .then((data) =>
+                                                                                                setGrowthData(
+                                                                                                                        data
+                                                                                                )
+                                                                        )
+                                                                        .catch(console.error);
+
+                                                // Fetch Engineering Economics 51-75
+                                                fetch(
+                                                                        `/api/v1/repositories/${selectedRepoId}/cto/engineering-economics`,
+                                                                        {
+                                                                                                headers: {
+                                                                                                                        Authorization: `Bearer ${token}`,
+                                                                                                },
+                                                                        }
+                                                )
+                                                                        .then((res) => res.json())
+                                                                        .then((data) =>
+                                                                                                setEconomicsData(
+                                                                                                                        data
+                                                                                                )
+                                                                        )
+                                                                        .catch(console.error);
+
+                                                // Fetch Future Intelligence 76-100
+                                                fetch(
+                                                                        `/api/v1/repositories/${selectedRepoId}/cto/future-intelligence`,
+                                                                        {
+                                                                                                headers: {
+                                                                                                                        Authorization: `Bearer ${token}`,
+                                                                                                },
+                                                                        }
+                                                )
+                                                                        .then((res) => res.json())
+                                                                        .then((data) =>
+                                                                                                setFutureData(
+                                                                                                                        data
+                                                                                                )
+                                                                        )
+                                                                        .catch(console.error);
+
+                                                // Fetch Global Executive 101-120
+                                                fetch(
+                                                                        `/api/v1/repositories/${selectedRepoId}/cto/global-executive`,
+                                                                        {
+                                                                                                headers: {
+                                                                                                                        Authorization: `Bearer ${token}`,
+                                                                                                },
+                                                                        }
+                                                )
+                                                                        .then((res) => res.json())
+                                                                        .then((data) => {
+                                                                                                setGlobalExecData(
+                                                                                                                        data
+                                                                                                );
+                                                                                                if (
+                                                                                                                        data?.digital_cto_command_center
+                                                                                                ) {
+                                                                                                                        setDigitalCtoData(
+                                                                                                                                                data.digital_cto_command_center
+                                                                                                                        );
+                                                                                                }
+                                                                        })
+                                                                        .catch(console.error);
+
+                                                // Fetch Tradeoff Decision
+                                                fetchTradeoffDecision(selectedDecisionKey);
+                        };
+
+                        const handleRunDigitalCtoCommand = (queryPrompt?: string) => {
+                                                if (!selectedRepoId || !token) return;
+                                                const promptToUse = queryPrompt || ctoPromptInput;
+                                                setCtoPromptLoading(true);
+                                                fetch(
+                                                                        `/api/v1/repositories/${selectedRepoId}/cto/digital-command-center`,
+                                                                        {
+                                                                                                method: 'POST',
+                                                                                                headers: {
+                                                                                                                        'Content-Type': 'application/json',
+                                                                                                                        Authorization: `Bearer ${token}`,
+                                                                                                },
+                                                                                                body: JSON.stringify(
+                                                                                                                        {
+                                                                                                                                                query_prompt: promptToUse,
+                                                                                                                        }
+                                                                                                ),
+                                                                        }
+                                                )
+                                                                        .then((res) => res.json())
+                                                                        .then((data) => {
+                                                                                                setDigitalCtoData(
+                                                                                                                        data
+                                                                                                );
+                                                                                                setCtoPromptLoading(
+                                                                                                                        false
+                                                                                                );
+                                                                        })
+                                                                        .catch((err) => {
+                                                                                                console.error(
+                                                                                                                        err
+                                                                                                );
+                                                                                                setCtoPromptLoading(
+                                                                                                                        false
+                                                                                                );
+                                                                        });
+                        };
+
+                        const fetchTradeoffDecision = (decisionKey: string) => {
+                                                if (!selectedRepoId || !token) return;
+                                                fetch(
+                                                                        `/api/v1/repositories/${selectedRepoId}/cto/strategic-advisor`,
+                                                                        {
+                                                                                                method: 'POST',
+                                                                                                headers: {
+                                                                                                                        'Content-Type': 'application/json',
+                                                                                                                        Authorization: `Bearer ${token}`,
+                                                                                                },
+                                                                                                body: JSON.stringify(
+                                                                                                                        {
+                                                                                                                                                decision_key: decisionKey,
+                                                                                                                        }
+                                                                                                ),
+                                                                        }
+                                                )
+                                                                        .then((res) => res.json())
+                                                                        .then((data) =>
+                                                                                                setTradeoffData(
+                                                                                                                        data
+                                                                                                )
+                                                                        )
+                                                                        .catch(console.error);
+                        };
 
                         const fetchHistoryAndComparison = () => {
                                                 if (!selectedRepoId || !token) return;
@@ -1016,13 +1247,6 @@ export default function AiCtoPage() {
                                                                                                                                                                         Console
                                                                                                                                                 </h3>
                                                                                                                                                 <p className="text-xs text-muted-foreground mt-0.5">
-                                                                                                                                                                        Simulate
-                                                                                                                                                                        hypothetical
-                                                                                                                                                                        load
-                                                                                                                                                                        conditions
-                                                                                                                                                                        to
-                                                                                                                                                                        forecast
-                                                                                                                                                                        structural
                                                                                                                                                                         service
                                                                                                                                                                         requirements,
                                                                                                                                                                         latency
@@ -1417,33 +1641,27 @@ export default function AiCtoPage() {
                                                                                                 </Button>
                                                                         </div>
 
-                                                                        {continuousLogs.length >
-                                                                                                0 && (
-                                                                                                <div className="bg-black/80 border border-indigo-500/30 rounded-xl p-3 font-mono text-[11px] text-indigo-300 space-y-1">
-                                                                                                                        {continuousLogs.map(
-                                                                                                                                                (
-                                                                                                                                                                        log,
-                                                                                                                                                                        idx
-                                                                                                                                                ) => (
-                                                                                                                                                                        <div
-                                                                                                                                                                                                key={
-                                                                                                                                                                                                                        idx
-                                                                                                                                                                                                }
-                                                                                                                                                                                                className="flex items-center gap-2"
-                                                                                                                                                                        >
-                                                                                                                                                                                                <span>
-                                                                                                                                                                                                                        {
-                                                                                                                                                                                                                                                log
-                                                                                                                                                                                                                        }
-                                                                                                                                                                                                </span>
-                                                                                                                                                                        </div>
+                                                                        <div className="flex border-b mb-6 overflow-x-auto">
+                                                                                                <button
+                                                                                                                        onClick={() =>
+                                                                                                                                                setActiveTab(
+                                                                                                                                                                        'digital_cto'
                                                                                                                                                 )
-                                                                                                                        )}
-                                                                                                </div>
-                                                                        )}
-
-                                                                        {/* Split view tabs selector */}
-                                                                        <div className="flex border-b overflow-x-auto">
+                                                                                                                        }
+                                                                                                                        className={`pb-3 px-6 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${
+                                                                                                                                                activeTab ===
+                                                                                                                                                'digital_cto'
+                                                                                                                                                                        ? 'border-primary text-primary'
+                                                                                                                                                                        : 'border-transparent text-muted-foreground hover:text-foreground'
+                                                                                                                        }`}
+                                                                                                >
+                                                                                                                        🌟
+                                                                                                                        Digital
+                                                                                                                        CTO
+                                                                                                                        Command
+                                                                                                                        Center
+                                                                                                                        (101-120)
+                                                                                                </button>
                                                                                                 <button
                                                                                                                         onClick={() =>
                                                                                                                                                 setActiveTab(

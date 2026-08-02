@@ -86,25 +86,25 @@ export default function AIArchitectureWhiteboardPage() {
 
                         const migrationPhases = [
                                                 {
-                                                                        phase: 'Phase 1',
+                                                                        phase: 'Stage 1',
                                                                         title: 'Decouple Auth Vault & gRPC Proto Schema Contracts',
                                                                         duration: '3 Months',
                                                                         deliverable: 'Isolated gRPC Auth Microservice',
                                                 },
                                                 {
-                                                                        phase: 'Phase 2',
+                                                                        phase: 'Stage 2',
                                                                         title: 'Multi-Region CockroachDB Migration & Row Locality Rules',
                                                                         duration: '4 Months',
                                                                         deliverable: 'Active-Active Dual Region DB',
                                                 },
                                                 {
-                                                                        phase: 'Phase 3',
+                                                                        phase: 'Stage 3',
                                                                         title: 'Zero-Trust mTLS Inter-Service Mesh & Circuit Breakers',
                                                                         duration: '3 Months',
                                                                         deliverable: 'Zero-Trust EKS Service Mesh',
                                                 },
                                                 {
-                                                                        phase: 'Phase 4',
+                                                                        phase: 'Stage 4',
                                                                         title: '50M User Load Test & Automated Blue/Green Rollback Verification',
                                                                         duration: '2 Months',
                                                                         deliverable: '100% SLA Scale Readiness',
@@ -319,7 +319,7 @@ export default function AIArchitectureWhiteboardPage() {
                                                                                                                         },
                                                                                                                         {
                                                                                                                                                 id: 'migration',
-                                                                                                                                                label: '2. Migration Phases',
+                                                                                                                                                label: '2. Migration Stages',
                                                                                                                                                 icon: GitBranch,
                                                                                                                         },
                                                                                                                         {

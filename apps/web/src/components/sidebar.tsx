@@ -2,207 +2,49 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import {
-                        Activity,
                         LayoutDashboard,
-                        BarChart3,
-                        Settings,
-                        ShieldAlert,
-                        HeartPulse,
-                        Layers,
-                        Brain,
-                        Flame,
                         BookOpen,
-                        Clock,
-                        Cpu,
-                        Map,
-                        Globe,
-                        Compass,
-                        Play,
-                        Sparkles,
-                        Server,
-                        Users,
-                        Rocket,
-                        Building2,
-                        Monitor,
-                        Dna,
-                        Orbit,
-                        Atom,
-                        Palette,
+                        Search,
+                        Layers,
                         FlaskConical,
-                        Network,
-                        DollarSign,
+                        Zap,
+                        Sparkles,
+                        ShieldAlert,
+                        Compass,
+                        Settings,
+                        Orbit,
+                        Cpu,
+                        Building2,
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import { useTour } from '@/context/tour-context';
 
 interface NavigationItem {
                         name: string;
                         href: string;
                         icon: React.ComponentType<any>;
                         isHeader?: boolean;
-                        isSub?: boolean;
 }
 
 const navigation: NavigationItem[] = [
                         {
-                                                name: '💼 Phase 38 — Business Impact Intelligence (BIIE) ⭐',
-                                                href: '/biie',
-                                                icon: DollarSign,
-                        },
-                        {
-                                                name: '🌐 Phase 37 — Enterprise Knowledge Graph (ESKG) ⭐',
-                                                href: '/eskg',
-                                                icon: Network,
-                        },
-
-                        {
-                                                name: '🚀 Phase 36 — Organization Intelligence (OIP) ⭐',
-                                                href: '/oip',
-                                                icon: Building2,
-                        },
-                        {
-                                                name: '🧠 Phase 35 — Decision Intelligence Engine (EDIE) ⭐',
-                                                href: '/edie',
-                                                icon: Brain,
-                        },
-                        {
-                                                name: '🚀 Phase 33 — AI Release Commander (ARC) ⭐',
-                                                href: '/arc',
-                                                icon: Rocket,
-                        },
-                        {
-                                                name: '🔬 Phase 32 — Engineering Simulation Lab (ESL) ⭐',
-                                                href: '/esl',
-                                                icon: FlaskConical,
-                        },
-                        {
-                                                name: '🚀 Phase 31 — Autonomous Refactoring Engine (ARE) ⭐',
-                                                href: '/are',
-                                                icon: Cpu,
-                        },
-                        {
-                                                name: '🌍 Phase 30 — World Knowledge Graph (WSKG) ⭐',
-                                                href: '/wskg',
-                                                icon: Globe,
-                        },
-                        {
-                                                name: '🚀 Phase 29 — Autonomous Evolution (ASE) ⭐',
-                                                href: '/ase',
-                                                icon: Sparkles,
-                        },
-
-                        { name: '🧬 Engineering Digital Genome (EDG)', href: '/edg', icon: Dna },
-                        {
-                                                name: '🌌 Interactive Software Physics Lab 🌟',
-                                                href: '/spe-lab',
-                                                icon: Orbit,
-                        },
-                        { name: '⚛️ Software Physics Engine (SPE)', href: '/spe', icon: Atom },
-                        {
-                                                name: '🏛️ AI Engineering Boardroom 🌟',
-                                                href: '/aeo-boardroom',
-                                                icon: Users,
-                        },
-                        {
-                                                name: '🏢 Autonomous Engineering Org (AEO)',
-                                                href: '/aeo',
-                                                icon: Building2,
-                        },
-                        {
-                                                name: '🎨 AI Architecture Whiteboard 🌟',
-                                                href: '/agi-whiteboard',
-                                                icon: Palette,
-                        },
-                        {
-                                                name: '⚡ Simulation & Insights Lab',
-                                                href: '/agi-sim-insights',
-                                                icon: FlaskConical,
-                        },
-                        {
-                                                name: '🧠 Universal Reasoning Engine',
-                                                href: '/agi-reasoning',
-                                                icon: Brain,
-                        },
-                        {
-                                                name: '🚀 Phase 25 — Engineering AGI',
-                                                href: '/engineering-agi',
-                                                icon: Cpu,
-                        },
-                        {
-                                                name: '🌍 Software Evolution Atlas ⭐',
-                                                href: '/evolution-atlas',
-                                                icon: Globe,
-                        },
-                        {
-                                                name: '🧠 Knowledge & Insights',
-                                                href: '/knowledge-insights',
-                                                icon: Brain,
-                        },
-                        {
-                                                name: '⭐ Maturity Benchmarking',
-                                                href: '/benchmarking',
-                                                icon: BarChart3,
-                        },
-                        { name: '🖥️ CodeAtlas OS Kernel', href: '/os', icon: Monitor },
-                        { name: '🌐 Engineering Reality Engine', href: '/reality', icon: Activity },
-                        { name: '🌌 Visual Experience World', href: '/visual', icon: Globe },
-                        {
-                                                name: '🏥 Health Intelligence',
-                                                href: '/health-intelligence',
-                                                icon: Activity,
-                                                isHeader: true,
-                        },
-                        { name: 'Overview', href: '/', icon: LayoutDashboard },
-                        { name: 'Command Center', href: '/command-center', icon: BarChart3 },
-                        { name: 'Software City', href: '/software-city', icon: Map },
-                        { name: 'Software World', href: '/software-world', icon: Globe },
-                        { name: 'Repository DNA & Avatar', href: '/repository-dna', icon: Brain },
-                        { name: 'Architecture', href: '/architecture', icon: Layers },
-                        { name: 'Knowledge', href: '/knowledge', icon: BookOpen },
-                        { name: 'Reliability', href: '/reliability', icon: HeartPulse },
-                        { name: 'Technical Debt', href: '/tech-debt', icon: Flame },
-                        {
-                                                name: 'Governance',
-                                                href: '/architecture?tab=governance',
-                                                icon: ShieldAlert,
-                        },
-                        { name: 'AI Architect', href: '/architect', icon: Cpu },
-                        { name: 'Architecture Presenter', href: '/presentation', icon: Play },
-                        {
-                                                name: 'AI Scenario Simulator',
-                                                href: '/scenario-simulator',
-                                                icon: Sparkles,
-                        },
-                        { name: 'AI CTO', href: '/ai-cto', icon: Settings },
-                        { name: 'AI Engineering Council', href: '/council', icon: Users },
-                        { name: 'Autonomous Platform', href: '/autonomous', icon: Sparkles },
-                        { name: 'Enterprise Portfolio', href: '/enterprise', icon: Building2 },
-                        { name: 'Enterprise Twin', href: '/enterprise-twin', icon: Server },
-                        {
-                                                name: '🧭 Interactive Tour',
-                                                href: '#tour',
-                                                icon: Compass,
-                        },
-                        {
-                                                name: '⭐ Health Diagnostics',
-                                                href: '/health-intelligence',
-                                                icon: Activity,
-                                                isHeader: true,
-                        },
-                        { name: 'Health ⭐', href: '/health-intelligence', icon: Activity },
-                        {
-                                                name: 'Executive Dashboard',
-                                                href: '/health-intelligence?tab=executive',
+                                                name: 'Developer Workflows',
+                                                href: '#',
                                                 icon: LayoutDashboard,
+                                                isHeader: true,
                         },
-                        {
-                                                name: 'CTO Dashboard',
-                                                href: '/health-intelligence?tab=cto',
-                                                icon: BarChart3,
-                        },
+                        { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+                        { name: 'Repositories', href: '/repositories', icon: BookOpen },
+                        { name: 'Analyze', href: '/analyze', icon: Search },
+                        { name: 'Architecture', href: '/architecture', icon: Layers },
+                        { name: 'Investigate', href: '/investigate', icon: FlaskConical },
+                        { name: 'Simulate', href: '/simulate', icon: Zap },
+                        { name: 'Improve', href: '/improve', icon: Sparkles },
+                        { name: 'Monitor', href: '/monitor', icon: ShieldAlert },
+                        { name: 'Search', href: '/search', icon: Compass },
+                        { name: 'Settings', href: '/settings', icon: Settings },
 ];
 
 interface SidebarProps {
@@ -212,9 +54,6 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                         const pathname = usePathname();
-                        const searchParams = useSearchParams();
-                        const currentTab = searchParams?.get('tab');
-                        const { startTour } = useTour();
 
                         return (
                                                 <>
@@ -239,21 +78,27 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                                                                                                                                                 : '-translate-x-full'
                                                                                                 )}
                                                                         >
-                                                                                                <div className="flex h-16 items-center border-b px-6">
+                                                                                                {/* Logo Header */}
+                                                                                                <div className="flex h-16 items-center border-b px-6 justify-between">
                                                                                                                         <Link
                                                                                                                                                 href="/"
                                                                                                                                                 className="flex items-center gap-2 font-semibold"
                                                                                                                         >
-                                                                                                                                                <span className="text-xl font-bold tracking-tight text-primary">
+                                                                                                                                                <span className="text-xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
                                                                                                                                                                         CodeAtlas
                                                                                                                                                 </span>
                                                                                                                         </Link>
+                                                                                                                        <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                                                                                                                                                PLATFORM
+                                                                                                                        </span>
                                                                                                 </div>
 
-                                                                                                <nav className="flex-1 space-y-1 px-4 py-4 overflow-y-auto">
+                                                                                                {/* Nav Links */}
+                                                                                                <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
                                                                                                                         {navigation.map(
                                                                                                                                                 (
-                                                                                                                                                                        item
+                                                                                                                                                                        item,
+                                                                                                                                                                        idx
                                                                                                                                                 ) => {
                                                                                                                                                                         if (
                                                                                                                                                                                                 item.isHeader
@@ -261,11 +106,10 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                                                                                                                                                                                                 return (
                                                                                                                                                                                                                         <div
                                                                                                                                                                                                                                                 key={
-                                                                                                                                                                                                                                                                        item.name
+                                                                                                                                                                                                                                                                        idx
                                                                                                                                                                                                                                                 }
-                                                                                                                                                                                                                                                className="px-3 pt-5 pb-2 text-[10px] font-extrabold text-muted-foreground uppercase tracking-widest flex items-center gap-2 border-t border-white/5 mt-4 first:mt-0 first:border-0"
+                                                                                                                                                                                                                                                className="pt-4 pb-1 px-3 text-[10px] font-black uppercase tracking-widest text-muted-foreground/70"
                                                                                                                                                                                                                         >
-                                                                                                                                                                                                                                                <item.icon className="h-3.5 w-3.5 text-primary/70" />
                                                                                                                                                                                                                                                 {
                                                                                                                                                                                                                                                                         item.name
                                                                                                                                                                                                                                                 }
@@ -273,30 +117,14 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                                                                                                                                                                                                 );
                                                                                                                                                                         }
 
-                                                                                                                                                                        // Calculate active state by route path and tab query parameter
-                                                                                                                                                                        const isRouteMatch =
-                                                                                                                                                                                                pathname ===
-                                                                                                                                                                                                item.href.split(
-                                                                                                                                                                                                                        '?'
-                                                                                                                                                                                                )[0];
-                                                                                                                                                                        const queryParamsStr =
-                                                                                                                                                                                                item.href.split(
-                                                                                                                                                                                                                        '?'
-                                                                                                                                                                                                )[1] ||
-                                                                                                                                                                                                '';
-                                                                                                                                                                        const queryTab =
-                                                                                                                                                                                                new URLSearchParams(
-                                                                                                                                                                                                                        queryParamsStr
-                                                                                                                                                                                                ).get(
-                                                                                                                                                                                                                        'tab'
-                                                                                                                                                                                                );
-
                                                                                                                                                                         const isActive =
-                                                                                                                                                                                                isRouteMatch &&
-                                                                                                                                                                                                (queryTab
-                                                                                                                                                                                                                        ? currentTab ===
-                                                                                                                                                                                                                          queryTab
-                                                                                                                                                                                                                        : !currentTab);
+                                                                                                                                                                                                pathname ===
+                                                                                                                                                                                                                        item.href ||
+                                                                                                                                                                                                (item.href !==
+                                                                                                                                                                                                                        '/' &&
+                                                                                                                                                                                                                        pathname?.startsWith(
+                                                                                                                                                                                                                                                item.href
+                                                                                                                                                                                                                        ));
 
                                                                                                                                                                         return (
                                                                                                                                                                                                 <Link
@@ -306,44 +134,48 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                                                                                                                                                                                                                         href={
                                                                                                                                                                                                                                                 item.href
                                                                                                                                                                                                                         }
-                                                                                                                                                                                                                        onClick={(
-                                                                                                                                                                                                                                                e
-                                                                                                                                                                                                                        ) => {
+                                                                                                                                                                                                                        onClick={() =>
                                                                                                                                                                                                                                                 setIsOpen(
                                                                                                                                                                                                                                                                         false
-                                                                                                                                                                                                                                                );
-                                                                                                                                                                                                                                                if (
-                                                                                                                                                                                                                                                                        item.href ===
-                                                                                                                                                                                                                                                                        '#tour'
-                                                                                                                                                                                                                                                ) {
-                                                                                                                                                                                                                                                                        e.preventDefault();
-                                                                                                                                                                                                                                                                        startTour();
-                                                                                                                                                                                                                                                }
-                                                                                                                                                                                                                        }}
+                                                                                                                                                                                                                                                )
+                                                                                                                                                                                                                        }
                                                                                                                                                                                                                         className={cn(
-                                                                                                                                                                                                                                                'group flex items-center rounded-md transition-all duration-150',
-                                                                                                                                                                                                                                                item.isSub
-                                                                                                                                                                                                                                                                        ? 'pl-8 py-2 text-xs font-semibold'
-                                                                                                                                                                                                                                                                        : 'px-3 py-2.5 text-sm font-semibold',
+                                                                                                                                                                                                                                                'flex items-center gap-3 rounded-xl px-3 py-2 text-xs font-bold transition-all',
                                                                                                                                                                                                                                                 isActive
-                                                                                                                                                                                                                                                                        ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/20'
-                                                                                                                                                                                                                                                                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                                                                                                                                                                                                                                                                        ? 'bg-primary/10 text-primary border border-primary/20 shadow-sm'
+                                                                                                                                                                                                                                                                        : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
                                                                                                                                                                                                                         )}
                                                                                                                                                                                                 >
-                                                                                                                                                                                                                        {!item.isSub && (
-                                                                                                                                                                                                                                                <item.icon
-                                                                                                                                                                                                                                                                        className="mr-3 h-5 w-5 flex-shrink-0"
-                                                                                                                                                                                                                                                                        aria-hidden="true"
-                                                                                                                                                                                                                                                />
-                                                                                                                                                                                                                        )}
-                                                                                                                                                                                                                        {
-                                                                                                                                                                                                                                                item.name
-                                                                                                                                                                                                                        }
+                                                                                                                                                                                                                        <item.icon
+                                                                                                                                                                                                                                                className={cn(
+                                                                                                                                                                                                                                                                        'h-4 w-4',
+                                                                                                                                                                                                                                                                        isActive
+                                                                                                                                                                                                                                                                                                ? 'text-primary'
+                                                                                                                                                                                                                                                                                                : 'text-muted-foreground'
+                                                                                                                                                                                                                                                )}
+                                                                                                                                                                                                                        />
+                                                                                                                                                                                                                        <span>
+                                                                                                                                                                                                                                                {
+                                                                                                                                                                                                                                                                        item.name
+                                                                                                                                                                                                                                                }
+                                                                                                                                                                                                                        </span>
                                                                                                                                                                                                 </Link>
                                                                                                                                                                         );
                                                                                                                                                 }
                                                                                                                         )}
-                                                                                                </nav>
+                                                                                                </div>
+
+                                                                                                {/* Footer */}
+                                                                                                <div className="border-t p-4 text-[11px] text-muted-foreground flex justify-between items-center">
+                                                                                                                        <span>
+                                                                                                                                                Software
+                                                                                                                                                Intelligence
+                                                                                                                        </span>
+                                                                                                                        <span
+                                                                                                                                                className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"
+                                                                                                                                                title="System Online"
+                                                                                                                        />
+                                                                                                </div>
                                                                         </div>
                                                 </>
                         );

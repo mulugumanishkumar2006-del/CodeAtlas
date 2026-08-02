@@ -210,3 +210,251 @@ def trigger_continuous_reevaluation(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Continuous CTO re-evaluation error: {str(e)}",
         )
+
+
+@router.get(
+    "/repositories/{repo_id}/cto/strategic-decisions",
+    summary="Get evidence-backed strategic answers to 8 core CTO questions (Phase 39)",
+)
+def get_cto_strategic_decisions(
+    repo_id: str,
+    target_users: Optional[int] = 100000,
+    target_requests_per_sec: Optional[int] = 500,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    _validate_repo(repo_id, db, user)
+    try:
+        analysis = cto_orchestrator.analyze_repository(
+            db=db,
+            repo_id=repo_id,
+            target_users=target_users,
+            target_requests_per_sec=target_requests_per_sec,
+        )
+        return analysis.strategic_decisions
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve CTO strategic decisions: {str(e)}",
+        )
+
+
+class ScaleSimulationRequest(BaseModel):
+    target_users: int = Field(
+        default=100000000, description="User scale simulation target"
+    )
+    target_requests_per_sec: int = Field(
+        default=50000, description="Requests/sec simulation target"
+    )
+
+
+@router.post(
+    "/repositories/{repo_id}/cto/simulate-scale",
+    summary="Execute custom 100M+ user infrastructure stress simulation (Phase 39)",
+)
+def simulate_scale_scenario(
+    repo_id: str,
+    req: ScaleSimulationRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    _validate_repo(repo_id, db, user)
+    try:
+        analysis = cto_orchestrator.analyze_repository(
+            db=db,
+            repo_id=repo_id,
+            target_users=req.target_users,
+            target_requests_per_sec=req.target_requests_per_sec,
+        )
+        return {
+            "goals": analysis.goals,
+            "scenario_simulation": analysis.scenario_simulation,
+            "scaling_100m_analysis": analysis.strategic_decisions.get(
+                "scaling_100m", {}
+            ),
+            "capacity_planning": analysis.capacity_planning,
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Scale simulation execution error: {str(e)}",
+        )
+
+
+@router.get(
+    "/repositories/{repo_id}/cto/engineering-strategy",
+    summary="Generate 1-Year, 3-Year, and 5-Year Multi-Year Engineering Strategy (Feature 2)",
+)
+def get_engineering_strategy(
+    repo_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)
+):
+    _validate_repo(repo_id, db, user)
+    try:
+        return cto_orchestrator.get_engineering_strategy(db=db, repo_id=repo_id)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate engineering strategy: {str(e)}",
+        )
+
+
+@router.get(
+    "/repositories/{repo_id}/cto/engineering-vision-2030",
+    summary="Generate formal Engineering Vision 2030 Document (Feature 3)",
+)
+def get_engineering_vision_2030(
+    repo_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)
+):
+    _validate_repo(repo_id, db, user)
+    try:
+        return cto_orchestrator.get_engineering_vision_2030(db=db, repo_id=repo_id)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate Engineering Vision 2030: {str(e)}",
+        )
+
+
+class StrategicAdvisorRequest(BaseModel):
+    decision_key: str = Field(
+        default="monolith_vs_microservices",
+        description="Architectural decision topic to evaluate",
+    )
+
+
+@router.post(
+    "/repositories/{repo_id}/cto/strategic-advisor",
+    summary="Evaluate trade-off decisions (Build vs Buy, Monolith vs Microservices, etc.) (Feature 5)",
+)
+def evaluate_tradeoff_decision(
+    repo_id: str,
+    req: StrategicAdvisorRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    _validate_repo(repo_id, db, user)
+    try:
+        return cto_orchestrator.evaluate_tradeoff_decision(
+            db=db, repo_id=repo_id, decision_key=req.decision_key
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Trade-off decision evaluation error: {str(e)}",
+        )
+
+
+@router.get(
+    "/repositories/{repo_id}/cto/technology-intelligence",
+    summary="Get Technology Intelligence Suite across 20 specialized domains (Features 6–25)",
+)
+def get_technology_intelligence(
+    repo_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)
+):
+    _validate_repo(repo_id, db, user)
+    try:
+        return cto_orchestrator.get_technology_intelligence(db=db, repo_id=repo_id)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve technology intelligence suite: {str(e)}",
+        )
+
+
+@router.get(
+    "/repositories/{repo_id}/cto/growth-intelligence",
+    summary="Get Engineering Growth Intelligence Suite (Features 26–50)",
+)
+def get_growth_intelligence(
+    repo_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)
+):
+    _validate_repo(repo_id, db, user)
+    try:
+        return cto_orchestrator.get_growth_intelligence(db=db, repo_id=repo_id)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve growth intelligence suite: {str(e)}",
+        )
+
+
+@router.get(
+    "/repositories/{repo_id}/cto/engineering-economics",
+    summary="Get Engineering Economics & FinOps Suite (Features 51–75)",
+)
+def get_engineering_economics(
+    repo_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)
+):
+    _validate_repo(repo_id, db, user)
+    try:
+        return cto_orchestrator.get_engineering_economics(db=db, repo_id=repo_id)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve engineering economics suite: {str(e)}",
+        )
+
+
+@router.get(
+    "/repositories/{repo_id}/cto/future-intelligence",
+    summary="Get Future Engineering Intelligence & 10-Year Horizon Suite (Features 76–100)",
+)
+def get_future_intelligence(
+    repo_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)
+):
+    _validate_repo(repo_id, db, user)
+    try:
+        return cto_orchestrator.get_future_intelligence(db=db, repo_id=repo_id)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve future intelligence suite: {str(e)}",
+        )
+
+
+@router.get(
+    "/repositories/{repo_id}/cto/global-executive",
+    summary="Get Global Executive Intelligence Suite (Features 101–120)",
+)
+def get_global_executive_intelligence(
+    repo_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)
+):
+    _validate_repo(repo_id, db, user)
+    try:
+        return cto_orchestrator.get_global_executive_intelligence(
+            db=db, repo_id=repo_id
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve global executive intelligence suite: {str(e)}",
+        )
+
+
+class DigitalCTOCommandRequest(BaseModel):
+    query_prompt: str = Field(
+        default="Our company expects to grow from 1 million to 100 million users over the next five years. What should we do?",
+        description="Strategic query for Virtual CTO reasoning engine",
+    )
+
+
+@router.post(
+    "/repositories/{repo_id}/cto/digital-command-center",
+    summary="Signature Feature 120: Ask the AI CTO (Digital CTO Command Center Console)",
+)
+def run_digital_cto_command(
+    repo_id: str,
+    req: DigitalCTOCommandRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    _validate_repo(repo_id, db, user)
+    try:
+        return cto_orchestrator.run_digital_cto_command(
+            db=db, repo_id=repo_id, query_prompt=req.query_prompt
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Digital CTO Command Center execution error: {str(e)}",
+        )

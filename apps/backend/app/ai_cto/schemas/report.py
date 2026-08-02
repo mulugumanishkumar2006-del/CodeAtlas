@@ -142,3 +142,7 @@ class CTOAnalysisResponse(BaseModel):
         default_factory=dict,
         description="Impact forecasts for a 100x traffic simulation scenario",
     )
+    strategic_decisions: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Evidence-backed strategic answers to core CTO questions (Phase 39)",
+    )
