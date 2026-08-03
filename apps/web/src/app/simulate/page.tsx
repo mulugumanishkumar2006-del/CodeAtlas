@@ -13,148 +13,103 @@ import {
                         ExternalLink,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { EngineeringSimulationStudio } from '@/components/ui/engineering-simulation-studio';
 
 export default function SimulateWorkflowPage() {
-                        const [activeTab, setActiveTab] = useState<'load' | 'refactor' | 'schema'>(
-                                                'load'
-                        );
-                        const [simulating, setSimulating] = useState<boolean>(false);
-                        const [simData, setSimData] = useState<any>(null);
+	const [activeTab, setActiveTab] = useState<'studio' | 'load' | 'refactor' | 'schema'>(
+		'studio'
+	);
+	const [simulating, setSimulating] = useState<boolean>(false);
+	const [simData, setSimData] = useState<any>(null);
 
-                        const handleRunSim = () => {
-                                                setSimulating(true);
-                                                setTimeout(() => {
-                                                                        setSimData({
-                                                                                                scenario: '1M to 100M User Growth Scenario',
-                                                                                                health_score: 94.0,
-                                                                                                bottlenecks: [
-                                                                                                                        'DB Connection Pool saturates at 15k concurrent requests',
-                                                                                                                        'Auth JWT validation latency spikes +45ms',
-                                                                                                ],
-                                                                                                recommendations: [
-                                                                                                                        'Introduce Redis Cluster Auth Cache',
-                                                                                                                        'Decouple REST Router queries to async repository pattern',
-                                                                                                ],
-                                                                        });
-                                                                        setSimulating(false);
-                                                }, 1200);
-                        };
+	const handleRunSim = () => {
+		setSimulating(true);
+		setTimeout(() => {
+			setSimData({
+				scenario: '1M to 100M User Growth Scenario',
+				health_score: 94.0,
+				bottlenecks: [
+					'DB Connection Pool saturates at 15k concurrent requests',
+					'Auth JWT validation latency spikes +45ms',
+				],
+				recommendations: [
+					'Introduce Redis Cluster Auth Cache',
+					'Decouple REST Router queries to async repository pattern',
+				],
+			});
+			setSimulating(false);
+		}, 1200);
+	};
 
-                        return (
-                                                <div className="min-h-screen bg-background text-foreground p-8 space-y-8 max-w-7xl mx-auto">
-                                                                        {/* Top Header */}
-                                                                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b pb-6">
-                                                                                                <div className="space-y-1">
-                                                                                                                        <div className="flex items-center gap-3">
-                                                                                                                                                <h1 className="text-3xl font-black tracking-tight text-foreground">
-                                                                                                                                                                        ⚡
-                                                                                                                                                                        Simulate
-                                                                                                                                                                        Workflow
-                                                                                                                                                </h1>
-                                                                                                                                                <span className="px-3 py-1 bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-xs font-black rounded-full uppercase tracking-wider">
-                                                                                                                                                                        ARCHITECTURE
-                                                                                                                                                                        SIMULATION
-                                                                                                                                                                        LAB
-                                                                                                                                                </span>
-                                                                                                                        </div>
-                                                                                                                        <p className="text-sm text-muted-foreground">
-                                                                                                                                                Simulate
-                                                                                                                                                system
-                                                                                                                                                behavior
-                                                                                                                                                under
-                                                                                                                                                100M
-                                                                                                                                                user
-                                                                                                                                                load,
-                                                                                                                                                microservices
-                                                                                                                                                migrations,
-                                                                                                                                                and
-                                                                                                                                                database
-                                                                                                                                                schema
-                                                                                                                                                evolution
-                                                                                                                                                before
-                                                                                                                                                writing
-                                                                                                                                                code.
-                                                                                                                        </p>
-                                                                                                </div>
-                                                                                                {activeTab ===
-                                                                                                                        'load' && (
-                                                                                                                        <Button
-                                                                                                                                                onClick={
-                                                                                                                                                                        handleRunSim
-                                                                                                                                                }
-                                                                                                                                                disabled={
-                                                                                                                                                                        simulating
-                                                                                                                                                }
-                                                                                                                                                className="bg-primary text-primary-foreground font-bold text-xs gap-2"
-                                                                                                                        >
-                                                                                                                                                <Play className="h-4 w-4" />{' '}
-                                                                                                                                                {simulating
-                                                                                                                                                                        ? 'Simulating...'
-                                                                                                                                                                        : 'Run 100M User Load Test'}
-                                                                                                                        </Button>
-                                                                                                )}
-                                                                        </div>
+	return (
+		<div className="space-y-6 max-w-7xl mx-auto pb-12">
+			{/* Top Header */}
+			<div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-800/80 pb-5">
+				<div>
+					<div className="flex items-center gap-3">
+						<h1 className="text-2xl font-black tracking-tight text-white flex items-center gap-2">
+							<Zap className="w-6 h-6 text-cyan-400" /> Engineering Simulation Studio
+						</h1>
+						<span className="px-2.5 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-[10px] font-mono font-bold rounded-full uppercase tracking-wider">
+							FIGMA + GOOGLE MAPS + AI ARCHITECT
+						</span>
+					</div>
+					<p className="text-xs text-slate-400 mt-1">
+						Simulate code changes, database migrations, package extractions, and traffic scaling safely before writing code.
+					</p>
+				</div>
+			</div>
 
-                                                                        {/* Sub-Workflow Navigation Tabs */}
-                                                                        <div className="flex items-center gap-2 border-b pb-2 overflow-x-auto">
-                                                                                                <button
-                                                                                                                        onClick={() =>
-                                                                                                                                                setActiveTab(
-                                                                                                                                                                        'load'
-                                                                                                                                                )
-                                                                                                                        }
-                                                                                                                        className={`px-4 py-2 text-xs font-extrabold rounded-xl transition-all flex items-center gap-2 ${
-                                                                                                                                                activeTab ===
-                                                                                                                                                'load'
-                                                                                                                                                                        ? 'bg-primary/10 text-primary border border-primary/20 shadow-sm'
-                                                                                                                                                                        : 'text-muted-foreground hover:bg-muted/50'
-                                                                                                                        }`}
-                                                                                                >
-                                                                                                                        <Zap className="h-4 w-4 text-indigo-400" />{' '}
-                                                                                                                        Load
-                                                                                                                        &
-                                                                                                                        Scale
-                                                                                                                        Simulator
-                                                                                                </button>
-                                                                                                <button
-                                                                                                                        onClick={() =>
-                                                                                                                                                setActiveTab(
-                                                                                                                                                                        'refactor'
-                                                                                                                                                )
-                                                                                                                        }
-                                                                                                                        className={`px-4 py-2 text-xs font-extrabold rounded-xl transition-all flex items-center gap-2 ${
-                                                                                                                                                activeTab ===
-                                                                                                                                                'refactor'
-                                                                                                                                                                        ? 'bg-primary/10 text-primary border border-primary/20 shadow-sm'
-                                                                                                                                                                        : 'text-muted-foreground hover:bg-muted/50'
-                                                                                                                        }`}
-                                                                                                >
-                                                                                                                        <Layers className="h-4 w-4 text-purple-400" />{' '}
-                                                                                                                        Refactoring
-                                                                                                                        Impact
-                                                                                                                        Simulator
-                                                                                                </button>
-                                                                                                <button
-                                                                                                                        onClick={() =>
-                                                                                                                                                setActiveTab(
-                                                                                                                                                                        'schema'
-                                                                                                                                                )
-                                                                                                                        }
-                                                                                                                        className={`px-4 py-2 text-xs font-extrabold rounded-xl transition-all flex items-center gap-2 ${
-                                                                                                                                                activeTab ===
-                                                                                                                                                'schema'
-                                                                                                                                                                        ? 'bg-primary/10 text-primary border border-primary/20 shadow-sm'
-                                                                                                                                                                        : 'text-muted-foreground hover:bg-muted/50'
-                                                                                                                        }`}
-                                                                                                >
-                                                                                                                        <Database className="h-4 w-4 text-emerald-400" />{' '}
-                                                                                                                        Schema
-                                                                                                                        &
-                                                                                                                        Database
-                                                                                                                        Evolution
-                                                                                                                        Simulator
-                                                                                                </button>
-                                                                        </div>
+			{/* Sub-Workflow Navigation Tabs */}
+			<div className="flex items-center gap-2 border-b border-slate-800/80 pb-2 overflow-x-auto">
+				<button
+					onClick={() => setActiveTab('studio')}
+					className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 ${
+						activeTab === 'studio'
+							? 'bg-cyan-500/15 text-cyan-200 border border-cyan-500/30 shadow-md font-bold'
+							: 'text-slate-400 hover:bg-slate-900'
+					}`}
+				>
+					<Zap className="h-4 w-4 text-cyan-400" /> Simulation Studio Canvas
+				</button>
+				<button
+					onClick={() => setActiveTab('load')}
+					className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 ${
+						activeTab === 'load'
+							? 'bg-cyan-500/15 text-cyan-200 border border-cyan-500/30 shadow-md font-bold'
+							: 'text-slate-400 hover:bg-slate-900'
+					}`}
+				>
+					<Play className="h-4 w-4 text-indigo-400" /> Load & Scale Tests
+				</button>
+				<button
+					onClick={() => setActiveTab('refactor')}
+					className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 ${
+						activeTab === 'refactor'
+							? 'bg-cyan-500/15 text-cyan-200 border border-cyan-500/30 shadow-md font-bold'
+							: 'text-slate-400 hover:bg-slate-900'
+					}`}
+				>
+					<Layers className="h-4 w-4 text-purple-400" /> Refactoring Impact
+				</button>
+				<button
+					onClick={() => setActiveTab('schema')}
+					className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 ${
+						activeTab === 'schema'
+							? 'bg-cyan-500/15 text-cyan-200 border border-cyan-500/30 shadow-md font-bold'
+							: 'text-slate-400 hover:bg-slate-900'
+					}`}
+				>
+					<Database className="h-4 w-4 text-emerald-400" /> Database Evolution
+				</button>
+			</div>
+
+			{/* TAB CONTENT: Engineering Simulation Studio */}
+			{activeTab === 'studio' && (
+				<div className="py-1">
+					<EngineeringSimulationStudio />
+				</div>
+			)}
 
                                                                         {/* TAB CONTENT 1: Load & Scale Simulator */}
                                                                         {activeTab === 'load' && (

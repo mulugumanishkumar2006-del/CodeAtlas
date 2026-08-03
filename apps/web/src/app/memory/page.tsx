@@ -25,61 +25,63 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { SoftwareMemoryTimeMachine } from '@/components/ui/software-memory-time-machine';
 
 interface Repository {
-                        id: string;
-                        name: string;
-                        full_name: string;
-                        clone_url: string;
-                        status: string;
+	id: string;
+	name: string;
+	full_name: string;
+	clone_url: string;
+	status: string;
 }
 
 interface MemorySource {
-                        id: string;
-                        type: string;
-                        name: string;
-                        details: string | null;
-                        properties: Record<string, any>;
+	id: string;
+	type: string;
+	name: string;
+	details: string | null;
+	properties: Record<string, any>;
 }
 
 interface MemoryQueryResponse {
-                        query: string;
-                        answer: string;
-                        sources: MemorySource[];
+	query: string;
+	answer: string;
+	sources: MemorySource[];
 }
 
 export default function RepositoryMemoryPage() {
-                        const { token } = useAuth();
+	const { token } = useAuth();
 
-                        // Repositories state
-                        const [repos, setRepos] = React.useState<Repository[]>([]);
-                        const [selectedRepoId, setSelectedRepoId] = React.useState<string>('');
-                        const [reposLoading, setReposLoading] = React.useState<boolean>(true);
+	// Repositories state
+	const [repos, setRepos] = React.useState<Repository[]>([]);
+	const [selectedRepoId, setSelectedRepoId] = React.useState<string>('');
+	const [reposLoading, setReposLoading] = React.useState<boolean>(true);
 
-                        // Chat Query state
-                        const [queryText, setQueryText] = React.useState<string>('');
-                        const [queryLoading, setQueryLoading] = React.useState<boolean>(false);
-                        const [queryResponse, setQueryResponse] =
-                                                React.useState<MemoryQueryResponse | null>(null);
+	// Chat Query state
+	const [queryText, setQueryText] = React.useState<string>('');
+	const [queryLoading, setQueryLoading] = React.useState<boolean>(false);
+	const [queryResponse, setQueryResponse] =
+		React.useState<MemoryQueryResponse | null>(null);
 
-                        // Statistics state
-                        const [stats, setStats] = React.useState<Record<string, number>>({});
-                        const [statsLoading, setStatsLoading] = React.useState<boolean>(false);
-                        const [dashboardMetrics, setDashboardMetrics] = React.useState<any | null>(
-                                                null
-                        );
+	// Statistics state
+	const [stats, setStats] = React.useState<Record<string, number>>({});
+	const [statsLoading, setStatsLoading] = React.useState<boolean>(false);
+	const [dashboardMetrics, setDashboardMetrics] = React.useState<any | null>(
+		null
+	);
 
-                        // Memory Browser state
-                        const [activeTab, setActiveTab] = React.useState<
-                                                | 'dashboard'
-                                                | 'adrs'
-                                                | 'commits'
-                                                | 'comments'
-                                                | 'docs'
-                                                | 'timeline'
-                                                | 'explorer'
-                                                | 'history'
-                        >('dashboard');
+	// Memory Browser state
+	const [activeTab, setActiveTab] = React.useState<
+		| 'timemachine'
+		| 'dashboard'
+		| 'adrs'
+		| 'commits'
+		| 'comments'
+		| 'docs'
+		| 'timeline'
+		| 'explorer'
+		| 'history'
+	>('timemachine');
                         const [adrs, setAdrs] = React.useState<any[]>([]);
                         const [commits, setCommits] = React.useState<any[]>([]);
                         const [comments, setComments] = React.useState<any[]>([]);
@@ -1125,6 +1127,11 @@ export default function RepositoryMemoryPage() {
                                                                                                                         <div className="flex flex-wrap gap-1 bg-muted p-1 rounded-lg border max-w-max">
                                                                                                                                                 {[
                                                                                                                                                                         {
+                                                                                                                                                                                                id: 'timemachine',
+                                                                                                                                                                                                label: 'Time Machine Studio',
+                                                                                                                                                                                                count: 6,
+                                                                                                                                                                        },
+                                                                                                                                                                        {
                                                                                                                                                                                                 id: 'dashboard',
                                                                                                                                                                                                 label: 'Memory Dashboard',
                                                                                                                                                                                                 count:
@@ -1183,7 +1190,7 @@ export default function RepositoryMemoryPage() {
                                                                                                                                                                                                                                                 'px-3.5 py-1.5 rounded-md text-xs font-semibold tracking-wide transition-all duration-200 cursor-pointer',
                                                                                                                                                                                                                                                 activeTab ===
                                                                                                                                                                                                                                                                         tab.id
-                                                                                                                                                                                                                                                                        ? 'bg-background shadow-sm text-foreground'
+                                                                                                                                                                                                                                                                        ? 'bg-primary/20 shadow-sm text-primary font-bold border border-primary/30'
                                                                                                                                                                                                                                                                         : 'text-muted-foreground hover:text-foreground'
                                                                                                                                                                                                                         )}
                                                                                                                                                                                                 >

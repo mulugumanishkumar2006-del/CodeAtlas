@@ -16,125 +16,92 @@ import {
                         Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { AIInvestigationWorkspace } from '@/components/ui/ai-investigation-workspace';
 
 export default function InvestigateWorkflowPage() {
-                        const [activeTab, setActiveTab] = useState<
-                                                'diagnostics' | 'council' | 'trace' | 'briefing'
-                        >('diagnostics');
+	const [activeTab, setActiveTab] = useState<
+		'workspace' | 'diagnostics' | 'council' | 'trace' | 'briefing'
+	>('workspace');
 
-                        return (
-                                                <div className="min-h-screen bg-background text-foreground p-8 space-y-8 max-w-7xl mx-auto">
-                                                                        {/* Top Header */}
-                                                                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b pb-6">
-                                                                                                <div className="space-y-1">
-                                                                                                                        <div className="flex items-center gap-3">
-                                                                                                                                                <h1 className="text-3xl font-black tracking-tight text-foreground">
-                                                                                                                                                                        🔬
-                                                                                                                                                                        Investigate
-                                                                                                                                                                        Workflow
-                                                                                                                                                </h1>
-                                                                                                                                                <span className="px-3 py-1 bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-black rounded-full uppercase tracking-wider">
-                                                                                                                                                                        DEBT
-                                                                                                                                                                        &
-                                                                                                                                                                        AGENTIC
-                                                                                                                                                                        DIAGNOSTICS
-                                                                                                                                                </span>
-                                                                                                                        </div>
-                                                                                                                        <p className="text-sm text-muted-foreground">
-                                                                                                                                                Deep
-                                                                                                                                                diagnostic
-                                                                                                                                                inspection
-                                                                                                                                                into
-                                                                                                                                                code
-                                                                                                                                                complexity,
-                                                                                                                                                multi-agent
-                                                                                                                                                council
-                                                                                                                                                debate,
-                                                                                                                                                reasoning
-                                                                                                                                                traces,
-                                                                                                                                                and
-                                                                                                                                                executive
-                                                                                                                                                summaries.
-                                                                                                                        </p>
-                                                                                                </div>
-                                                                        </div>
+	return (
+		<div className="space-y-6 max-w-7xl mx-auto pb-12">
+			{/* Top Header */}
+			<div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-800/80 pb-5">
+				<div>
+					<div className="flex items-center gap-3">
+						<h1 className="text-2xl font-black tracking-tight text-white flex items-center gap-2">
+							<Brain className="w-6 h-6 text-cyan-400" /> AI Investigation Workspace
+						</h1>
+						<span className="px-2.5 py-0.5 bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-[10px] font-mono font-bold rounded-full uppercase tracking-wider">
+							4-PANEL SYNCHRONIZED SUITE
+						</span>
+					</div>
+					<p className="text-xs text-slate-400 mt-1">
+						ChatGPT meets GitHub meets Google Maps: Investigate repository complexity, API coupling, technical debt, and architecture topology.
+					</p>
+				</div>
+			</div>
 
-                                                                        {/* Sub-Workflow Navigation Tabs */}
-                                                                        <div className="flex items-center gap-2 border-b pb-2 overflow-x-auto">
-                                                                                                <button
-                                                                                                                        onClick={() =>
-                                                                                                                                                setActiveTab(
-                                                                                                                                                                        'diagnostics'
-                                                                                                                                                )
-                                                                                                                        }
-                                                                                                                        className={`px-4 py-2 text-xs font-extrabold rounded-xl transition-all flex items-center gap-2 ${
-                                                                                                                                                activeTab ===
-                                                                                                                                                'diagnostics'
-                                                                                                                                                                        ? 'bg-primary/10 text-primary border border-primary/20 shadow-sm'
-                                                                                                                                                                        : 'text-muted-foreground hover:bg-muted/50'
-                                                                                                                        }`}
-                                                                                                >
-                                                                                                                        <Flame className="h-4 w-4 text-amber-400" />{' '}
-                                                                                                                        Complexity
-                                                                                                                        &
-                                                                                                                        Debt
-                                                                                                                        Diagnostics
-                                                                                                </button>
-                                                                                                <button
-                                                                                                                        onClick={() =>
-                                                                                                                                                setActiveTab(
-                                                                                                                                                                        'council'
-                                                                                                                                                )
-                                                                                                                        }
-                                                                                                                        className={`px-4 py-2 text-xs font-extrabold rounded-xl transition-all flex items-center gap-2 ${
-                                                                                                                                                activeTab ===
-                                                                                                                                                'council'
-                                                                                                                                                                        ? 'bg-primary/10 text-primary border border-primary/20 shadow-sm'
-                                                                                                                                                                        : 'text-muted-foreground hover:bg-muted/50'
-                                                                                                                        }`}
-                                                                                                >
-                                                                                                                        <Users className="h-4 w-4 text-indigo-400" />{' '}
-                                                                                                                        Multi-Agent
-                                                                                                                        Council
-                                                                                                                        Debate
-                                                                                                </button>
-                                                                                                <button
-                                                                                                                        onClick={() =>
-                                                                                                                                                setActiveTab(
-                                                                                                                                                                        'trace'
-                                                                                                                                                )
-                                                                                                                        }
-                                                                                                                        className={`px-4 py-2 text-xs font-extrabold rounded-xl transition-all flex items-center gap-2 ${
-                                                                                                                                                activeTab ===
-                                                                                                                                                'trace'
-                                                                                                                                                                        ? 'bg-primary/10 text-primary border border-primary/20 shadow-sm'
-                                                                                                                                                                        : 'text-muted-foreground hover:bg-muted/50'
-                                                                                                                        }`}
-                                                                                                >
-                                                                                                                        <Brain className="h-4 w-4 text-purple-400" />{' '}
-                                                                                                                        Reasoning
-                                                                                                                        Trace
-                                                                                                                        &
-                                                                                                                        Whiteboard
-                                                                                                </button>
-                                                                                                <button
-                                                                                                                        onClick={() =>
-                                                                                                                                                setActiveTab(
-                                                                                                                                                                        'briefing'
-                                                                                                                                                )
-                                                                                                                        }
-                                                                                                                        className={`px-4 py-2 text-xs font-extrabold rounded-xl transition-all flex items-center gap-2 ${
-                                                                                                                                                activeTab ===
-                                                                                                                                                'briefing'
-                                                                                                                                                                        ? 'bg-primary/10 text-primary border border-primary/20 shadow-sm'
-                                                                                                                                                                        : 'text-muted-foreground hover:bg-muted/50'
-                                                                                                                        }`}
-                                                                                                >
-                                                                                                                        <Building2 className="h-4 w-4 text-emerald-400" />{' '}
-                                                                                                                        Executive
-                                                                                                                        Briefing
-                                                                                                </button>
-                                                                        </div>
+			{/* Sub-Workflow Navigation Tabs */}
+			<div className="flex items-center gap-2 border-b border-slate-800/80 pb-2 overflow-x-auto">
+				<button
+					onClick={() => setActiveTab('workspace')}
+					className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 ${
+						activeTab === 'workspace'
+							? 'bg-cyan-500/15 text-cyan-200 border border-cyan-500/30 shadow-md font-bold'
+							: 'text-slate-400 hover:bg-slate-900'
+					}`}
+				>
+					<Brain className="h-4 w-4 text-cyan-400" /> 4-Panel AI Workspace
+				</button>
+				<button
+					onClick={() => setActiveTab('diagnostics')}
+					className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 ${
+						activeTab === 'diagnostics'
+							? 'bg-cyan-500/15 text-cyan-200 border border-cyan-500/30 shadow-md font-bold'
+							: 'text-slate-400 hover:bg-slate-900'
+					}`}
+				>
+					<Flame className="h-4 w-4 text-amber-400" /> Debt & Complexity Diagnostics
+				</button>
+				<button
+					onClick={() => setActiveTab('council')}
+					className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 ${
+						activeTab === 'council'
+							? 'bg-cyan-500/15 text-cyan-200 border border-cyan-500/30 shadow-md font-bold'
+							: 'text-slate-400 hover:bg-slate-900'
+					}`}
+				>
+					<Users className="h-4 w-4 text-indigo-400" /> Multi-Agent Council Debate
+				</button>
+				<button
+					onClick={() => setActiveTab('trace')}
+					className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 ${
+						activeTab === 'trace'
+							? 'bg-cyan-500/15 text-cyan-200 border border-cyan-500/30 shadow-md font-bold'
+							: 'text-slate-400 hover:bg-slate-900'
+					}`}
+				>
+					<Sparkles className="h-4 w-4 text-purple-400" /> Reasoning Trace
+				</button>
+				<button
+					onClick={() => setActiveTab('briefing')}
+					className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 ${
+						activeTab === 'briefing'
+							? 'bg-cyan-500/15 text-cyan-200 border border-cyan-500/30 shadow-md font-bold'
+							: 'text-slate-400 hover:bg-slate-900'
+					}`}
+				>
+					<Building2 className="h-4 w-4 text-emerald-400" /> Executive Briefing
+				</button>
+			</div>
+
+			{/* TAB CONTENT: 4-Panel AI Investigation Workspace */}
+			{activeTab === 'workspace' && (
+				<div className="py-1">
+					<AIInvestigationWorkspace />
+				</div>
+			)}
 
                                                                         {/* TAB CONTENT 1: Diagnostics */}
                                                                         {activeTab ===
