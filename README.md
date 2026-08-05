@@ -1,12 +1,14 @@
 # CodeAtlas
 
-CodeAtlas is a developer platform designed to organize, analyze, and manage codebases. Built with a Next.js frontend and a FastAPI backend, it features GitHub OAuth + JWT authorization, PostgreSQL persistence, and Celery asynchronous background tasks for repo management.
+CodeAtlas is an AI Operating System for Software Engineering. Built with a Next.js frontend and a FastAPI backend, it features GitHub OAuth + JWT authorization, PostgreSQL persistence, and Celery asynchronous background tasks for repo management.
 
-## Key Features
+## Next-Generation Platform Features
 
-**AI Refactoring Studio** (72% $\rightarrow$ 93% health transformation).
-
-- **Collapsible Dashboard**: A responsive, theme-aware layout supporting light and dark modes.
+- **AI Mission Control** (`/` & `/mission-control`): Real-time engineering command center replacing static dashboards with dynamic state greetings, 8 intelligent scorecards with SVG progress rings, live AI activity stream, repository digital twins, daily focus task lists, live engineering timeline, and docked context-aware AI Copilot.
+- **AI CTO Workspace** (`/ai-cto`): Proactive organizational intelligence workspace offering 5 Executive Abstraction Views (`DEVELOPER`, `TECH_LEAD`, `ENGINEERING_MANAGER`, `PRINCIPAL_ENGINEER`, `CTO`), 10 live telemetry metrics, proactive AI recommendations, an interactive Engineering Advisor, a 6-week AI strategic roadmap, architectural decision support, and persistent long-term AI memory.
+- **AI Investigation Engine** (`/investigate`): Autonomous incident response engine with 12 preset trigger queries (*slow checkout, auth failures, memory usage, drift, dependency conflicts, circular dependencies, database bottlenecks, etc.*), a real-time 15-stage reasoning pipeline, transparent chain-of-thought reasoning tree, structured report viewer with direct tool links (`/repositories`, `/architecture`, `/knowledge`, `/analyze`, `/simulate`, `/dependency-graph`, `/security`, `/tech-debt`, `/monitor`), and team collaboration tools.
+- **AI Refactoring Planner** (`/improve`): Complete engineering execution planner featuring automatic refactoring opportunity detection (*God Services, God Classes, Cyclic Dependencies, DB Bottlenecks, Shotgun Surgery, etc.*), an interactive 6-step visual roadmap, side-by-side Digital Twin simulation comparison (latency, throughput, debt payoff), trade-off analysis matrix, detailed execution plan with rollback strategies, and a live execution progress assistant.
+- **Collapsible Dashboard**: Responsive, theme-aware layout supporting light and dark modes.
 - **GitHub OAuth + JWT Authentication**: Secure authentication flow with token-based session verification.
 - **Relational Code Base Tracking**: Complete persistence layers for tracking users, repositories, and jobs.
 - **Async Git Cloning**: Asynchronous clone execution using Celery background workers and Redis queues.
@@ -29,8 +31,8 @@ codeatlas/
 │   │   └── Dockerfile
 │   └── web/                 # Next.js Frontend Application
 │       ├── src/
-│       │   ├── app/         # App Router Views (Dashboard, Login)
-│       │   ├── components/  # Collapsible Sidebar, ThemeToggle
+│       │   ├── app/         # App Router Views (AI Mission Control, AI CTO, Investigate, Refactoring Planner)
+│       │   ├── components/  # AI Mission Control, AI CTO, AI Investigation, Refactoring Planner components
 │       │   └── context/     # Auth Context storing local tokens
 │       └── Dockerfile
 ├── docs/                    # REST API specifications and release notes
