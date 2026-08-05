@@ -9,3 +9,5 @@ __pycache__/
 .next/
 cloned_repos/
 *.db
+test_out.txt
+test_output.txt

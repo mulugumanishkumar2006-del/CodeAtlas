@@ -1,8 +1,12 @@
 'use client';
 
 import React from 'react';
-import { UniversalSearchCommandCenter } from '@/components/ui/universal-search-command-center';
+import { SemanticSearchStudio } from '@/components/search/semantic-search-studio';
 
 export default function SearchWorkflowPage() {
-	return <UniversalSearchCommandCenter />;
+  return (
+    <div className="-m-6 h-[calc(100vh-4rem)] overflow-hidden">
+      <SemanticSearchStudio />
+    </div>
+  );
 }
