@@ -1,82 +1,307 @@
-export type ReviewRolePerspective = 'Developer' | 'Tech Lead' | 'Staff Engineer' | 'Principal Engineer' | 'Engineering Manager' | 'Director' | 'CTO';
+import { CodeReviewTarget } from './review-types';
 
-export type ReviewModeType =
-  | 'Overall Architecture'
-  | 'Scalability'
-  | 'Performance'
-  | 'Security'
-  | 'Reliability'
-  | 'Maintainability'
-  | 'Developer Experience'
-  | 'Cloud Readiness'
-  | 'Microservices'
-  | 'Event Driven'
-  | 'Domain Driven Design'
-  | 'Clean Architecture'
-  | 'Hexagonal Architecture'
-  | 'CQRS'
-  | 'Event Sourcing'
-  | 'Layered Architecture'
-  | 'Monolith'
-  | 'Modular Monolith'
-  | 'Serverless'
-  | 'Kubernetes'
-  | 'Platform Engineering'
-  | 'Repository Organization'
-  | 'API Design'
-  | 'Database Design';
+export const MOCK_REVIEW_TARGETS: CodeReviewTarget[] = [
+  {
+    id: 'pr-482',
+    title: 'PR #482: Add Async Payment Webhook Worker & Multi-Tenant Partitioning',
+    description: 'Refactors synchronous Stripe payment capture into a decoupled Kafka event processing loop with tenant-isolated database connection pooling.',
+    targetType: 'pr',
+    author: {
+      name: 'Elena Rostova',
+      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+      role: 'Staff Backend Engineer',
+    },
+    branch: 'feat/async-payment-worker',
+    baseBranch: 'main',
+    commitHash: 'a4f9b21e',
+    createdAt: '25 mins ago',
+    status: 'IN_REVIEW',
+    scorecard: {
+      overallScore: 94,
+      architectureScore: 92,
+      securityScore: 98,
+      performanceScore: 96,
+      maintainabilityScore: 95,
+      documentationScore: 90,
+      testQualityScore: 91,
+      techDebtImpactHours: -18, // 18 hours of tech debt eliminated!
+      deploymentReadiness: 'READY',
+    },
+    files: [
+      {
+        id: 'file-1',
+        oldPath: 'apps/backend/app/services/payment_service.py',
+        newPath: 'apps/backend/app/services/payment_service.py',
+        status: 'modified',
+        additions: 48,
+        deletions: 16,
+        diffHunks: [
+          {
+            header: '@@ -35,16 +35,48 @@ class PaymentService:',
+            oldStart: 35,
+            oldLines: 16,
+            newStart: 35,
+            newLines: 48,
+            lines: [
+              { type: 'context', oldLineNumber: 35, newLineNumber: 35, content: '    def capture_checkout_session(self, db: Session, payload: dict):' },
+              { type: 'delete', oldLineNumber: 36, content: '        # Direct sync HTTP call to external Stripe API' },
+              { type: 'delete', oldLineNumber: 37, content: '        res = requests.post("https://api.stripe.com/v1/charges", data=payload)' },
+              { type: 'delete', oldLineNumber: 38, content: '        db.execute(f"UPDATE payments SET status=\'PAID\' WHERE id=\'{payload[\'id\']}\'")' },
+              { type: 'add', newLineNumber: 36, content: '        # [AI Staff Engineer Review]: Decoupled via Kafka Event Producer' },
+              { type: 'add', newLineNumber: 37, content: '        event_payload = PaymentCheckoutEvent(' },
+              { type: 'add', newLineNumber: 38, content: '            session_id=payload["id"],' },
+              { type: 'add', newLineNumber: 39, content: '            tenant_id=payload.get("tenant_id", "default"),' },
+              { type: 'add', newLineNumber: 40, content: '            amount_cents=payload["amount_cents"],' },
+              { type: 'add', newLineNumber: 41, content: '            currency=payload["currency"],' },
+              { type: 'add', newLineNumber: 42, content: '        )' },
+              { type: 'add', newLineNumber: 43, content: '        kafka_producer.send("payment.checkout.v1", value=event_payload.dict())' },
+              { type: 'add', newLineNumber: 44, content: '        return {"status": "QUEUED", "event_id": event_payload.event_id}' },
+            ],
+          },
+        ],
+      },
+      {
+        id: 'file-2',
+        oldPath: 'apps/backend/app/api/v1/payment_router.py',
+        newPath: 'apps/backend/app/api/v1/payment_router.py',
+        status: 'modified',
+        additions: 32,
+        deletions: 8,
+        diffHunks: [
+          {
+            header: '@@ -12,8 +12,32 @@ @router.post("/checkout")',
+            oldStart: 12,
+            oldLines: 8,
+            newStart: 12,
+            newLines: 32,
+            lines: [
+              { type: 'context', oldLineNumber: 12, newLineNumber: 12, content: '@router.post("/checkout", response_model=CheckoutResponse)' },
+              { type: 'delete', oldLineNumber: 13, content: 'def process_checkout(payload: dict, db: Session = Depends(get_db)):' },
+              { type: 'add', newLineNumber: 13, content: 'async def process_checkout(' },
+              { type: 'add', newLineNumber: 14, content: '    req: CheckoutRequestSchema,' },
+              { type: 'add', newLineNumber: 15, content: '    db: AsyncSession = Depends(get_async_db),' },
+              { type: 'add', newLineNumber: 16, content: '    current_user: User = Depends(get_current_user)' },
+              { type: 'add', newLineNumber: 17, content: '):' },
+              { type: 'add', newLineNumber: 18, content: '    # Parameterized query isolation & async routing' },
+              { type: 'add', newLineNumber: 19, content: '    return await payment_service.capture_async(db, req, current_user.tenant_id)' },
+            ],
+          },
+        ],
+      },
+    ],
+    comments: [
+      {
+        id: 'c-101',
+        filePath: 'apps/backend/app/services/payment_service.py',
+        lineStart: 38,
+        lineEnd: 38,
+        title: 'SQL Injection Vulnerability & Synchronous Latency Hotspot',
+        category: 'security',
+        severity: 'CRITICAL',
+        aiConfidence: 99.4,
+        problemDescription: 'Line 38 in the original code executed un-parameterized SQL string formatting `f"UPDATE payments SET status=\'PAID\' WHERE id=\'{payload[\'id\']}\'"`, exposing the database to direct SQL Injection if `payload[\'id\']` contained unsanitized user input.',
+        evidenceSnippet: 'db.execute(f"UPDATE payments SET status=\'PAID\' WHERE id=\'{payload[\'id\']}\'")',
+        affectedFiles: [
+          'apps/backend/app/services/payment_service.py',
+          'apps/backend/app/models/payment.py',
+        ],
+        architectureContext: 'Violates CodeAtlas Security Architecture Rule #4 (Mandatory Parameterized SQLAlchemy ORM Queries) and DDD layer boundaries by placing raw SQL inside domain services.',
+        businessImpact: 'Protects enterprise tenant data against malicious payload injection and eliminates customer checkout failures under heavy traffic spikes.',
+        engineeringImpact: 'Replaces raw SQL strings with parameterized SQLAlchemy expressions, enabling connection pooling and query plan caching.',
+        suggestedFix: {
+          explanation: 'Use SQLAlchemy parameterized update query with strict type bindings.',
+          targetFile: 'apps/backend/app/services/payment_service.py',
+          startLine: 36,
+          endLine: 44,
+          originalCodeSnippet: `db.execute(f"UPDATE payments SET status='PAID' WHERE id='{payload['id']}'")`,
+          fixedCodeSnippet: `stmt = update(Payment).where(Payment.id == payload["id"]).values(status=PaymentStatus.PAID)\ndb.execute(stmt)`,
+          applyable: true,
+        },
+        alternativeSolutions: [
+          {
+            title: 'Option A (Recommended): Decouple via Kafka Event Producer',
+            description: 'Publish checkout events to Kafka payment.checkout.v1 topic and execute batch updates asynchronously in consumer workers.',
+            pros: ['Drops checkout latency from 340ms to 24ms', 'Full failure domain isolation', 'Replayable audit log'],
+            cons: ['Requires Kafka consumer worker deployment'],
+            complexity: 'Medium',
+            effortHours: 4,
+          },
+          {
+            title: 'Option B: Synchronous SQLAlchemy Parameterized ORM Update',
+            description: 'Execute parameterized UPDATE query within current HTTP request thread.',
+            pros: ['Zero additional infrastructure requirements'],
+            cons: ['Leaves synchronous external HTTP blocking intact'],
+            complexity: 'Low',
+            effortHours: 1,
+          },
+        ],
+        relatedDocLink: {
+          engine: 'doc_engineer',
+          label: 'Security & Auth Guide (AI Doc Engineer)',
+          url: '/docs?id=doc-sec-guide',
+          badge: 'Doc Engineer',
+        },
+        relatedAdrLink: {
+          engine: 'architecture_intelligence',
+          label: 'ADR-0042: Hybrid Graph-Relational Architecture',
+          url: '/docs?id=doc-adr',
+          badge: 'ADR-0042',
+        },
+        relatedInvestigationLink: {
+          engine: 'ai_investigation',
+          label: 'AI Root Cause Analysis #1042 (Checkout Spike Failure)',
+          url: '/investigate',
+          badge: 'Investigation',
+        },
+        relatedSimulationLink: {
+          engine: 'simulation_studio',
+          label: 'Scenario Simulator: 100k Peak Traffic Spike',
+          url: '/simulate',
+          badge: '100k Sim',
+        },
+        resolved: false,
+        pinned: true,
+        author: {
+          name: 'AI Code Review Staff Engineer',
+          avatar: '',
+          role: 'Principal Review Bot',
+          isAI: true,
+        },
+        createdAt: '18 mins ago',
+      },
+      {
+        id: 'c-102',
+        filePath: 'apps/backend/app/api/v1/payment_router.py',
+        lineStart: 13,
+        lineEnd: 19,
+        title: 'Excellent Microservice Boundary Isolation & AsyncIO Migration',
+        category: 'architecture',
+        severity: 'LOW',
+        aiConfidence: 98.8,
+        problemDescription: 'PR author correctly upgraded synchronous route handler to FastAPI `async def` with AsyncSession dependency injection.',
+        evidenceSnippet: 'async def process_checkout(req: CheckoutRequestSchema, db: AsyncSession = Depends(get_async_db)):',
+        affectedFiles: ['apps/backend/app/api/v1/payment_router.py'],
+        architectureContext: 'Complies with CodeAtlas Clean Architecture standard for non-blocking I/O microservice endpoints.',
+        businessImpact: 'Increases API server concurrent connection handling by 7x without requiring additional Kubernetes pod replicas.',
+        engineeringImpact: 'Frees event loop thread during database and network I/O wait times.',
+        resolved: true,
+        pinned: false,
+        author: {
+          name: 'Sarah Chen',
+          avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
+          role: 'Principal Architect',
+          isAI: false,
+        },
+        createdAt: '12 mins ago',
+      },
+    ],
+    performancePredictions: [
+      {
+        metric: 'P95 API Response Latency',
+        beforeValue: '340.5',
+        afterValue: '24.2',
+        unit: 'ms',
+        changePct: -92.9,
+        isImprovement: true,
+        explanation: 'Offloading Stripe network handshake to async Kafka event queue drops sync request processing time.',
+      },
+      {
+        metric: 'Peak API Throughput',
+        beforeValue: '1,200',
+        afterValue: '8,450',
+        unit: 'req/sec',
+        changePct: 604.1,
+        isImprovement: true,
+        explanation: 'Non-blocking AsyncSession connection pool allows worker loops to serve 8.4k concurrent users.',
+      },
+      {
+        metric: 'Database CPU Utilization',
+        beforeValue: '78.4',
+        afterValue: '14.2',
+        unit: '%',
+        changePct: -81.8,
+        isImprovement: true,
+        explanation: 'Parameterized SQLAlchemy queries enable PostgreSQL prepared statement plan caching.',
+      },
+    ],
+    securityOwaspItems: [
+      {
+        owaspId: 'A03:2021 - Injection',
+        title: 'SQL Injection via Unsanitized ID Payload',
+        riskLevel: 'CRITICAL',
+        evidenceLine: 'payment_service.py:38',
+        fixRecommendation: 'Replaced with SQLAlchemy update statement using strict parameter bindings.',
+        verificationChecklist: [
+          'Run Bandit static security scanner',
+          'Verify parameterized bindvars in query logs',
+          'Execute SQL injection automated test suite',
+        ],
+      },
+      {
+        owaspId: 'A01:2021 - Broken Access Control',
+        title: 'Tenant ID Multi-Tenancy Isolation Verification',
+        riskLevel: 'MEDIUM',
+        evidenceLine: 'payment_router.py:16',
+        fixRecommendation: 'Tenant ID automatically extracted from JWT token claims rather than client payload body.',
+        verificationChecklist: [
+          'Verify tenant_id context variable in async DB session',
+          'Run cross-tenant data leak integration tests',
+        ],
+      },
+    ],
+    preApprovalSimulation: {
+      architectureImpactScore: 96,
+      performanceImpactScore: 98,
+      securityImpactScore: 100,
+      dependencyRiskScore: 8,
+      techDebtDeltaHours: -18,
+      deploymentRiskLevel: 'LOW',
+      sideBySideComparison: [
+        {
+          dimension: 'Architecture Drift',
+          beforeState: '1 Layer Bypass Detected in PaymentService',
+          afterState: '0 Layer Bypasses (Clean Hexagonal Decoupling)',
+          status: 'improved',
+        },
+        {
+          dimension: 'Request Throughput',
+          beforeState: '1,200 requests/sec (Bottlenecked at 78% DB CPU)',
+          afterState: '8,450 requests/sec (Optimal Async I/O)',
+          status: 'improved',
+        },
+        {
+          dimension: 'Security Exposure',
+          beforeState: 'Critical OWASP Injection Vulnerability',
+          afterState: '100% Parameterized & Token Isolated',
+          status: 'improved',
+        },
+        {
+          dimension: 'Technical Debt',
+          beforeState: '42 Hours Cumulative Tech Debt',
+          afterState: '24 Hours (-18 Hours Refactored)',
+          status: 'improved',
+        },
+      ],
+    },
+    assignedReviewers: [
+      { name: 'Sarah Chen', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150', role: 'Principal Architect', approved: true },
+      { name: 'Marcus Vance', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150', role: 'Security Lead', approved: true },
+    ],
+  },
+];
 
-export interface ScorecardDimension {
-  name: string;
-  scorePct: number;
-  previousScorePct: number;
-  status: 'Excellent' | 'Good' | 'Warning' | 'Critical';
-  analysis: string;
-  frameworkPillar: string; // e.g. "AWS Well-Architected: Performance Efficiency"
-}
+export type { ReviewRolePerspective, ReviewModeType, ScorecardDimension, DesignOption, ReviewFinding } from './review-types';
 
-export interface DesignOption {
-  optionName: string;
-  title: string;
-  description: string;
-  advantages: string[];
-  disadvantages: string[];
-  complexity: 'Low' | 'Medium' | 'High';
-  estimatedCost: string;
-  effortHours: number;
-  riskReductionPct: number;
-  scalabilityRating: 'Good' | 'Excellent' | 'Fair';
-}
-
-export interface ReviewFinding {
-  id: string;
-  title: string;
-  category: 'Architecture Smell' | 'Layer Violation' | 'Bottleneck' | 'Security Risk';
-  severity: 'Critical' | 'High' | 'Medium';
-  affectedComponent: string;
-  evidence: string;
-  frameworkMapping: string;
-  businessImpact: string;
-  designOptions: DesignOption[];
-}
-
-export const MOCK_SCORECARD_DIMENSIONS: ScorecardDimension[] = [
+export const MOCK_SCORECARD_DIMENSIONS = [
   { name: 'Architecture Quality', scorePct: 94, previousScorePct: 92, status: 'Excellent', analysis: 'Strict domain layer separation across 87% of services.', frameworkPillar: 'Clean Architecture Principles' },
   { name: 'Scalability', scorePct: 86, previousScorePct: 84, status: 'Good', analysis: 'Stateless JWT auth scales linearly; PaymentService requires event queue decoupling.', frameworkPillar: 'AWS Well-Architected: Performance' },
   { name: 'Maintainability', scorePct: 82, previousScorePct: 85, status: 'Good', analysis: 'High modularity score; 1 layer bypass detected in database access layer.', frameworkPillar: 'SOLID: Dependency Inversion' },
   { name: 'Reliability', scorePct: 96, previousScorePct: 95, status: 'Excellent', analysis: 'Sub-second failover and multi-region Redis cluster fallback active.', frameworkPillar: 'Google SRE: Fault Tolerance' },
   { name: 'Security', scorePct: 95, previousScorePct: 94, status: 'Excellent', analysis: 'RS256 asymmetric token signing & mTLS Istio sidecars verified.', frameworkPillar: 'OWASP Top 10 API Security' },
   { name: 'Performance', scorePct: 88, previousScorePct: 82, status: 'Good', analysis: 'P95 latency 245ms; Stripe external API call represents 67% of request duration.', frameworkPillar: '12-Factor App: Concurrency' },
-  { name: 'Modularity', scorePct: 84, previousScorePct: 88, status: 'Good', analysis: 'Clean package bounds in Next.js frontend and Python FastAPI services.', frameworkPillar: 'DDD: Bounded Contexts' },
-  { name: 'Developer Experience', scorePct: 91, previousScorePct: 89, status: 'Excellent', analysis: 'Instant local docker-compose orchestration and auto-generated OpenAPI specs.', frameworkPillar: 'Platform Engineering UX' },
-  { name: 'Testability', scorePct: 89, previousScorePct: 88, status: 'Good', analysis: '84% unit test coverage and integrated Cypress e2e test suite.', frameworkPillar: 'Testing Pyramid Standards' },
-  { name: 'Documentation', scorePct: 78, previousScorePct: 80, status: 'Warning', analysis: 'Living ADR system active; 2 microservices missing updated OpenAPI schemas.', frameworkPillar: 'Documentation-as-Code' },
-  { name: 'Cloud Readiness', scorePct: 92, previousScorePct: 90, status: 'Excellent', analysis: 'Fully containerized with Helm charts and Strimzi Kafka operator.', frameworkPillar: 'CNCF Cloud Native Standards' },
-  { name: 'Observability', scorePct: 90, previousScorePct: 88, status: 'Excellent', analysis: 'Jaeger distributed tracing and Prometheus telemetry exporters enabled.', frameworkPillar: 'OpenTelemetry Observability' },
-  { name: 'Deployment Readiness', scorePct: 94, previousScorePct: 92, status: 'Excellent', analysis: 'Automated GitHub Actions CI/CD pipeline with Istio 90/10 canary splitting.', frameworkPillar: 'GitOps Continuous Deployment' }
 ];
 
-export const MOCK_REVIEW_FINDINGS: ReviewFinding[] = [
+export const MOCK_REVIEW_FINDINGS = [
   {
     id: 'finding-1',
     title: 'High Fan-Out Bottleneck & Layer Bypass in PaymentService',
@@ -99,30 +324,6 @@ export const MOCK_REVIEW_FINDINGS: ReviewFinding[] = [
         riskReductionPct: 35,
         scalabilityRating: 'Excellent'
       },
-      {
-        optionName: 'Option B',
-        title: 'Introduce Redis Read-Through Cache Layer',
-        description: 'Cache Cypher query results in Redis 7 Cluster with 1-hour TTL invalidation.',
-        advantages: ['Sub-millisecond read retrieval', 'Minimal code changes needed'],
-        disadvantages: ['Does not solve high fan-out coupling; potential stale cache'],
-        complexity: 'Low',
-        estimatedCost: '$120/mo Redis RAM',
-        effortHours: 12,
-        riskReductionPct: 18,
-        scalabilityRating: 'Good'
-      },
-      {
-        optionName: 'Option C',
-        title: 'Extract Dedicated Stripe Webhook Microservice',
-        description: 'Split PaymentService into PaymentCheckout API and PaymentWebhook Worker.',
-        advantages: ['Isolates third-party failure domains completely'],
-        disadvantages: ['Adds new microservice deployment overhead'],
-        complexity: 'High',
-        estimatedCost: '$160/mo additional pod',
-        effortHours: 40,
-        riskReductionPct: 28,
-        scalabilityRating: 'Excellent'
-      }
     ]
   }
 ];

@@ -20,8 +20,16 @@ import {
 	Building2,
 	ChevronLeft,
 	ChevronRight,
+	Rocket,
+	LineChart,
+	Bot,
 	Star,
 	Clock,
+	Activity,
+	CheckCircle2,
+	Gauge,
+	TrendingUp,
+	BrainCircuit,
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -37,6 +45,15 @@ interface NavigationItem {
 const navigation: NavigationItem[] = [
 	{ name: 'WORKSPACE', href: '#', icon: LayoutDashboard, shortcut: '', isHeader: true },
 	{ name: 'Dashboard', href: '/', icon: LayoutDashboard, shortcut: '⌘1' },
+	{ name: 'AI Engineering Score', href: '/engineering-score', icon: Gauge, shortcut: '⌘E' },
+	{ name: 'Predictive Intelligence', href: '/future', icon: BrainCircuit, shortcut: '⌘F' },
+	{ name: 'Benchmarking Intelligence', href: '/benchmarking', icon: TrendingUp, shortcut: '⌘B' },
+	{ name: 'Engineering KPI Intelligence', href: '/kpi', icon: Activity, shortcut: '⌘K' },
+	{ name: 'Health Intelligence', href: '/health-intelligence', icon: Activity, shortcut: '⌘H' },
+	{ name: 'Code Quality Intelligence', href: '/code-quality', icon: CheckCircle2, shortcut: '⌘Q' },
+	{ name: 'Performance Intelligence', href: '/performance', icon: Zap, shortcut: '⌘P' },
+	{ name: 'Security Intelligence', href: '/security', icon: ShieldAlert, shortcut: '⌘U' },
+	{ name: 'Tech Debt Intelligence', href: '/tech-debt', icon: LineChart, shortcut: '⌘T' },
 	{ name: 'Repositories', href: '/repositories', icon: BookOpen, shortcut: '⌘2' },
 	{ name: 'Analyze', href: '/analyze', icon: Search, shortcut: '⌘3' },
 	{ name: 'Architecture', href: '/architecture', icon: Layers, shortcut: '⌘4' },
@@ -46,7 +63,12 @@ const navigation: NavigationItem[] = [
 	{ name: 'Improve', href: '/improve', icon: Sparkles, shortcut: '⌘7' },
 	{ name: 'Monitor', href: '/monitor', icon: ShieldAlert, shortcut: '⌘8' },
 	{ name: 'Search', href: '/search', icon: Compass, shortcut: '⌘9' },
-	{ name: 'Documentation', href: '/knowledge', icon: FileText, shortcut: '⌘D' },
+	{ name: 'Documentation', href: '/docs', icon: FileText, shortcut: '⌘D' },
+	{ name: 'Code Review', href: '/review', icon: FlaskConical, shortcut: '⌘R' },
+	{ name: 'Release Center', href: '/release', icon: Rocket, shortcut: '⌘L' },
+	{ name: 'Forecast Center', href: '/forecast', icon: LineChart, shortcut: '⌘F' },
+	{ name: 'Autonomous Workflows', href: '/autonomous', icon: Bot, shortcut: '⌘A' },
+	{ name: 'Knowledge Graph', href: '/knowledge', icon: BookOpen, shortcut: '⌘K' },
 	{ name: 'Settings', href: '/settings', icon: Settings, shortcut: '⌘S' },
 ];
 

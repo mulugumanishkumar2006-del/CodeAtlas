@@ -1,17 +1,19 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
 import {
-                        HeartPulse,
-                        RefreshCw,
-                        Server,
-                        Database,
-                        Activity,
-                        Terminal,
-                        Layers,
-                        Cpu,
-                        CheckCircle,
-                        AlertTriangle,
+	HeartPulse,
+	RefreshCw,
+	Server,
+	Database,
+	Activity,
+	Terminal,
+	Layers,
+	Cpu,
+	CheckCircle,
+	AlertTriangle,
+	Sparkles,
 } from 'lucide-react';
 import { useAuth } from '@/context/auth-context';
 import { Button } from '@/components/ui/button';
@@ -107,8 +109,33 @@ export default function HealthPage() {
                         };
 
                         return (
-                                                <div className="space-y-6">
-                                                                        {/* Top Header */}
+				<div className="space-y-6 font-mono">
+					{/* Repository Health Intelligence Launch Banner */}
+					<div className="p-6 rounded-3xl bg-gradient-to-r from-cyan-950/80 via-slate-900 to-indigo-950/80 border border-cyan-500/40 shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+						<div className="flex items-center gap-4">
+							<div className="p-3 rounded-2xl bg-cyan-500/20 border border-cyan-500/40 text-cyan-300">
+								<Activity className="w-8 h-8 animate-pulse" />
+							</div>
+							<div>
+								<div className="flex items-center gap-2">
+									<h3 className="text-lg font-black text-white">Repository Health Intelligence Center</h3>
+									<span className="px-2 py-0.5 text-[10px] font-bold text-cyan-300 bg-cyan-950 border border-cyan-500/40 rounded-full">NEW</span>
+								</div>
+								<p className="text-xs text-slate-300 mt-1">
+									Full 14-dimension health scorecards, interactive module heatmaps, time machine replay, and AI CTO advisor.
+								</p>
+							</div>
+						</div>
+						<Link
+							href="/health-intelligence"
+							className="px-5 py-3 rounded-2xl bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg flex items-center justify-center gap-2 transition-all shrink-0"
+						>
+							<Sparkles className="w-4 h-4" />
+							<span>Launch Repository Health Center →</span>
+						</Link>
+					</div>
+
+					{/* Top Header */}
                                                                         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b pb-4">
                                                                                                 <div>
                                                                                                                         <h2 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
