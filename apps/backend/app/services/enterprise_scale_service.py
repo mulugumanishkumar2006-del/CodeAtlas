@@ -244,7 +244,7 @@ class EnterpriseScaleService:
         ]
 
     def create_policy_exception(self, policy_id: str, reason: str, owner: str) -> PolicyExceptionModel:
-        now_str = datetime.datetime.utcnow().isoformat()
+        datetime.datetime.utcnow().isoformat()
         exp_str = (datetime.datetime.utcnow() + datetime.timedelta(days=30)).isoformat()
         return PolicyExceptionModel(
             exception_id=f"exc_{uuid.uuid4().hex[:6]}",

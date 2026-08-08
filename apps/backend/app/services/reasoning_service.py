@@ -197,7 +197,7 @@ class ReasoningEngineService:
 
         # Context Budget Enforcement
         token_estimate = sum(len(it.content.split()) for it in items)
-        
+
         return EvidencePack(
             repository_id=repository_id,
             analysis_version="v1.2-deterministic-graph",
@@ -279,7 +279,7 @@ class ReasoningEngineService:
         elif intent == EngineeringIntent.SECURITY:
             structured_steps[2].content = f"SECURITY REASONING: Analyzed trust boundaries, secrets, and auth flows for '{evidence_pack.target}' using deterministic evidence first."
         elif intent == EngineeringIntent.PERFORMANCE:
-            structured_steps[2].content = f"PERFORMANCE REASONING: Evaluated execution paths and bottlenecks. Distinguished measured from suspected bottlenecks."
+            structured_steps[2].content = "PERFORMANCE REASONING: Evaluated execution paths and bottlenecks. Distinguished measured from suspected bottlenecks."
         elif intent == EngineeringIntent.MIGRATION:
             structured_steps[2].content = f"MIGRATION REASONING: Structured multi-stage migration roadmap with rollback procedure for '{evidence_pack.target}'."
 
@@ -311,7 +311,7 @@ class ReasoningEngineService:
         validated_claims, extra_uncertainties = self.validate_claims(raw_claims, evidence_pack)
 
         facts = [c for c in validated_claims if c.category == ClaimType.FACT]
-        
+
         sources = [
             SourceCitation(
                 citation_id=f"cit_{idx}",

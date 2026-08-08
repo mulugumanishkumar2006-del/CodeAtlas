@@ -212,8 +212,8 @@ class EngineeringStrategyService:
             next_step = "Generate Non-Destructive Prevention Plan 'prev_plan_auth' under Autopilot control."
         else:
             recommendation = (
-                f"ORGANIZATIONAL AI STRATEGIST RESPONSE:\n\n"
-                f"Highest strategic priority is Decoupling Auth Provider Interface (Priority Score 94.5/100)."
+                "ORGANIZATIONAL AI STRATEGIST RESPONSE:\n\n"
+                "Highest strategic priority is Decoupling Auth Provider Interface (Priority Score 94.5/100)."
             )
             citations = ["Strategic Portfolio Engine"]
             opts = ["Option B", "Option A"]

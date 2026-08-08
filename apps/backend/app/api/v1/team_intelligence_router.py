@@ -413,7 +413,7 @@ def query_team_ai(
     team_id: str, req: TeamAIQueryRequest, db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     prompt_lower = req.prompt.lower()
-    
+
     if "friction" in prompt_lower or "review" in prompt_lower:
         answer = "Collaboration friction is concentrated around **cross-team gRPC contract changes** between Payments Core and Billing Subscriptions. PRs modifying Protobuf schemas take an average of 26 hours for dual approval, compared to 4 hours for internal PRs."
     elif "knowledge" in prompt_lower or "bus factor" in prompt_lower:

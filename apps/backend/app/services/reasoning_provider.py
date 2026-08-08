@@ -67,7 +67,7 @@ class MockProvider(LLMProvider):
         completion_tokens = len(mock_output.split())
         total_tokens = prompt_tokens + completion_tokens
         cost = (total_tokens / 1000.0) * 0.0001
-        
+
         return LLMProviderResponse(
             content=mock_output,
             token_usage={"prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens, "total_tokens": total_tokens},
@@ -96,7 +96,7 @@ class GeminiProvider(LLMProvider):
         if not self.api_key:
             fallback = MockProvider(provider_name="GeminiProvider (Fallback)", model_name=self.model_name)
             return fallback.generate(prompt, system_instruction, max_tokens, temperature, timeout_seconds)
-        
+
         start_time = time.time()
         try:
             # Here we simulate or call Gemini SDK if present

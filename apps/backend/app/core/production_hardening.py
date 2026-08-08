@@ -21,7 +21,7 @@ class ProductionHardeningMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         try:
             response = await call_next(request)
-        except Exception as exc:
+        except Exception:
             # Mask unhandled server exceptions to prevent stack trace leaks
             correlation_id = getattr(request.state, "correlation_id", "unknown")
             return JSONResponse(

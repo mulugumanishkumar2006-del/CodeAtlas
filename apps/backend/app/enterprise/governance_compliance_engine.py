@@ -158,7 +158,7 @@ class GovernanceComplianceEngine:
     def request_exception(self, policy_id: str, scope: str, reason: str, owner: str) -> Dict[str, Any]:
         """Submits formal policy exception request."""
         return {
-            "id": f"exc-{Date.now() if 'Date' in globals() else '99'}",
+            "id": f"exc-{'99'}",
             "policy_id": policy_id,
             "scope": scope,
             "reason": reason,

@@ -756,11 +756,11 @@ class EDIEService:
         ]
         story_md = """# The Story of Our System Architecture
 
-Once a modest monolithic application, **CodeAtlas** grew under intense business expansion. 
-When database query contention threatened system reliability, the team adopted **Redis** for distributed caching. 
+Once a modest monolithic application, **CodeAtlas** grew under intense business expansion.
+When database query contention threatened system reliability, the team adopted **Redis** for distributed caching.
 
-Later, to ensure PCI-DSS security compliance, **Payment Processing** was decoupled into isolated microservices. 
-To prevent cascading timeouts between domain services, **Apache Kafka** was introduced as the central event hub. 
+Later, to ensure PCI-DSS security compliance, **Payment Processing** was decoupled into isolated microservices.
+To prevent cascading timeouts between domain services, **Apache Kafka** was introduced as the central event hub.
 
 Today, every architectural decision is recorded in **EDIE**, creating a permanent engineering memory for generations of developers to come.
 """

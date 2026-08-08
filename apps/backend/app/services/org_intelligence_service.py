@@ -210,8 +210,8 @@ class OrganizationIntelligenceService:
             rec = "Initiate Autopilot Run to decouple auth_service interface contract."
         else:
             answer = (
-                f"ORGANIZATIONAL AI ARCHITECT RESPONSE:\n\n"
-                f"Organization health is 84.5/100 across 12 repositories. Major initiative 'Microservice Boundary Standardization' is 65% complete."
+                "ORGANIZATIONAL AI ARCHITECT RESPONSE:\n\n"
+                "Organization health is 84.5/100 across 12 repositories. Major initiative 'Microservice Boundary Standardization' is 65% complete."
             )
             citations = ["Org Health Model", "Initiative Tracker"]
             rec = "Review Executive Briefing for strategic priorities."

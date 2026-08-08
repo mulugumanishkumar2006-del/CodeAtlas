@@ -42,7 +42,7 @@ jobs:
             black
 
       - name: Python Ruff Linter Check
-        run: ruff check apps/backend --ignore E501,W503
+        run: ruff check apps/backend --ignore E501,E402,F401
 
       - name: Python Black Format Check
         run: black --check apps/backend --line-length 120

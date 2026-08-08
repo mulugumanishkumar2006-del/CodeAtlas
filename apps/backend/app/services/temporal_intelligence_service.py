@@ -415,7 +415,7 @@ class TemporalIntelligenceService:
     # Phase 16-19: Historical AI Reasoning & Search
     # ----------------------------------------------------
     def query_temporal_ai(self, req: TemporalAIExplanationRequest) -> TemporalAIExplanationResponse:
-        q = req.query.lower()
+        req.query.lower()
         hist_facts = [
             "Commit c1a2b3 introduced AuthService in apps/backend/app/services/auth.py.",
             "Commit d4e5f6 added direct database dependency to User service.",

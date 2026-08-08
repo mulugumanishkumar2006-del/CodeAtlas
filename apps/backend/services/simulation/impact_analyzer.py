@@ -14,18 +14,18 @@ class ChangeImpactAnalyzer:
     def predict_change_impact(self, target_symbol_id: str, proposed_change_type: str) -> Dict[str, Any]:
         """Analyze affected components and return predictive blast radius risk metrics."""
         start_time = time.time()
-        
+
         # Simulate high-speed graph traversal for affected callers and services
         affected_files = [
             "services/user_service.py",
             "api/v1/auth_routes.py",
             "services/payment_gateway.py"
         ]
-        
+
         # Calculate impact score based on change severity
         impact_score = 7.8 if proposed_change_type == "SIGNATURE_MODIFY" else 4.2
         blast_risk = "HIGH" if impact_score >= 7.0 else "MEDIUM"
-        
+
         duration = round(time.time() - start_time, 3)
         return {
             "status": "SUCCESS",

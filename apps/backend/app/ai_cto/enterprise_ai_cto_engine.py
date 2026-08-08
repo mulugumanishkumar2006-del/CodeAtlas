@@ -169,7 +169,7 @@ class EnterpriseAICTOEngine:
     def prepare_action_proposal(self, action_type: str, target: str) -> Dict[str, Any]:
         """Prepares high-impact action requiring explicit human authorization."""
         return {
-            "action_id": f"act-{Date.now() if 'Date' in globals() else '101'}",
+            "action_id": f"act-{'101'}",
             "action_type": action_type,
             "target_system": target,
             "proposed_change": "Merge automated Dependabot lockfile patch #402 for @acme/sec-vault@2.1.0",

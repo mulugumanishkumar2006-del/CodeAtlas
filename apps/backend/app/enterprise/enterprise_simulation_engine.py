@@ -59,7 +59,7 @@ class EnterpriseSimulationEngine:
     ) -> Dict[str, Any]:
         """Creates a new hypothetical scenario without modifying baseline production state."""
         return {
-            "id": f"scen-{Date.now() if 'Date' in globals() else '201'}",
+            "id": f"scen-{'201'}",
             "name": name,
             "scope": scope if scope in self.SIMULATION_SCOPES else "ARCHITECTURE",
             "operation": operation if operation in self.OPERATIONS else "REPLACE",
@@ -151,7 +151,7 @@ class EnterpriseSimulationEngine:
         """Branches scenario into a sub-hypothesis without mutating baseline."""
         return {
             "parent_scenario_id": parent_scenario_id,
-            "branch_id": f"scen-branch-{Date.now() if 'Date' in globals() else '301'}",
+            "branch_id": f"scen-branch-{'301'}",
             "branch_name": branch_name,
             "status": "DRAFT",
             "created_at": datetime.now(timezone.utc).isoformat(),

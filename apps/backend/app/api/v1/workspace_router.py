@@ -101,7 +101,7 @@ def list_workspaces(db: Session = Depends(get_db)) -> List[Dict[str, Any]]:
                 "created_at": datetime.now(timezone.utc).isoformat(),
             }
         ]
-    
+
     res = []
     for ws in workspaces:
         res.append({
@@ -155,7 +155,7 @@ def create_workspace(req: CreateWorkspaceRequest, db: Session = Depends(get_db))
 @router.get("/{ws_id}")
 def get_workspace_detail(ws_id: str, db: Session = Depends(get_db)) -> Dict[str, Any]:
     ws = db.query(Workspace).filter(Workspace.id == ws_id).first()
-    
+
     return {
         "id": ws_id,
         "name": ws.name if ws else "FinTech Ecosystem Workspace",
@@ -509,7 +509,7 @@ def query_workspace_ai(
     ws_id: str, req: AIQueryRequest, db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     prompt_lower = req.prompt.lower()
-    
+
     if "important" in prompt_lower or "critical" in prompt_lower:
         answer = "Based on centrality score and consumer node connectivity across the workspace graph, the **AuthGatewayService** (auth-gateway-repo) and **PaymentProcessingEngine** (payment-core-repo) are the most systemically important repositories. AuthGateway sits in the critical path for 11 microservices, while PaymentProcessingEngine handles all transactional ledger locks."
     elif "depend" in prompt_lower or "payments" in prompt_lower:
@@ -615,7 +615,7 @@ def search_workspace(
 ) -> List[Dict[str, Any]]:
     if not q:
         return []
-    
+
     return [
         {
             "type": "REPOSITORY",

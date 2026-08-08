@@ -7,7 +7,7 @@ import time
 
 class MonorepoStreamingAnalyzer:
     """Chunked streaming parsing analyzer for large monorepositories."""
-    
+
     CHUNK_SIZE = 500  # Process 500 files per memory chunk
 
     def __init__(self, repo_id: str, total_files: List[str]):
