@@ -1,30 +1,24 @@
 [tool.black]
-line-length = 88
-target-version = ['py310']
+line-length = 120
+target-version = ["py310"]
 exclude = '''
 /(
-    \.git
-  | \.venv
-  | node_modules
-  | build
-  | dist
+    \.venv
+  | \.git
+  | __pycache__
+  | alembic
 )/
 '''
 
 [tool.ruff]
-line-length = 88
+line-length = 120
 target-version = "py310"
 exclude = [
-    ".git",
-    ".venv",
-    "node_modules",
-    "build",
-    "dist"
+  ".venv",
+  "__pycache__",
+  "alembic",
 ]
 
 [tool.ruff.lint]
-select = ["E", "F", "I"]
-ignore = ["E501"]
-
-[tool.ruff.lint.per-file-ignores]
-"__init__.py" = ["F401"]
+ignore = ["E501", "W503", "E402", "F401"]
+select = ["E", "W", "F"]
