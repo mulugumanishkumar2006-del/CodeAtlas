@@ -1,239 +1,142 @@
 'use client';
 
-import * as React from 'react';
+import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { BetaFeedbackModal } from '@/components/ui/beta-feedback-modal';
 import {
-	LayoutDashboard,
-	BookOpen,
-	Search,
-	Layers,
-	Network,
-	FlaskConical,
-	Zap,
-	Sparkles,
-	ShieldAlert,
-	Compass,
-	FileText,
-	Settings,
-	ChevronDown,
-	Building2,
-	ChevronLeft,
-	ChevronRight,
-	Rocket,
-	LineChart,
-	Bot,
-	Star,
-	Clock,
-	Activity,
-	CheckCircle2,
-	Gauge,
-	TrendingUp,
-	BrainCircuit,
+  LayoutDashboard,
+  Building2,
+  Sparkles,
+  ShieldAlert,
+  FileText,
+  Users,
+  BookOpen,
+  Layers,
+  FlaskConical,
+  Zap,
+  Compass,
+  Settings,
+  Network,
+  Command,
+  Activity,
+  Bot,
 } from 'lucide-react';
 
-import { cn } from '@/lib/utils';
-
 interface NavigationItem {
-	name: string;
-	href: string;
-	icon: React.ComponentType<any>;
-	shortcut: string;
-	isHeader?: boolean;
+  name: string;
+  href: string;
+  icon: any;
+  shortcut: string;
+  isHeader?: boolean;
 }
 
 const navigation: NavigationItem[] = [
-	{ name: 'WORKSPACE', href: '#', icon: LayoutDashboard, shortcut: '', isHeader: true },
-	{ name: 'Dashboard', href: '/', icon: LayoutDashboard, shortcut: '⌘1' },
-	{ name: 'AI Engineering Score', href: '/engineering-score', icon: Gauge, shortcut: '⌘E' },
-	{ name: 'Predictive Intelligence', href: '/future', icon: BrainCircuit, shortcut: '⌘F' },
-	{ name: 'Benchmarking Intelligence', href: '/benchmarking', icon: TrendingUp, shortcut: '⌘B' },
-	{ name: 'Engineering KPI Intelligence', href: '/kpi', icon: Activity, shortcut: '⌘K' },
-	{ name: 'Health Intelligence', href: '/health-intelligence', icon: Activity, shortcut: '⌘H' },
-	{ name: 'Code Quality Intelligence', href: '/code-quality', icon: CheckCircle2, shortcut: '⌘Q' },
-	{ name: 'Performance Intelligence', href: '/performance', icon: Zap, shortcut: '⌘P' },
-	{ name: 'Security Intelligence', href: '/security', icon: ShieldAlert, shortcut: '⌘U' },
-	{ name: 'Tech Debt Intelligence', href: '/tech-debt', icon: LineChart, shortcut: '⌘T' },
-	{ name: 'Repositories', href: '/repositories', icon: BookOpen, shortcut: '⌘2' },
-	{ name: 'Analyze', href: '/analyze', icon: Search, shortcut: '⌘3' },
-	{ name: 'Architecture', href: '/architecture', icon: Layers, shortcut: '⌘4' },
-	{ name: 'Dependency Graph', href: '/dependency-graph', icon: Network, shortcut: '⌘G' },
-	{ name: 'Investigate', href: '/investigate', icon: FlaskConical, shortcut: '⌘5' },
-	{ name: 'Simulation', href: '/simulate', icon: Zap, shortcut: '⌘6' },
-	{ name: 'Improve', href: '/improve', icon: Sparkles, shortcut: '⌘7' },
-	{ name: 'Monitor', href: '/monitor', icon: ShieldAlert, shortcut: '⌘8' },
-	{ name: 'Search', href: '/search', icon: Compass, shortcut: '⌘9' },
-	{ name: 'Documentation', href: '/docs', icon: FileText, shortcut: '⌘D' },
-	{ name: 'Code Review', href: '/review', icon: FlaskConical, shortcut: '⌘R' },
-	{ name: 'Release Center', href: '/release', icon: Rocket, shortcut: '⌘L' },
-	{ name: 'Forecast Center', href: '/forecast', icon: LineChart, shortcut: '⌘F' },
-	{ name: 'Autonomous Workflows', href: '/autonomous', icon: Bot, shortcut: '⌘A' },
-	{ name: 'Knowledge Graph', href: '/knowledge', icon: BookOpen, shortcut: '⌘K' },
-	{ name: 'Settings', href: '/settings', icon: Settings, shortcut: '⌘S' },
+  // CORE WORKFLOW HUBS
+  { name: 'CORE WORKFLOW HUBS', href: '#', icon: LayoutDashboard, shortcut: '', isHeader: true },
+  { name: 'Dashboard', href: '/', icon: LayoutDashboard, shortcut: '⌘1' },
+  { name: 'Repositories & Software', href: '/repositories', icon: BookOpen, shortcut: '⌘2' },
+  { name: 'Architecture Intelligence', href: '/architecture', icon: Layers, shortcut: '⌘4' },
+  { name: 'Investigate & Call Flows', href: '/investigate', icon: FlaskConical, shortcut: '⌘5' },
+  { name: 'Simulation Studio', href: '/simulate', icon: FlaskConical, shortcut: '⌘6' },
+  { name: 'Autonomous Optimization', href: '/improve', icon: Zap, shortcut: '⌘7' },
+
+  // INTELLIGENCE & GOVERNANCE
+  { name: 'INTELLIGENCE & GOVERNANCE', href: '#', icon: ShieldAlert, shortcut: '', isHeader: true },
+  { name: 'Cross-Org Risk Radar', href: '/risk', icon: ShieldAlert, shortcut: '⌘R' },
+  { name: 'Governance & Compliance', href: '/governance', icon: FileText, shortcut: '⌘G' },
+  { name: 'Team Intelligence', href: '/team-intelligence', icon: Users, shortcut: '⌘T' },
+  { name: 'Knowledge Graph', href: '/knowledge', icon: Network, shortcut: '⌘K' },
+  { name: 'AI CTO Advisor', href: '/ai-cto', icon: Sparkles, shortcut: '⌘AI' },
+  { name: 'Executive Command Center', href: '/enterprise', icon: Building2, shortcut: '⌘W' },
+
+  // WORKSPACE & TOOLING
+  { name: 'WORKSPACE & TOOLING', href: '#', icon: Settings, shortcut: '', isHeader: true },
+  { name: 'Unified Search', href: '/search', icon: Compass, shortcut: '⌘9' },
+  { name: 'Settings', href: '/settings', icon: Settings, shortcut: '⌘S' },
 ];
 
-interface SidebarProps {
-	isOpen: boolean;
-	setIsOpen: (open: boolean) => void;
-}
+export function Sidebar() {
+  const pathname = usePathname();
+  const [isFeedbackOpen, setIsFeedbackOpen] = React.useState(false);
 
-export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
-	const pathname = usePathname();
-	const [isCollapsed, setIsCollapsed] = React.useState<boolean>(false);
+  return (
+    <>
+      <aside className="w-64 bg-slate-950 border-r border-slate-800/80 flex flex-col h-screen shrink-0 font-sans z-20 select-none">
+        {/* Brand Header */}
+        <div className="h-16 px-5 border-b border-slate-800/80 flex items-center justify-between bg-slate-900/50">
+          <Link href="/" className="flex items-center gap-2.5 group">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-cyan-500 via-indigo-500 to-rose-500 p-0.5 shadow-lg shadow-cyan-500/20 group-hover:scale-105 transition-transform">
+              <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
+                <Sparkles className="w-4 h-4 text-cyan-400" />
+              </div>
+            </div>
+            <div className="flex flex-col">
+              <span className="font-black text-sm tracking-wider text-white font-mono flex items-center gap-1">
+                CODEATLAS
+                <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-400 font-bold border border-amber-500/30">
+                  BETA
+                </span>
+              </span>
+              <span className="text-[10px] text-slate-400 font-mono">Software Intelligence Platform</span>
+            </div>
+          </Link>
+        </div>
 
-	return (
-		<>
-			{/* Mobile Backdrop */}
-			{isOpen && (
-				<div
-					className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
-					onClick={() => setIsOpen(false)}
-				/>
-			)}
+        {/* Navigation Links */}
+        <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1 scrollbar-none font-mono text-xs">
+          {navigation.map((item, idx) => {
+            if (item.isHeader) {
+              return (
+                <div
+                  key={idx}
+                  className="px-3 pt-4 pb-1.5 text-[9.5px] font-black text-slate-500 uppercase tracking-widest"
+                >
+                  {item.name}
+                </div>
+              );
+            }
 
-			{/* Sidebar container */}
-			<div
-				className={cn(
-					'fixed inset-y-0 left-0 z-50 flex flex-col border-r border-slate-800/80 bg-slate-950/95 backdrop-blur-xl transition-all duration-300 ease-in-out lg:static lg:translate-x-0 font-sans select-none',
-					isCollapsed ? 'w-20' : 'w-64',
-					isOpen ? 'translate-x-0' : '-translate-x-full'
-				)}
-			>
-				{/* Logo Header */}
-				<div className="flex h-16 items-center border-b border-slate-800/80 px-4 justify-between shrink-0">
-					<Link href="/" className="flex items-center gap-3 group">
-						<div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-cyan-500 via-indigo-500 to-purple-600 p-0.5 shadow-lg shadow-cyan-500/20 group-hover:scale-105 transition-transform shrink-0">
-							<div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
-								<Sparkles className="w-4 h-4 text-cyan-400" />
-							</div>
-						</div>
-						{!isCollapsed && (
-							<div className="flex flex-col">
-								<span className="text-base font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-sky-300 to-indigo-300">
-									CodeAtlas
-								</span>
-								<span className="text-[9px] font-bold text-slate-500 tracking-wider font-mono">
-									INTEL PLATFORM
-								</span>
-							</div>
-						)}
-					</Link>
+            const Icon = item.icon;
+            const isActive = pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href));
 
-					<button
-						onClick={() => setIsCollapsed(!isCollapsed)}
-						className="hidden lg:flex p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-white transition-colors"
-						title={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
-					>
-						{isCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
-					</button>
-				</div>
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex items-center justify-between px-3 py-2 rounded-xl transition-all font-semibold ${
+                  isActive
+                    ? 'bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 shadow-md shadow-cyan-500/5'
+                    : 'text-slate-400 hover:text-slate-100 hover:bg-slate-900/80'
+                }`}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-cyan-400' : 'text-slate-500'}`} />
+                  <span className="truncate">{item.name}</span>
+                </div>
+                {item.shortcut && (
+                  <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-500 font-bold shrink-0">
+                    {item.shortcut}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
+        </div>
 
-				{/* Workspace Switcher */}
-				{!isCollapsed && (
-					<div className="px-3 pt-3 shrink-0">
-						<div className="flex items-center justify-between p-2.5 rounded-xl border border-slate-800/90 bg-slate-900/50 hover:bg-slate-900 transition-colors cursor-pointer group font-mono">
-							<div className="flex items-center gap-2.5">
-								<div className="w-6 h-6 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center shrink-0">
-									<Building2 className="w-3.5 h-3.5 text-indigo-400" />
-								</div>
-								<div className="flex flex-col">
-									<span className="text-xs font-bold text-white leading-none">CodeAtlas Prod</span>
-									<span className="text-[10px] text-slate-500 leading-tight">Primary Workspace</span>
-								</div>
-							</div>
-							<ChevronDown className="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-300 transition-colors" />
-						</div>
-					</div>
-				)}
+        {/* Beta Feedback Footer */}
+        <div className="p-3 border-t border-slate-800/80 bg-slate-900/30 font-mono text-xs space-y-2">
+          <button
+            onClick={() => setIsFeedbackOpen(true)}
+            className="w-full p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20 font-bold flex items-center justify-between transition-all"
+          >
+            <span>Give Beta Feedback</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 font-bold">Feedback</span>
+          </button>
+        </div>
+      </aside>
 
-				{/* Navigation Links */}
-				<div className="flex-1 overflow-y-auto px-3 py-3 space-y-1 scrollbar-none font-mono">
-					{navigation.map((item, idx) => {
-						if (item.isHeader) {
-							if (isCollapsed) return null;
-							return (
-								<div
-									key={idx}
-									className="pt-3 pb-1 px-3 text-[10px] font-black uppercase tracking-widest text-slate-500"
-								>
-									{item.name}
-								</div>
-							);
-						}
-
-						const isActive =
-							pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href));
-
-						return (
-							<Link
-								key={item.name}
-								href={item.href}
-								onClick={() => setIsOpen(false)}
-								className={cn(
-									'flex items-center justify-between rounded-xl px-3 py-2 text-xs font-semibold transition-all group relative',
-									isActive
-										? 'bg-gradient-to-r from-cyan-500/15 to-indigo-500/10 text-cyan-200 border border-cyan-500/30 shadow-md shadow-cyan-950/50 font-bold'
-										: 'text-slate-400 hover:bg-slate-900/60 hover:text-slate-200'
-								)}
-								title={isCollapsed ? item.name : undefined}
-							>
-								{isActive && (
-									<div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-cyan-400 rounded-r-full shadow-lg shadow-cyan-400/50" />
-								)}
-								<div className="flex items-center gap-3">
-									<item.icon
-										className={cn(
-											'h-4 w-4 transition-colors shrink-0',
-											isActive
-												? 'text-cyan-400'
-												: 'text-slate-500 group-hover:text-slate-300'
-										)}
-									/>
-									{!isCollapsed && <span>{item.name}</span>}
-								</div>
-								{!isCollapsed && item.shortcut && (
-									<kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[9px] font-mono text-slate-500 bg-slate-900/80 border border-slate-800 rounded group-hover:text-slate-400 transition-colors">
-										{item.shortcut}
-									</kbd>
-								)}
-							</Link>
-						);
-					})}
-				</div>
-
-				{/* Pinned Favorites Quick Access */}
-				{!isCollapsed && (
-					<div className="px-3 py-2 border-t border-slate-800/80 space-y-1 font-mono shrink-0">
-						<span className="px-2 text-[9px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-							<Star className="w-3 h-3 text-amber-400" /> Favorites
-						</span>
-						<Link
-							href="/investigate"
-							className="flex items-center gap-2 px-2 py-1 rounded text-xs text-slate-400 hover:text-slate-200 hover:bg-slate-900/50"
-						>
-							<span className="w-1.5 h-1.5 rounded-full bg-cyan-400" /> PaymentService Trace
-						</Link>
-						<Link
-							href="/simulate"
-							className="flex items-center gap-2 px-2 py-1 rounded text-xs text-slate-400 hover:text-slate-200 hover:bg-slate-900/50"
-						>
-							<span className="w-1.5 h-1.5 rounded-full bg-purple-400" /> Kafka Microservices Sim
-						</Link>
-					</div>
-				)}
-
-				{/* Footer Live Status */}
-				<div className="border-t border-slate-800/80 p-3 text-[11px] text-slate-400 flex justify-between items-center bg-slate-950/80 shrink-0 font-mono">
-					<div className="flex items-center gap-2">
-						<span className="relative flex h-2 w-2">
-							<span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-							<span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-						</span>
-						{!isCollapsed && <span className="font-semibold text-slate-300">Live AI Engine</span>}
-					</div>
-					{!isCollapsed && <span className="font-mono text-[10px] text-emerald-400 font-bold">READY</span>}
-				</div>
-			</div>
-		</>
-	);
+      <BetaFeedbackModal isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} />
+    </>
+  );
 }

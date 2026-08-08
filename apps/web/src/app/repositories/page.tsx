@@ -1,8 +1,12 @@
 'use client';
 
 import React from 'react';
-import { RepositoryExplorer } from '@/components/ui/repository-explorer';
+import { MultiRepositoryWorkspaceView } from '@/components/workspace/multi-repository-workspace-view';
 
 export default function RepositoriesWorkflowPage() {
-	return <RepositoryExplorer />;
+  return (
+    <div className="-m-6 h-[calc(100vh-4rem)] overflow-hidden">
+      <MultiRepositoryWorkspaceView />
+    </div>
+  );
 }

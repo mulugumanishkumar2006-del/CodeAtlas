@@ -162,6 +162,22 @@ from app.models.visual_experience import (
     EngineeringAchievement,
     ServiceHeartbeatLog,
 )
+from app.models.team_intelligence import (
+    CollaborationBottleneck,
+    KnowledgeConcentrationItem,
+    KnowledgeTransferTask,
+    TeamDependency,
+    TeamModel,
+    TeamOwnership,
+)
+from app.models.workspace import (
+    Workspace,
+    WorkspaceAuditLog,
+    WorkspaceDependency,
+    WorkspaceMember,
+    WorkspaceRepository,
+    WorkspaceService,
+)
 from app.models.wskg import (
     WSKGCaseStudy,
     WSKGEdge,

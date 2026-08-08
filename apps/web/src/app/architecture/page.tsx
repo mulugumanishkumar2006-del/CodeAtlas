@@ -1,12 +1,12 @@
 'use client';
 
 import React from 'react';
-import { ArchitectureExplorer } from '@/components/architecture/architecture-explorer';
+import { EnterpriseArchitectureStudio } from '@/components/architecture/enterprise-architecture-studio';
 
 export default function ArchitecturePage() {
   return (
     <div className="-m-6 h-[calc(100vh-4rem)] overflow-hidden">
-      <ArchitectureExplorer />
+      <EnterpriseArchitectureStudio />
     </div>
   );
 }

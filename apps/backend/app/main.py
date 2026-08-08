@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from app.core.correlation_middleware import CorrelationIdMiddleware, global_exception_handler
 
 # pyrefly: ignore [missing-import]
 from app.api.v1 import (
@@ -29,6 +30,7 @@ from app.api.v1 import (
     caee_router,
     codeatlas_os_router,
     council_router,
+    cross_org_risk_router,
     digital_twin,
     edg_features_1_5_router,
     edg_features_6_10_router,
@@ -38,19 +40,28 @@ from app.api.v1 import (
     edg_router,
     edie_router,
     engineering_agi_router,
+    enterprise_ai_cto_router,
+    enterprise_autonomous_optimization_router,
+    enterprise_simulation_router,
     enterprise_router,
+    enterprise_architecture_router,
+    executive_intelligence_router,
     eskg_router,
     esl_router,
     evolution,
     evolution_atlas_router,
+    governance_compliance_router,
     graph,
     health,
     health_intelligence,
+    health_readiness_router,
+    impact_router,
     knowledge,
     knowledge_insights_router,
     memory_router,
     network_router,
     oip_router,
+    org_knowledge_graph_router,
     prediction_router,
     reality_router,
     reliability,
@@ -62,9 +73,41 @@ from app.api.v1 import (
     spe_lab_finale_router,
     spe_router,
     tech_debt,
+    team_intelligence_router,
     visual_router,
+    workspace_router,
     wskg_router,
+    reasoning_engine_router,
+    temporal_intelligence_router,
+    simulation_studio_router,
+    release_candidate_router,
+    production_launch_router,
+    v13_observation_router,
+    developer_intelligence_router,
+    predictive_intelligence_router,
+    preventive_intelligence_router,
+    autopilot_router,
+    enterprise_governance_router,
+    org_intelligence_router,
+    engineering_strategy_router,
+    continuous_intelligence_router,
+    knowledge_fabric_router,
+    autonomous_engineering_router,
+    control_plane_router,
+    platform_router,
+    enterprise_scale_router,
+    developer_platform_router,
+    marketplace_intelligence_router,
+    global_intelligence_router,
+    predictive_cloud_router,
+    autonomous_operations_router,
+    self_healing_router,
+    global_optimization_router,
+    governance_router,
+    autonomous_cloud_router,
+    enterprise_expansion_router,
 )
+from app.api.v1.production_launch_router import router as production_launch_v31_router, launch_v2_router
 
 # pyrefly: ignore [missing-import]
 from app.core.config import settings
@@ -108,7 +151,8 @@ def shutdown_event():
 app.add_exception_handler(CodeAtlasException, codeatlas_exception_handler)
 
 # Correlation & Logging Middleware
-app.add_middleware(CorrelationAndLoggingMiddleware)
+app.add_middleware(CorrelationIdMiddleware)
+app.add_exception_handler(Exception, global_exception_handler)
 
 # CORS configuration
 app.add_middleware(
@@ -120,8 +164,41 @@ app.add_middleware(
 )
 
 # Include routers
+app.include_router(health_readiness_router.router, prefix=settings.API_V1_STR, tags=["health_readiness"])
+app.include_router(impact_router.router, prefix=settings.API_V1_STR, tags=["Impact Intelligence Engine"])
 app.include_router(health.router, prefix=settings.API_V1_STR, tags=["health"])
 app.include_router(auth.router, prefix=settings.API_V1_STR, tags=["auth"])
+app.include_router(reasoning_engine_router.router, prefix=settings.API_V1_STR, tags=["Engineering Reasoning"])
+app.include_router(temporal_intelligence_router.router, prefix=settings.API_V1_STR, tags=["Temporal Software Intelligence"])
+app.include_router(simulation_studio_router.router, prefix=settings.API_V1_STR, tags=["Engineering Simulation Studio"])
+app.include_router(release_candidate_router.router, prefix=settings.API_V1_STR, tags=["Release Candidate & Hardening"])
+app.include_router(production_launch_router.router, prefix=settings.API_V1_STR, tags=["Production Deployment & Launch"])
+app.include_router(v13_observation_router.router, prefix=settings.API_V1_STR, tags=["Production Observation & v1.3 Planning"])
+app.include_router(developer_intelligence_router.router, prefix=settings.API_V1_STR, tags=["Core Developer Intelligence"])
+app.include_router(predictive_intelligence_router.router, prefix=settings.API_V1_STR, tags=["Predictive Engineering Intelligence"])
+app.include_router(preventive_intelligence_router.router, prefix=settings.API_V1_STR, tags=["Preventive Engineering Intelligence"])
+app.include_router(autopilot_router.router, prefix=settings.API_V1_STR, tags=["Engineering Autopilot"])
+app.include_router(enterprise_governance_router.router, prefix=settings.API_V1_STR, tags=["Enterprise Governance & Multi-Repo Intelligence"])
+app.include_router(org_intelligence_router.router, prefix=settings.API_V1_STR, tags=["Organizational Intelligence"])
+app.include_router(engineering_strategy_router.router, prefix=settings.API_V1_STR, tags=["Engineering Strategy & Optimization"])
+app.include_router(continuous_intelligence_router.router, prefix=settings.API_V1_STR, tags=["Continuous Engineering Intelligence"])
+app.include_router(knowledge_fabric_router.router, prefix=settings.API_V1_STR, tags=["Engineering Knowledge Fabric"])
+app.include_router(autonomous_engineering_router.router, prefix=settings.API_V1_STR, tags=["Autonomous Engineering"])
+app.include_router(control_plane_router.router, prefix=settings.API_V1_STR, tags=["Engineering Control Plane"])
+app.include_router(platform_router.router, prefix=settings.API_V1_STR, tags=["Platform & Production Launch"])
+app.include_router(enterprise_scale_router.router, prefix=settings.API_V1_STR, tags=["Production Growth & Enterprise Scale"])
+app.include_router(developer_platform_router.router, prefix=settings.API_V1_STR, tags=["Ecosystem & Developer Platform"])
+app.include_router(marketplace_intelligence_router.router, prefix=settings.API_V1_STR, tags=["Intelligence Marketplace"])
+app.include_router(global_intelligence_router.router, prefix=settings.API_V1_STR, tags=["Global Engineering Intelligence"])
+app.include_router(predictive_cloud_router.router, prefix=settings.API_V1_STR, tags=["Predictive Engineering Cloud"])
+app.include_router(autonomous_operations_router.router, prefix=settings.API_V1_STR, tags=["Autonomous Engineering Operations"])
+app.include_router(self_healing_router.router, prefix=settings.API_V1_STR, tags=["Self-Healing Engineering Platform"])
+app.include_router(global_optimization_router.router, prefix=settings.API_V1_STR, tags=["Global Engineering Optimization"])
+app.include_router(governance_router.router, prefix=settings.API_V1_STR, tags=["Engineering Autonomy & Governance"])
+app.include_router(autonomous_cloud_router.router, prefix=settings.API_V1_STR, tags=["Autonomous Engineering Cloud"])
+app.include_router(production_launch_v31_router, prefix=settings.API_V1_STR, tags=["Production Launch & Growth"])
+app.include_router(launch_v2_router, prefix=settings.API_V1_STR, tags=["Production Deployment & Launch"])
+app.include_router(enterprise_expansion_router.router, prefix=settings.API_V1_STR, tags=["Enterprise Expansion"])
 app.include_router(
     repositories.router, prefix=settings.API_V1_STR, tags=["repositories"]
 )
@@ -183,6 +260,56 @@ app.include_router(
 )
 
 
+app.include_router(
+    org_knowledge_graph_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["org_knowledge_graph"],
+)
+app.include_router(
+    team_intelligence_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["team_intelligence"],
+)
+app.include_router(
+    workspace_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["workspaces"],
+)
+app.include_router(
+    enterprise_autonomous_optimization_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["enterprise_autonomous_optimization"],
+)
+app.include_router(
+    enterprise_simulation_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["enterprise_simulation"],
+)
+app.include_router(
+    governance_compliance_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["governance_compliance"],
+)
+app.include_router(
+    enterprise_ai_cto_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["enterprise_ai_cto"],
+)
+app.include_router(
+    cross_org_risk_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["cross_org_risk"],
+)
+app.include_router(
+    enterprise_architecture_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["enterprise_architecture"],
+)
+app.include_router(
+    executive_intelligence_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["executive_intelligence"],
+)
 app.include_router(
     enterprise_router.router,
     prefix=settings.API_V1_STR,

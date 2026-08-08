@@ -13,6 +13,12 @@ import {
   FileText,
   ShieldCheck,
   Flame,
+  Sparkles,
+  Users,
+  Building2,
+  BookOpen,
+  ShieldAlert,
+  Compass,
   X,
   ArrowRight
 } from 'lucide-react';
@@ -43,15 +49,19 @@ export function CommandPaletteModal({ isOpen, onClose }: CommandPaletteModalProp
   if (!isOpen) return null;
 
   const actions = [
-    { label: 'Search Architecture & Entities', icon: Search, shortcut: 'Enter', route: `/search?q=${encodeURIComponent(query)}` },
-    { label: 'Open Architecture Explorer', icon: Layers, shortcut: '⌘A', route: '/architecture' },
-    { label: 'Open Knowledge Graph Intelligence', icon: Network, shortcut: '⌘K', route: '/knowledge' },
-    { label: 'Open Dependency Intelligence', icon: Zap, shortcut: '⌘D', route: '/dependency-graph' },
-    { label: 'Open Call Flow & Execution Intelligence', icon: Globe, shortcut: '⌘E', route: '/investigate' },
-    { label: 'Open Scenario Simulator', icon: FlaskConical, shortcut: '⌘S', route: '/simulate' },
-    { label: 'Open AI Architecture Decisions (ADR)', icon: FileText, shortcut: '⌘R', route: '/architect' },
-    { label: 'Open AI Architecture Review & Critique', icon: ShieldCheck, shortcut: '⌘V', route: '/are' },
-    { label: 'Open Enterprise Workspace', icon: Command, shortcut: '⌘W', route: '/enterprise' },
+    { label: 'Search Architecture & Workspace Entities', icon: Search, shortcut: 'Enter', route: `/search?q=${encodeURIComponent(query)}` },
+    { label: 'Open Repositories & Software Ecosystem', icon: BookOpen, shortcut: '⌘2', route: '/repositories' },
+    { label: 'Open Enterprise Architecture Intelligence Studio', icon: Layers, shortcut: '⌘4', route: '/architecture' },
+    { label: 'Open Investigate & Call Flows Studio', icon: FlaskConical, shortcut: '⌘5', route: '/investigate' },
+    { label: 'Open Enterprise Simulation Studio', icon: FlaskConical, shortcut: '⌘6', route: '/simulate' },
+    { label: 'Open Autonomous Optimization Control Center', icon: Zap, shortcut: '⌘7', route: '/improve' },
+    { label: 'Show Cross-Organization Risk Radar', icon: ShieldAlert, shortcut: '⌘R', route: '/risk' },
+    { label: 'Open Governance & Compliance Posture', icon: FileText, shortcut: '⌘G', route: '/governance' },
+    { label: 'Open Team Engineering Intelligence Studio', icon: Users, shortcut: '⌘T', route: '/team-intelligence' },
+    { label: 'Open Organization Knowledge Graph Engine', icon: Network, shortcut: '⌘K', route: '/knowledge' },
+    { label: 'Ask Enterprise AI CTO Advisor', icon: Sparkles, shortcut: '⌘AI', route: '/ai-cto' },
+    { label: 'Open Executive Command Center', icon: Building2, shortcut: '⌘W', route: '/enterprise' },
+    { label: 'Open Unified Search', icon: Compass, shortcut: '⌘9', route: '/search' },
   ];
 
   const filteredActions = actions.filter((a) =>
