@@ -106,6 +106,44 @@ from app.api.v1 import (
     governance_router,
     autonomous_cloud_router,
     enterprise_expansion_router,
+    ecosystem_router,
+    intelligence_scale_router,
+    autonomous_network_router,
+    global_operations_router,
+    intelligence_advanced_router,
+    platform_hardening_router,
+    global_intelligence_v4_router,
+    product_adoption_v41_router,
+    enterprise_os_v42_router,
+    autonomous_v43_router,
+    simulation_v44_router,
+    network_v45_router,
+    engineering_os_v50_router,
+    production_v51_router,
+    security_v52_router,
+    ecosystem_v53_router,
+    marketplace_v54_router,
+    federation_v55_router,
+    commercial_v60_router,
+    workflows_v61_router,
+    autonomy_v62_router,
+    learning_v63_router,
+    simulation_v64_router,
+    autonomous_org_v65_router,
+    governance_trust_v66_router,
+    economy_v67_router,
+    science_v68_router,
+    ecosystem_v69_router,
+    platform_v70_router,
+    protocol_v71_router,
+    network_v72_router,
+    collective_v73_router,
+    marketplace_v74_router,
+    fabric_v75_router,
+    autonomy_os_v76_router,
+    self_healing_v77_router,
+    immune_v78_router,
+    evolution_v79_router,
 )
 from app.api.v1.production_launch_router import router as production_launch_v31_router, launch_v2_router
 
@@ -199,6 +237,28 @@ app.include_router(autonomous_cloud_router.router, prefix=settings.API_V1_STR, t
 app.include_router(production_launch_v31_router, prefix=settings.API_V1_STR, tags=["Production Launch & Growth"])
 app.include_router(launch_v2_router, prefix=settings.API_V1_STR, tags=["Production Deployment & Launch"])
 app.include_router(enterprise_expansion_router.router, prefix=settings.API_V1_STR, tags=["Enterprise Expansion"])
+app.include_router(ecosystem_router.router, prefix=settings.API_V1_STR, tags=["Engineering Ecosystem & Integrations"])
+app.include_router(intelligence_scale_router.router, prefix=settings.API_V1_STR, tags=["Intelligence at Scale"])
+app.include_router(autonomous_network_router.router, prefix=settings.API_V1_STR, tags=["Autonomous Engineering Network"])
+app.include_router(global_operations_router.router, prefix=settings.API_V1_STR, tags=["Global Engineering Operations"])
+app.include_router(intelligence_advanced_router.router, prefix=settings.API_V1_STR, tags=["Advanced Engineering Intelligence"])
+app.include_router(platform_hardening_router.router, prefix=settings.API_V1_STR, tags=["Platform Hardening & v4.0 Readiness"])
+app.include_router(global_intelligence_v4_router.router, prefix=settings.API_V1_STR, tags=["Global Engineering Intelligence Platform v4.0"])
+app.include_router(product_adoption_v41_router.router, prefix=settings.API_V1_STR, tags=["Product Adoption, DX & Market Readiness v4.1"])
+app.include_router(enterprise_os_v42_router.router, prefix=settings.API_V1_STR, tags=["Enterprise Intelligence & Organizational OS v4.2"])
+app.include_router(autonomous_v43_router.router, prefix=settings.API_V1_STR, tags=["Autonomous Engineering 2.0 v4.3"])
+app.include_router(simulation_v44_router.router, prefix=settings.API_V1_STR, tags=["Advanced Engineering Simulation v4.4"])
+app.include_router(network_v45_router.router, prefix=settings.API_V1_STR, tags=["Global Engineering Network v4.5"])
+app.include_router(engineering_os_v50_router.router, prefix=settings.API_V1_STR, tags=["Engineering Intelligence OS v5.0"])
+app.include_router(production_v51_router.router, prefix=settings.API_V1_STR, tags=["Production Platform v5.1"])
+app.include_router(security_v52_router.router, prefix=settings.API_V1_STR, tags=["Security & Enterprise Trust v5.2"])
+app.include_router(ecosystem_v53_router.router, prefix=settings.API_V1_STR, tags=["Developer & Enterprise Ecosystem v5.3"])
+app.include_router(marketplace_v54_router.router, prefix=settings.API_V1_STR, tags=["Intelligence Marketplace v5.4"])
+app.include_router(federation_v55_router.router, prefix=settings.API_V1_STR, tags=["Federated Intelligence Network v5.5"])
+app.include_router(commercial_v60_router.router, prefix=settings.API_V1_STR, tags=["Commercial Autonomous Platform v6.0"])
+app.include_router(workflows_v61_router.router, prefix=settings.API_V1_STR, tags=["Autonomous Engineering Workflows v6.1"])
+app.include_router(autonomy_v62_router.router, prefix=settings.API_V1_STR, tags=["Engineering Autonomy v6.2"])
+app.include_router(learning_v63_router.router, prefix=settings.API_V1_STR, tags=["Engineering Intelligence Learning System v6.3"])
 app.include_router(
     repositories.router, prefix=settings.API_V1_STR, tags=["repositories"]
 )
@@ -520,3 +580,99 @@ app.include_router(
     prefix=settings.API_V1_STR,
     tags=["biie_command_center"],
 )
+app.include_router(
+    learning_v63_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["learning_v63"],
+)
+app.include_router(
+    simulation_v64_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["simulation_v64"],
+)
+app.include_router(
+    autonomous_org_v65_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["autonomous_org_v65"],
+)
+app.include_router(
+    governance_trust_v66_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["governance_trust_v66"],
+)
+app.include_router(
+    economy_v67_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["economy_v67"],
+)
+app.include_router(
+    science_v68_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["science_v68"],
+)
+app.include_router(
+    ecosystem_v69_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["ecosystem_v69"],
+)
+app.include_router(
+    platform_v70_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["platform_v70"],
+)
+app.include_router(
+    protocol_v71_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["protocol_v71"],
+)
+app.include_router(
+    network_v72_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["network_v72"],
+)
+app.include_router(
+    collective_v73_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["collective_v73"],
+)
+app.include_router(
+    marketplace_v74_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["marketplace_v74"],
+)
+app.include_router(
+    fabric_v75_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["fabric_v75"],
+)
+app.include_router(
+    autonomy_os_v76_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["autonomy_os_v76"],
+)
+app.include_router(
+    self_healing_v77_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["self_healing_v77"],
+)
+app.include_router(
+    immune_v78_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["immune_v78"],
+)
+app.include_router(
+    evolution_v79_router.router,
+    prefix=settings.API_V1_STR,
+    tags=["evolution_v79"],
+)
+
+
+
+
+
+
+
+
+
+
+

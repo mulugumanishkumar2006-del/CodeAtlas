@@ -1,0 +1,98 @@
+"""
+CodeAtlas v3.3 - Unified Engineering Graph & Cross-System Search Engine
+Builds unified graph linking Developer, Team, Repository, Commit, PR, Issue, Service, Deployment, Incident, Cloud, Dependency, Document, Agent.
+Provides cross-system search and Universal Command Palette capabilities.
+"""
+
+from typing import Dict, Any, List
+from datetime import datetime, timezone
+
+class UnifiedEngineeringGraph:
+    def __init__(self):
+        self.nodes: Dict[str, Dict[str, Any]] = {}
+        self.edges: List[Dict[str, Any]] = []
+        self._build_sample_graph()
+
+    def _build_sample_graph(self):
+        sample_nodes = [
+            {"id": "dev_alice", "type": "Developer", "label": "Alice Smith", "email": "alice@company.com"},
+            {"id": "team_payments", "type": "Team", "label": "Payments Engineering Team"},
+            {"id": "repo_payment", "type": "Repository", "label": "github.com/company/payment-service"},
+            {"id": "commit_a1b2", "type": "Commit", "label": "Commit a1b2c3d4 (Fix Caching)"},
+            {"id": "pr_101", "type": "PullRequest", "label": "PR #101: Add Caching Layer"},
+            {"id": "issue_42", "type": "Issue", "label": "ENG-42: Redis Cache Memory Spike"},
+            {"id": "service_payment", "type": "Service", "label": "payment-service"},
+            {"id": "deploy_8812", "type": "Deployment", "label": "Deployment #8812 (Production)"},
+            {"id": "inc_9941", "type": "Incident", "label": "INC-9941: API Latency Spike"},
+            {"id": "cloud_ecs", "type": "CloudResource", "label": "AWS ECS payment-cluster"},
+            {"id": "dep_redis", "type": "Dependency", "label": "redis-py v5.0.1"},
+            {"id": "doc_adr1", "type": "Document", "label": "ADR-001: Async Redis Usage"},
+            {"id": "agent_rollback", "type": "Agent", "label": "Autonomous Rollback Agent"}
+        ]
+        for n in sample_nodes:
+            self.nodes[n["id"]] = n
+
+        self.edges = [
+            {"source": "dev_alice", "target": "team_payments", "relationship": "MEMBER_OF"},
+            {"source": "team_payments", "target": "repo_payment", "relationship": "OWNS"},
+            {"source": "dev_alice", "target": "pr_101", "relationship": "AUTHOR_OF"},
+            {"source": "pr_101", "target": "commit_a1b2", "relationship": "CONTAINS"},
+            {"source": "commit_a1b2", "target": "repo_payment", "relationship": "COMMITTED_TO"},
+            {"source": "repo_payment", "target": "service_payment", "relationship": "BUILDS_SERVICE"},
+            {"source": "service_payment", "target": "deploy_8812", "relationship": "DEPLOYED_AS"},
+            {"source": "deploy_8812", "target": "inc_9941", "relationship": "TRIGGERED_INCIDENT"},
+            {"source": "service_payment", "target": "cloud_ecs", "relationship": "RUNS_ON"},
+            {"source": "service_payment", "target": "dep_redis", "relationship": "DEPENDS_ON"},
+            {"source": "service_payment", "target": "doc_adr1", "relationship": "GOVERNED_BY"},
+            {"source": "agent_rollback", "target": "inc_9941", "relationship": "INVESTIGATED"}
+        ]
+
+    def query_graph(self) -> Dict[str, Any]:
+        return {
+            "total_nodes": len(self.nodes),
+            "total_edges": len(self.edges),
+            "nodes": list(self.nodes.values()),
+            "edges": self.edges
+        }
+
+    def cross_system_search(self, query: str) -> List[Dict[str, Any]]:
+        """Searches across Code, PR, Issue, Incident, Deployment, Docs, Services."""
+        q = query.lower()
+        results = []
+        for node_id, node in self.nodes.items():
+            if q in node["label"].lower() or q in node["type"].lower() or q in node_id.lower():
+                results.append({
+                    "id": node_id,
+                    "type": node["type"],
+                    "title": node["label"],
+                    "system": "CodeAtlas Engineering Graph",
+                    "url": f"/graph/nodes/{node_id}"
+                })
+        return results
+
+    def universal_command_palette(self, action_query: str) -> Dict[str, Any]:
+        """Processes Universal Command Palette actions."""
+        action_query_lower = action_query.lower()
+        if "investigate" in action_query_lower:
+            return {
+                "action": "INVESTIGATE_INCIDENT",
+                "target": "INC-9941",
+                "suggested_flow": ["Inspect Telemetry", "View Affected Services", "Propose Rollback"]
+            }
+        elif "architecture" in action_query_lower:
+            return {
+                "action": "VIEW_ARCHITECTURE",
+                "target": "payment-service",
+                "suggested_flow": ["View Dependency DAG", "Check ADR Compliance"]
+            }
+        elif "deploy" in action_query_lower or "release" in action_query_lower:
+            return {
+                "action": "CHECK_DEPLOYMENT_RISK",
+                "target": "Production",
+                "suggested_flow": ["Calculate Change Risk", "Verify Security Scans"]
+            }
+        return {
+            "action": "GLOBAL_SEARCH",
+            "target": action_query,
+            "results": self.cross_system_search(action_query)
+        }

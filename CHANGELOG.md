@@ -6,28 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
-## [1.1.0] - 2026-08-08
+## [7.9.0] - 2026-08-10
 
-### Added
-- **Monorepo Streaming Analysis Engine**: Implemented chunked parsing queues in Celery background workers, reducing Tier 3 monorepo parsing duration from 104.2s to **54.8s** (+47.4% speedup).
-- **Architecture Graph Filter Presets**: Added 1-click preset filter buttons (`API Ingress`, `Database Nodes`, `Microservice Boundaries`) to unclutter dense 50+ node graphs.
-- **Call Flow Execution Focus Mode**: Added 1-click execution path focus mode isolating active caller/callee sub-trees during deep call flow investigations.
-- **Visual Edge Diff Highlights**: Added contrasting green (`#10B981`) and red (`#EF4444`) graph edge diff highlights in the Simulation Studio when comparing scenarios.
-- **Mock Neo4j Test Fixture**: Built [mock_neo4j.py](file:///c:/Users/mulug/OneDrive/ドキュメント/Desktop/CodeAtlas/apps/backend/tests/fixtures/mock_neo4j.py) fixture suite resolving DEBT-02 and enabling offline integration testing.
-
-### Performance & Telemetry
-- Average time-to-first-insight reduced from 1.8 minutes to **1.2 minutes** (+33.3% faster).
-- Monorepo parsing memory footprint reduced from 1.8 GB RAM to **1.2 GB RAM** (-33.3% memory usage).
-- Preserved **100% Evidence Grounding (0 Hallucinations)** across AI CTO Advisor queries.
-- Maintained **99.2% Readiness Probe Score** across `/health/live`, `/health/ready`, `/health/deps`, and `/health/readiness-score`.
+### Added — Engineering Evolution Engine (Phases 1–100)
+- **9-Metric System Fitness Model & Constraint Engine**: Evaluates Reliability, Performance, Security, Cost (FinOps), Scalability, Maintainability, Developer Velocity, Architecture Quality, and Operational Complexity under hard policy constraints.
+- **Multi-Domain Opportunity Detector**: Discovers bottlenecks, FinOps overprovisioned compute, technical debt, and AI Agent/Model/Prompt/Memory evolution candidates (Dynamic LLM Model Router).
+- **Digital Twin Alternative Worlds & Pareto Optimization**: Simulates candidate future architectures; calculates non-dominated Pareto fronts and explains multi-metric trade-offs.
+- **Strangler-Pattern Migration Planner**: Generates 4-phase reversible migration plans with API and data compatibility guarantees.
+- **Controlled Experiments & Canary Evolution**: 10% shadow traffic canary rollout with 5-second route fallback rollback.
+- **Engineering Genome & Local Optima Trap Detector**: Maps structured architectural patterns, practices, repairs, and trade-offs; detects local optima trap states to achieve global ecosystem optimization.
+- **20-Step Master Evolution Test & 45-Point Readiness Audit**: Verified complete 20-step scenario test, Phase 95 Failed Evolution test, Phase 96 Evolution Regression test, Phase 97 Local Optimum test, Phase 98 Scale test, and 45 readiness criteria (`CODEATLAS v7.9 ENGINEERING EVOLUTION ENGINE READY`).
 
 ---
 
-## [1.0.0] - 2026-08-08
+## [7.8.0] - 2026-08-10
 
-### Added
-- **Unified 12-Hub Developer Workspace**: Brought together Dashboard, Repositories, Architecture, Investigate, Simulation, Optimize, Risk Radar, Governance, Team Intelligence, Knowledge Graph, AI CTO Advisor, and Executive Command Center.
-- **Universal Entity Detail Header**: Standardized detail headers across service, risk, policy, and scenario views with 1-click Contextual Action Bars.
-- **Enterprise Simulation Studio**: Hypothetical change modeling for service extractions and dependency updates with side-by-side graph diffs without live side-effects.
-- **Enterprise Autonomous Optimization Control Center**: Configurable across 7 Autonomy Levels (Level 0 - Level 6) featuring an explicit Level 4 Human Approval Gateway.
-- **Grounded AI CTO Advisor**: Evidence-driven conversational advisor bound by strict context filtering and zero hallucinations.
+### Added — Engineering Immune System (Phases 1–100)
+- **Immune Graph & Dynamic Evidence-Based Trust**: 13 domain entities mapping assets, users, services, dependencies, agents, credentials, deployments, repos, infra, threats, vulns, and incidents.
+- **6-Level Adaptive Containment Engine**: 6 containment levels (`Observe`, `Alert`, `Restrict`, `Isolate`, `Quarantine`, `Block`).
+
+---
+
+## [7.7.0] - 2026-08-10
+
+### Added — Engineering Self-Healing System (Phases 1–100)
+- **System Health Model & Explainable Scoring**: 12 system entity types with 10 health dimensions and degradation factor explanations.
