@@ -1,0 +1,452 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  Bot, 
+  User, 
+  Send, 
+  Sparkles, 
+  FileCode, 
+  ExternalLink, 
+  RefreshCw, 
+  Plus, 
+  ChevronDown, 
+  ChevronRight, 
+  ShieldCheck, 
+  AlertCircle,
+  Layers,
+  Terminal
+} from 'lucide-react';
+import { Repository, ChatMessage } from '../types';
+import { api } from '../services/api';
+
+interface ChatAssistantViewProps {
+  repository: Repository;
+  onNavigateToFile?: (path: string, startLine?: number, endLine?: number) => void;
+  initialQuestion?: string | null;
+  onClearInitialQuestion?: () => void;
+}
+
+export const ChatAssistantView: React.FC<ChatAssistantViewProps> = ({
+  repository,
+  onNavigateToFile,
+  initialQuestion,
+  onClearInitialQuestion,
+}) => {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [inputQuery, setInputQuery] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingStage, setLoadingStage] = useState<string>('Analyzing repository...');
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [expandedSources, setExpandedSources] = useState<Record<number, boolean>>({});
+  const [error, setError] = useState<string | null>(null);
+
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, isLoading]);
+
+  // Load conversations on repo change
+  useEffect(() => {
+    let isMounted = true;
+    const loadConversations = async () => {
+      try {
+        setError(null);
+        const res = await api.getConversations(repository.id);
+        if (!isMounted) return;
+        if (res.conversations && res.conversations.length > 0) {
+          const latest = res.conversations[0];
+          setActiveConversationId(latest.id);
+          setMessages(latest.messages || []);
+        } else {
+          setActiveConversationId(null);
+          setMessages([]);
+        }
+      } catch (err: any) {
+        if (isMounted) {
+          console.error('Error loading conversations:', err);
+        }
+      }
+    };
+
+    loadConversations();
+    return () => {
+      isMounted = false;
+    };
+  }, [repository.id]);
+
+  // Handle initial question submitted from bottom dock
+  useEffect(() => {
+    if (initialQuestion && initialQuestion.trim() && !isLoading) {
+      handleSendMessage(initialQuestion.trim());
+      onClearInitialQuestion?.();
+    }
+  }, [initialQuestion]);
+
+  const handleNewChat = async () => {
+    try {
+      setError(null);
+      const newConv = await api.createConversation(repository.id, `Chat ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
+      setActiveConversationId(newConv.id);
+      setMessages([]);
+      setTimeout(() => inputRef.current?.focus(), 100);
+    } catch (err: any) {
+      console.error('Failed to create new conversation:', err);
+      // Local fallback reset
+      setActiveConversationId(null);
+      setMessages([]);
+    }
+  };
+
+  const handleSendMessage = async (queryText?: string) => {
+    const q = (queryText || inputQuery).trim();
+    if (!q || isLoading) return;
+
+    setInputQuery('');
+    setError(null);
+
+    // Optimistic user message
+    const userMsg: ChatMessage = {
+      role: 'user',
+      content: q,
+      created_at: new Date().toISOString(),
+    };
+
+    setMessages((prev) => [...prev, userMsg]);
+    setIsLoading(true);
+    setLoadingStage('Analyzing query intent & keywords...');
+
+    const timer1 = setTimeout(() => setLoadingStage('Retrieving repository AST symbols & source code...'), 600);
+    const timer2 = setTimeout(() => setLoadingStage('Synthesizing grounded evidence & citations...'), 1200);
+
+    try {
+      const response = await api.queryRepository(
+        repository.id,
+        q,
+        activeConversationId,
+      );
+
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+
+      const assistantMsg: ChatMessage = {
+        role: 'assistant',
+        content: response.answer,
+        sources: response.sources || [],
+        created_at: new Date().toISOString(),
+      };
+
+      setMessages((prev) => [...prev, assistantMsg]);
+      if (response.conversation_id && !activeConversationId) {
+        setActiveConversationId(response.conversation_id);
+      }
+    } catch (err: any) {
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+      setError(err.message || 'Failed to query repository intelligence.');
+      const errorMsg: ChatMessage = {
+        role: 'assistant',
+        content: `Error: ${err.message || 'Unable to complete repository analysis. Please verify the repository has been indexed.'}`,
+        sources: [],
+        created_at: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, errorMsg]);
+    } finally {
+      setIsLoading(false);
+      setTimeout(() => inputRef.current?.focus(), 100);
+    }
+  };
+
+  const toggleSourceExpand = (index: number) => {
+    setExpandedSources((prev) => ({
+      ...prev,
+      [index]: !prev[index],
+    }));
+  };
+
+  // Render markdown with clickable citation chips
+  const renderMessageContent = (content: string) => {
+    // Regex matching citations like [src/auth/service.py:25–48] or [src/auth/service.py:25-48]
+    const citationRegex = /\[([a-zA-Z0-9_\-\.\/\\]+\.[a-zA-Z0-9]+):(\d+)[–\-](\d+)\]/g;
+
+    const parts: (string | React.ReactNode)[] = [];
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = citationRegex.exec(content)) !== null) {
+      // Add text before citation
+      if (match.index > lastIndex) {
+        parts.push(content.substring(lastIndex, match.index));
+      }
+
+      const filePath = match[1];
+      const startLine = parseInt(match[2], 10);
+      const endLine = parseInt(match[3], 10);
+
+      parts.push(
+        <button
+          key={`cite-${match.index}`}
+          className="citation-badge-btn"
+          onClick={() => onNavigateToFile?.(filePath, startLine, endLine)}
+          title={`Open ${filePath} (Lines ${startLine}–${endLine}) in Code Explorer`}
+        >
+          <FileCode size={12} style={{ marginRight: 4, verticalAlign: 'middle' }} />
+          <span>{filePath}:{startLine}–{endLine}</span>
+          <ExternalLink size={10} style={{ marginLeft: 4, verticalAlign: 'middle', opacity: 0.7 }} />
+        </button>
+      );
+
+      lastIndex = match.index + match[0].length;
+    }
+
+    if (lastIndex < content.length) {
+      parts.push(content.substring(lastIndex));
+    }
+
+    // Basic markdown styling for headers and code blocks
+    return (
+      <div className="chat-markdown-body">
+        {parts.map((part, idx) => {
+          if (typeof part !== 'string') return part;
+
+          // Simple line-by-line markdown processor for headings and bullet points
+          const lines = part.split('\n');
+          return (
+            <React.Fragment key={idx}>
+              {lines.map((line, lIdx) => {
+                if (line.startsWith('### ')) {
+                  return <h4 key={lIdx} className="chat-md-h3">{line.replace('### ', '')}</h4>;
+                }
+                if (line.startsWith('## ')) {
+                  return <h3 key={lIdx} className="chat-md-h2">{line.replace('## ', '')}</h3>;
+                }
+                if (line.startsWith('- ') || line.startsWith('* ')) {
+                  return (
+                    <div key={lIdx} className="chat-md-bullet">
+                      <span className="bullet-dot">•</span>
+                      <span>{line.substring(2)}</span>
+                    </div>
+                  );
+                }
+                if (line.trim() === '') {
+                  return <div key={lIdx} style={{ height: '6px' }} />;
+                }
+                return <p key={lIdx} className="chat-md-p">{line}</p>;
+              })}
+            </React.Fragment>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const sampleQueries = [
+    'How does authentication work in this codebase?',
+    'What is the high-level architecture and structure?',
+    'What dependencies does this project have?',
+    'Where is the main entry point defined?',
+  ];
+
+  return (
+    <div className="chat-assistant-container">
+      {/* Header bar */}
+      <div className="chat-assistant-header">
+        <div className="chat-header-meta">
+          <div className="chat-avatar-assistant">
+            <Bot size={18} />
+          </div>
+          <div>
+            <div className="chat-header-title">
+              Repository Intelligence — <span className="highlight-repo">{repository.name}</span>
+            </div>
+            <div className="chat-header-subtitle">
+              <ShieldCheck size={12} style={{ display: 'inline', marginRight: 4, color: 'var(--accent-green)' }} />
+              Grounded strictly in indexed AST symbols, files, and dependencies
+            </div>
+          </div>
+        </div>
+
+        <div className="chat-header-actions">
+          <button
+            id="btn-new-chat"
+            className="btn-new-chat"
+            onClick={handleNewChat}
+            title="Start a new clean chat thread for this repository"
+          >
+            <Plus size={14} />
+            <span>New Chat</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Messages Scroll Area */}
+      <div className="chat-messages-scroll-area">
+        {messages.length === 0 ? (
+          <div className="chat-empty-assistant-state">
+            <div className="empty-sparkle-icon">
+              <Sparkles size={36} />
+            </div>
+            <h3>Ask CodeAtlas about {repository.name}</h3>
+            <p>
+              Ask structural, architectural, flow, or implementation questions. Every claim is cited with exact repository file and line ranges.
+            </p>
+
+            <div className="suggested-queries-grid">
+              {sampleQueries.map((sq, i) => (
+                <button
+                  key={i}
+                  className="suggested-query-card"
+                  onClick={() => handleSendMessage(sq)}
+                  disabled={isLoading}
+                >
+                  <Sparkles size={14} style={{ color: 'var(--accent-cyan)', flexShrink: 0 }} />
+                  <span>{sq}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="chat-messages-thread">
+            {messages.map((msg, idx) => {
+              const isUser = msg.role === 'user';
+              const hasSources = msg.sources && msg.sources.length > 0;
+              const isSourcesExpanded = expandedSources[idx] ?? false;
+
+              return (
+                <div
+                  key={idx}
+                  className={`chat-message-row ${isUser ? 'user-row' : 'assistant-row'}`}
+                >
+                  <div className={`chat-message-avatar ${isUser ? 'user-avatar' : 'assistant-avatar'}`}>
+                    {isUser ? <User size={16} /> : <Bot size={16} />}
+                  </div>
+
+                  <div className="chat-message-bubble-wrapper">
+                    <div className="chat-message-author-tag">
+                      {isUser ? 'You' : 'CodeAtlas Intelligence'}
+                      {msg.created_at && (
+                        <span className="chat-message-timestamp">
+                          {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className={`chat-message-bubble ${isUser ? 'user-bubble' : 'assistant-bubble'}`}>
+                      {renderMessageContent(msg.content)}
+                    </div>
+
+                    {/* Grounded Sources Panel */}
+                    {!isUser && hasSources && (
+                      <div className="chat-sources-panel">
+                        <button
+                          className="sources-toggle-btn"
+                          onClick={() => toggleSourceExpand(idx)}
+                          aria-expanded={isSourcesExpanded}
+                        >
+                          {isSourcesExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                          <Layers size={13} style={{ marginLeft: 4, marginRight: 4 }} />
+                          <span className="sources-count-label">
+                            {msg.sources!.length} Grounded Repository {msg.sources!.length === 1 ? 'Source' : 'Sources'}
+                          </span>
+                        </button>
+
+                        {isSourcesExpanded && (
+                          <div className="sources-list-expanded">
+                            {msg.sources!.map((src, sIdx) => (
+                              <div
+                                key={sIdx}
+                                className="source-item-card"
+                                onClick={() => onNavigateToFile?.(src.path, src.start_line, src.end_line)}
+                                title="Click to view file and line range in Code Explorer"
+                              >
+                                <div className="source-item-header">
+                                  <FileCode size={14} style={{ color: 'var(--accent-cyan)' }} />
+                                  <span className="source-item-path">{src.path}</span>
+                                  <span className="source-line-badge">
+                                    Lines {src.start_line}–{src.end_line}
+                                  </span>
+                                  <ExternalLink size={12} className="source-item-ext" />
+                                </div>
+                                {src.symbol && (
+                                  <div className="source-symbol-info">
+                                    <Terminal size={12} style={{ display: 'inline', marginRight: 4 }} />
+                                    Symbol: <code>{src.symbol}</code>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Real-time Loading State */}
+            {isLoading && (
+              <div className="chat-message-row assistant-row">
+                <div className="chat-message-avatar assistant-avatar">
+                  <Bot size={16} />
+                </div>
+                <div className="chat-message-bubble-wrapper">
+                  <div className="chat-loading-container">
+                    <RefreshCw size={16} className="spinner-icon" />
+                    <span>{loadingStage}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
+          </div>
+        )}
+      </div>
+
+      {/* Error Banner */}
+      {error && (
+        <div className="chat-error-banner">
+          <AlertCircle size={14} />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {/* Chat Input Bar */}
+      <div className="chat-input-container">
+        <form
+          className="chat-input-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSendMessage();
+          }}
+        >
+          <Sparkles size={18} className="chat-sparkle-prefix" />
+          <input
+            ref={inputRef}
+            id="chat-assistant-input"
+            type="text"
+            className="chat-assistant-input-field"
+            placeholder={`Ask about ${repository.name}... (e.g., 'How does authentication work?')`}
+            value={inputQuery}
+            onChange={(e) => setInputQuery(e.target.value)}
+            disabled={isLoading}
+          />
+          <button
+            id="btn-chat-assistant-submit"
+            type="submit"
+            className="btn-chat-assistant-send"
+            disabled={!inputQuery.trim() || isLoading}
+            aria-label="Send Query"
+          >
+            <Send size={15} />
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+};
