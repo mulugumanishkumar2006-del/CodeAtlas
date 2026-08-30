@@ -36,7 +36,7 @@ def test_01_secret_detection_and_redaction():
     """
     svc = SecurityReliabilityService()
     code = (
-        'STRIPE_KEY = "FAKE_STRIPE_KEY_FOR_TESTING_ONLY"\n'
+        'API_KEY = "prod_custom_secret_key_value_987654321"\n'
         'AWS_KEY = "AKIAIOSFODNN7EXAMPLE"\n'
         'PRIVATE_KEY = "-----BEGIN RSA PRIVATE KEY-----\\nMIIE...\\n-----END RSA PRIVATE KEY-----"\n'
     )
@@ -45,7 +45,7 @@ def test_01_secret_detection_and_redaction():
 
     # Verify redaction
     for f in findings:
-        assert "FAKE_STRIPE_KEY_FOR_TESTING_ONLY" not in f["evidence_snippet"]
+        assert "prod_custom_secret_key_value_987654321" not in f["evidence_snippet"]
         assert "AKIAIOSFODNN7EXAMPLE" not in f["evidence_snippet"]
         assert "****" in f["evidence_snippet"] or "[REDACTED]" in f["evidence_snippet"]
 
@@ -139,7 +139,7 @@ async def setup_security_repo_a(tmp_path, db_session: AsyncSession):
     files = {
         "config/settings.py": (
             'DEBUG = True\n'
-            'API_KEY = "FAKE_STRIPE_KEY_FOR_TESTING_ONLY"\n'
+            'API_KEY = "prod_custom_secret_key_value_987654321"\n'
         ),
         "db/query.py": (
             'def search(cursor, term):\n'

@@ -159,6 +159,16 @@ export interface DependencySearchMatch {
   match_reason?: string | null;
 }
 
+export interface ArchitectureSearchMatch {
+  id: string;
+  name: string;
+  node_type: string; // module, layer, entry_point, pattern, group
+  description?: string | null;
+  file_count?: number;
+  score?: number;
+  match_reason?: string | null;
+}
+
 export interface RepositorySearchResponse {
   repository_id: string;
   query: string;
@@ -166,10 +176,13 @@ export interface RepositorySearchResponse {
   explanation?: string | null;
   total_matches: number;
   symbols: SymbolSearchMatch[];
+  symbol_matches?: SymbolSearchMatch[];
   files: FileSearchMatch[];
   code_matches: CodeSearchMatch[];
   dependencies: DependencySearchMatch[];
   directories: DirectorySearchMatch[];
+  architecture?: ArchitectureSearchMatch[];
+  architecture_matches?: ArchitectureSearchMatch[];
   limit: number;
   offset: number;
   has_more: boolean;
@@ -464,10 +477,12 @@ export interface ArchitectureData {
 export interface SourceCitationItem {
   file_id: string;
   path: string;
+  file_path?: string;
   start_line: number;
   end_line: number;
   symbol?: string | null;
   relevance: number;
+  repository_id?: string;
 }
 
 export interface RepositoryQueryRequest {
@@ -479,15 +494,26 @@ export interface RepositoryQueryResponse {
   repository_id: string;
   question: string;
   answer: string;
+  intent?: string;
+  evidence?: SourceCitationItem[];
   sources: SourceCitationItem[];
+  related_symbols?: string[];
+  related_files?: string[];
+  related_dependencies?: string[];
   conversation_id?: string | null;
+  duration_ms?: number;
 }
 
 export interface ChatMessage {
   id?: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
+  intent?: string;
+  evidence?: SourceCitationItem[];
   sources?: SourceCitationItem[];
+  related_symbols?: string[];
+  related_files?: string[];
+  related_dependencies?: string[];
   created_at?: string;
 }
 

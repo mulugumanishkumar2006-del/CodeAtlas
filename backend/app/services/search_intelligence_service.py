@@ -1,4 +1,5 @@
 import re
+import logging
 from typing import Optional, List, Dict, Any, Tuple
 from sqlalchemy import select, or_, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -6,13 +7,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.app.models.file import File
 from backend.app.models.symbol import Symbol
 from backend.app.models.dependency import Dependency
+from backend.app.models.repository import Repository
 from backend.app.services.source_code_service import source_code_service
+
+logger = logging.getLogger("codeatlas.search")
 
 
 class SearchIntelligenceService:
     """
     Search & Code Intelligence Service for repository-scoped search and query understanding.
-    Grounded in real indexed AST symbols, files, dependencies, and source checkouts.
+    Grounded in real indexed AST symbols, files, dependencies, architecture, and source checkouts.
     """
 
     INTENTS = {
@@ -24,6 +28,7 @@ class SearchIntelligenceService:
         "DEPENDENCY_OUTGOING": "Finding modules and files that a given file depends on or imports",
         "CALLER_SEARCH": "Finding callers of a specific function or method",
         "CALLEE_SEARCH": "Finding functions or methods called by a specific function",
+        "ARCHITECTURE_SEARCH": "Finding architecture modules, layers, patterns, and components",
         "DIRECTORY_SEARCH": "Finding and inspecting directory structures and metrics",
         "UNKNOWN": "Unknown query intent",
     }
@@ -69,26 +74,31 @@ class SearchIntelligenceService:
             target = m.group(1).strip("'\"` ")
             return ("CALLEE_SEARCH", target, f"Finding calls made by function '{target}'")
 
-        # 5. File search queries ("Where is auth.py", "Find file auth.py")
+        # 5. Architecture queries ("What are the components?", "architecture of auth", "layers in project")
+        if re.search(r"\b(architecture|layer|layers|module|modules|component|components|entry point|entry points|pattern|patterns)\b", lower_q):
+            target = re.sub(r"\b(show|find|list|what are|the|in|of|for|project|repository|architecture|layers?|modules?|components?)\b", "", lower_q).strip(" ?'\"`")
+            return ("ARCHITECTURE_SEARCH", target or q, f"Searching architecture components matching '{target or q}'")
+
+        # 6. File search queries ("Where is auth.py", "Find file auth.py")
         m = re.search(r"^(?:where\s+is|find|show|locate)\s+(?:file\s+)?([a-zA-Z0-9_\-\.\/\\]+\.[a-zA-Z0-9]+)\??$", lower_q)
         if m:
             target = m.group(1).strip("'\"` ")
             return ("FILE_SEARCH", target, f"Locating file '{target}'")
 
-        # 6. General location/symbol queries ("Where is authentication implemented?", "Where is AuthService?")
+        # 7. General location/symbol queries ("Where is authentication implemented?", "Where is AuthService?")
         m = re.search(r"^(?:where\s+is|find|show|locate)\s+(?:the\s+)?([a-zA-Z0-9_\-\.\/\s]+?)(?:\s+implemented|\s+defined|\s+handled|\s+created)?\??$", lower_q)
         if m:
             target = m.group(1).strip("'\"` ")
             if target:
                 return ("SYMBOL_SEARCH", target, f"Searching for symbol or implementation of '{target}'")
 
-        # 7. Directory queries ("directory services", "folder src")
+        # 8. Directory queries ("directory services", "folder src")
         m = re.search(r"^(?:dir|directory|folder)\s+([a-zA-Z0-9_\-\.\/\\]+)\??$", lower_q)
         if m:
             target = m.group(1).strip("'\"` ")
             return ("DIRECTORY_SEARCH", target, f"Inspecting directory structure for '{target}'")
 
-        # 8. "Which files contain X"
+        # 9. "Which files contain X"
         m = re.search(r"^(?:which\s+files?\s+contains?)\s+([a-zA-Z0-9_\-\.\/\s]+)\??$", lower_q)
         if m:
             target = m.group(1).strip("'\"` ")
@@ -110,6 +120,7 @@ class SearchIntelligenceService:
     ) -> Dict[str, Any]:
         """
         Execute ranked, repository-scoped search and intelligence query across all indexed entities.
+        Strictly bounded by repository_id.
         """
         if not query_str or not query_str.strip():
             return {
@@ -119,10 +130,13 @@ class SearchIntelligenceService:
                 "explanation": "Search query was empty.",
                 "total_matches": 0,
                 "symbols": [],
+                "symbol_matches": [],
                 "files": [],
                 "code_matches": [],
                 "dependencies": [],
                 "directories": [],
+                "architecture": [],
+                "architecture_matches": [],
                 "limit": limit,
                 "offset": offset,
                 "has_more": False,
@@ -136,6 +150,7 @@ class SearchIntelligenceService:
         code_matches_list: List[Dict[str, Any]] = []
         deps_list: List[Dict[str, Any]] = []
         dirs_list: List[Dict[str, Any]] = []
+        arch_list: List[Dict[str, Any]] = []
 
         # Map files in repo
         file_query = select(File).where(File.repository_id == repository_id)
@@ -150,9 +165,9 @@ class SearchIntelligenceService:
         file_id_to_obj = {f.id: f for f in repo_files}
 
         # -------------------------------------------------------------
-        # 1. SYMBOL SEARCH (Ranked)
+        # 1. SYMBOL SEARCH (Ranked with Deterministic Signals)
         # -------------------------------------------------------------
-        if search_type in ["all", "symbol", "query"] and intent in ["KEYWORD_SEARCH", "SYMBOL_SEARCH", "CALLER_SEARCH", "CALLEE_SEARCH"]:
+        if search_type in ["all", "symbol", "query"] and intent in ["KEYWORD_SEARCH", "SYMBOL_SEARCH", "CALLER_SEARCH", "CALLEE_SEARCH", "ARCHITECTURE_SEARCH"]:
             sym_q = (
                 select(Symbol, File)
                 .join(File, Symbol.file_id == File.id)
@@ -172,7 +187,11 @@ class SearchIntelligenceService:
             sym_rows = (await db.execute(sym_q)).all()
 
             for sym, f in sym_rows:
-                # Deterministic ranking score
+                # Deterministic ranking score:
+                # 100: Exact symbol name match
+                # 80: Starts-with symbol name match
+                # 60: Substring symbol name match
+                # 45: Qualified name substring match
                 score = 30
                 if sym.name.lower() == clean_target.lower():
                     score = 100
@@ -201,12 +220,17 @@ class SearchIntelligenceService:
             symbols_list.sort(key=lambda x: (-x["score"], x["name"]))
 
         # -------------------------------------------------------------
-        # 2. FILE SEARCH (Ranked)
+        # 2. FILE SEARCH (Ranked with Deterministic Signals)
         # -------------------------------------------------------------
-        if search_type in ["all", "file", "query"] and intent in ["KEYWORD_SEARCH", "FILE_SEARCH", "SYMBOL_SEARCH"]:
+        if search_type in ["all", "file", "query"] and intent in ["KEYWORD_SEARCH", "FILE_SEARCH", "SYMBOL_SEARCH", "ARCHITECTURE_SEARCH"]:
             for f in repo_files:
                 f_basename = f.path.split("/")[-1]
                 score = 0
+                # Deterministic ranking:
+                # 95: Exact filename match
+                # 75: Starts-with filename match
+                # 55: Substring filename match
+                # 35: Path substring match
                 if f_basename.lower() == clean_target.lower():
                     score = 95
                 elif f_basename.lower().startswith(clean_target.lower()):
@@ -224,7 +248,7 @@ class SearchIntelligenceService:
                         "line_count": f.line_count,
                         "size_bytes": f.size_bytes,
                         "score": score,
-                        "match_reason": f"File path contains '{clean_target}'",
+                        "match_reason": f"File path matches '{clean_target}'",
                     })
 
             files_list.sort(key=lambda x: (-x["score"], x["path"]))
@@ -232,7 +256,7 @@ class SearchIntelligenceService:
         # -------------------------------------------------------------
         # 3. DIRECTORY SEARCH & AGGREGATIONS
         # -------------------------------------------------------------
-        if search_type in ["all", "directory", "query"] and (intent in ["DIRECTORY_SEARCH", "KEYWORD_SEARCH"] or "/" in clean_target or not "." in clean_target):
+        if search_type in ["all", "directory", "query"] and (intent in ["DIRECTORY_SEARCH", "KEYWORD_SEARCH", "ARCHITECTURE_SEARCH"] or "/" in clean_target or not "." in clean_target):
             dir_stats: Dict[str, Dict[str, Any]] = {}
             for f in repo_files:
                 parts = f.path.split("/")
@@ -260,79 +284,139 @@ class SearchIntelligenceService:
             dirs_list.sort(key=lambda d: (-d["file_count"], d["directory"]))
 
         # -------------------------------------------------------------
-        # 4. DEPENDENCY & CALLER QUERIES
+        # 4. DEPENDENCY SEARCH (Ranked)
         # -------------------------------------------------------------
         if search_type in ["all", "dependency", "query"] or intent in ["DEPENDENCY_INCOMING", "DEPENDENCY_OUTGOING", "CALLER_SEARCH", "CALLEE_SEARCH"]:
-            # A) Incoming Dependencies: What depends on X?
-            if intent in ["DEPENDENCY_INCOMING", "CALLER_SEARCH", "KEYWORD_SEARCH"]:
-                all_repo_deps_q = select(Dependency).where(Dependency.repository_id == repository_id)
-                all_repo_deps = (await db.execute(all_repo_deps_q)).scalars().all()
+            all_repo_deps_q = select(Dependency).where(Dependency.repository_id == repository_id)
+            all_repo_deps = (await db.execute(all_repo_deps_q)).scalars().all()
 
-                for dep in all_repo_deps:
-                    meta = dep.metadata_json or {}
-                    target_path = meta.get("target_path") or ""
-                    src_path = meta.get("source_path")
-                    if not src_path and dep.source_file_id and dep.source_file_id in file_id_to_obj:
-                        src_path = file_id_to_obj[dep.source_file_id].path
+            for dep in all_repo_deps:
+                meta = dep.metadata_json or {}
+                target_path = meta.get("target_path") or ""
+                src_path = meta.get("source_path")
+                if not src_path and dep.source_file_id and dep.source_file_id in file_id_to_obj:
+                    src_path = file_id_to_obj[dep.source_file_id].path
 
-                    target_stem = clean_target.split('.')[0].lower()
-                    # Check if target matches query
-                    if (
-                        clean_target.lower() in dep.name.lower()
-                        or target_stem in dep.name.lower()
-                        or (target_path and (clean_target.lower() in target_path.lower() or target_stem in target_path.lower()))
-                    ):
-                        deps_list.append({
-                            "id": dep.id,
-                            "dependency_type": dep.dependency_type,
-                            "name": dep.name,
-                            "source_file_id": dep.source_file_id,
-                            "source_path": src_path or "Unknown",
-                            "target_file_id": dep.target_file_id,
-                            "target_path": target_path or dep.name,
-                            "line": meta.get("line") or meta.get("start_line"),
-                            "resolved": meta.get("resolved", dep.target_file_id is not None),
-                            "relationship_type": "incoming",
-                            "match_reason": f"'{src_path or 'Module'}' imports '{dep.name}'",
-                        })
+                target_stem = clean_target.split('.')[0].lower()
+                is_match = (
+                    clean_target.lower() in dep.name.lower()
+                    or target_stem in dep.name.lower()
+                    or (target_path and (clean_target.lower() in target_path.lower() or target_stem in target_path.lower()))
+                    or (src_path and clean_target.lower() in src_path.lower())
+                )
 
-            # B) Outgoing Dependencies: What does X depend on?
-            if intent in ["DEPENDENCY_OUTGOING", "CALLEE_SEARCH"]:
-                # Match source file path
-                matched_source_file_ids = [
-                    f.id for f in repo_files if clean_target.lower() in f.path.lower()
-                ]
-                if matched_source_file_ids:
-                    out_q = (
-                        select(Dependency)
-                        .where(
-                            Dependency.repository_id == repository_id,
-                            Dependency.source_file_id.in_(matched_source_file_ids),
-                        )
-                    )
-                    out_deps = (await db.execute(out_q)).scalars().all()
-                    for dep in out_deps:
-                        meta = dep.metadata_json or {}
-                        src_path = meta.get("source_path")
-                        if not src_path and dep.source_file_id in file_id_to_obj:
-                            src_path = file_id_to_obj[dep.source_file_id].path
+                if is_match:
+                    score = 60
+                    if dep.name.lower() == clean_target.lower():
+                        score = 85
+                    elif dep.name.lower().startswith(clean_target.lower()):
+                        score = 75
 
-                        deps_list.append({
-                            "id": dep.id,
-                            "dependency_type": dep.dependency_type,
-                            "name": dep.name,
-                            "source_file_id": dep.source_file_id,
-                            "source_path": src_path or "Unknown",
-                            "target_file_id": dep.target_file_id,
-                            "target_path": meta.get("target_path") or dep.name,
-                            "line": meta.get("line") or meta.get("start_line"),
-                            "resolved": meta.get("resolved", dep.target_file_id is not None),
-                            "relationship_type": "outgoing",
-                            "match_reason": f"'{src_path}' imports '{dep.name}'",
-                        })
+                    rel_type = "outgoing" if (src_path and clean_target.lower() in src_path.lower()) else "incoming"
+                    deps_list.append({
+                        "id": dep.id,
+                        "dependency_type": dep.dependency_type,
+                        "name": dep.name,
+                        "source_file_id": dep.source_file_id,
+                        "source_path": src_path or "Unknown",
+                        "target_file_id": dep.target_file_id,
+                        "target_path": target_path or dep.name,
+                        "line": meta.get("line") or meta.get("start_line"),
+                        "resolved": meta.get("resolved", dep.target_file_id is not None),
+                        "relationship_type": rel_type,
+                        "score": score,
+                        "match_reason": f"'{src_path or 'Module'}' imports '{dep.name}'",
+                    })
+
+            deps_list.sort(key=lambda d: (-d.get("score", 0), d["name"]))
 
         # -------------------------------------------------------------
-        # 5. SOURCE CODE TEXT SEARCH (With 3-Line Context Snippet)
+        # 5. ARCHITECTURE SEARCH (Modules, Layers, Patterns, Entry Points)
+        # -------------------------------------------------------------
+        if search_type in ["all", "architecture", "query"] or intent == "ARCHITECTURE_SEARCH":
+            try:
+                from backend.app.services.architecture_service import architecture_service
+                files_data = [
+                    {"id": f.id, "path": f.path, "language": f.language, "line_count": f.line_count, "source_metadata": f.source_metadata or {}}
+                    for f in repo_files
+                ]
+                syms_res = await db.execute(select(Symbol).where(Symbol.repository_id == repository_id).limit(300))
+                syms_data = [
+                    {"id": s.id, "file_id": s.file_id, "name": s.name, "symbol_type": s.symbol_type, "start_line": s.start_line, "end_line": s.end_line}
+                    for s in syms_res.scalars().all()
+                ]
+                deps_res = await db.execute(select(Dependency).where(Dependency.repository_id == repository_id).limit(300))
+                deps_data = [
+                    {"id": d.id, "name": d.name, "source_path": file_map.get(d.source_file_id), "target_path": file_map.get(d.target_file_id) or d.name, "resolved": d.target_file_id is not None}
+                    for d in deps_res.scalars().all()
+                ]
+                arch_model = architecture_service.build_architecture_model(
+                    repository_id=repository_id,
+                    files=files_data,
+                    dependencies=deps_data,
+                    symbols=syms_data,
+                )
+
+                # Search Modules
+                for m in arch_model.get("modules", []):
+                    if clean_target.lower() in m.get("name", "").lower() or clean_target.lower() in m.get("layer", "").lower():
+                        score = 90 if m.get("name", "").lower() == clean_target.lower() else 70
+                        arch_list.append({
+                            "id": m.get("id"),
+                            "name": m.get("name"),
+                            "node_type": "module",
+                            "description": m.get("description"),
+                            "file_count": m.get("file_count", 0),
+                            "score": score,
+                            "match_reason": f"Architecture module in '{m.get('layer')}' layer",
+                        })
+
+                # Search Layers
+                for lyr in arch_model.get("layers", []):
+                    if clean_target.lower() in lyr.get("name", "").lower() or clean_target.lower() in lyr.get("category", "").lower():
+                        score = 85 if lyr.get("name", "").lower() == clean_target.lower() else 65
+                        arch_list.append({
+                            "id": f"layer_{lyr.get('name')}",
+                            "name": lyr.get("name"),
+                            "node_type": "layer",
+                            "description": lyr.get("description"),
+                            "file_count": lyr.get("file_count", 0),
+                            "score": score,
+                            "match_reason": f"Architecture layer ({lyr.get('category')})",
+                        })
+
+                # Search Entry Points
+                for ep in arch_model.get("entry_points", []):
+                    if clean_target.lower() in ep.get("file_path", "").lower() or (ep.get("symbol") and clean_target.lower() in ep.get("symbol", "").lower()):
+                        arch_list.append({
+                            "id": f"entry_{ep.get('file_path')}",
+                            "name": ep.get("symbol") or ep.get("file_path"),
+                            "node_type": "entry_point",
+                            "description": f"Entry point: {ep.get('reason')} ({ep.get('framework') or 'Application'})",
+                            "file_count": 1,
+                            "score": 80,
+                            "match_reason": f"Application entry point at {ep.get('file_path')}:{ep.get('line', 1)}",
+                        })
+
+                # Search Patterns
+                for pat in arch_model.get("patterns", []):
+                    if clean_target.lower() in pat.get("pattern", "").lower():
+                        arch_list.append({
+                            "id": f"pattern_{pat.get('pattern')}",
+                            "name": pat.get("pattern"),
+                            "node_type": "pattern",
+                            "description": pat.get("description"),
+                            "file_count": len(pat.get("evidence", [])),
+                            "score": 75,
+                            "match_reason": f"Detected architectural pattern ({pat.get('confidence')} confidence)",
+                        })
+
+                arch_list.sort(key=lambda a: (-a.get("score", 0), a["name"]))
+            except Exception as e:
+                logger.warning(f"Error during architecture search in repo '{repository_id}': {e}")
+
+        # -------------------------------------------------------------
+        # 6. SOURCE CODE TEXT SEARCH (With 3-Line Context Snippet)
         # -------------------------------------------------------------
         if search_type in ["all", "code", "query"] and intent in ["KEYWORD_SEARCH", "SOURCE_SEARCH", "SYMBOL_SEARCH"]:
             raw_code = source_code_service.search_repository_code(
@@ -377,6 +461,7 @@ class SearchIntelligenceService:
             + len(code_matches_list)
             + len(deps_list)
             + len(dirs_list)
+            + len(arch_list)
         )
 
         # Apply pagination across groups
@@ -385,6 +470,7 @@ class SearchIntelligenceService:
         paged_code = code_matches_list[offset : offset + limit]
         paged_deps = deps_list[offset : offset + limit]
         paged_dirs = dirs_list[offset : offset + limit]
+        paged_arch = arch_list[offset : offset + limit]
 
         has_more = (
             len(symbols_list) > offset + limit
@@ -392,6 +478,7 @@ class SearchIntelligenceService:
             or len(code_matches_list) > offset + limit
             or len(deps_list) > offset + limit
             or len(dirs_list) > offset + limit
+            or len(arch_list) > offset + limit
         )
 
         return {
@@ -406,6 +493,8 @@ class SearchIntelligenceService:
             "code_matches": paged_code,
             "dependencies": paged_deps,
             "directories": paged_dirs,
+            "architecture": paged_arch,
+            "architecture_matches": paged_arch,
             "limit": limit,
             "offset": offset,
             "has_more": has_more,
@@ -413,3 +502,4 @@ class SearchIntelligenceService:
 
 
 search_intelligence_service = SearchIntelligenceService()
+

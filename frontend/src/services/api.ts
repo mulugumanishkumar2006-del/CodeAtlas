@@ -141,7 +141,7 @@ class ApiClient {
     repositoryId: string,
     query: string,
     options?: {
-      type?: 'all' | 'code' | 'symbol' | 'file' | 'directory' | 'dependency' | 'query';
+      type?: 'all' | 'code' | 'symbol' | 'file' | 'directory' | 'dependency' | 'architecture' | 'query';
       path?: string;
       language?: string;
       limit?: number;

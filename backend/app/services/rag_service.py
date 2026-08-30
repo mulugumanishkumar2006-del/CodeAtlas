@@ -43,6 +43,23 @@ def is_secret_file(path: str) -> bool:
     return False
 
 
+def redact_sensitive_strings(text: str) -> str:
+    """Redact API keys, tokens, passwords, private keys from evidence and answers."""
+    if not text:
+        return ""
+    # Redact Stripe-like live/test keys
+    text = re.sub(r"sk_(?:live|test)_[a-zA-Z0-9]{16,}", "[REDACTED_STRIPE_KEY]", text)
+    # Redact AWS access keys
+    text = re.sub(r"AKIA[0-9A-Z]{16}", "[REDACTED_AWS_KEY]", text)
+    # Redact GitHub personal access tokens
+    text = re.sub(r"gh[pousr]_[A-Za-z0-9_]{30,}", "[REDACTED_GITHUB_TOKEN]", text)
+    # Redact Bearer tokens
+    text = re.sub(r"(Bearer\s+)[A-Za-z0-9\-\._~\+\/]{20,}={0,2}", r"\1[REDACTED_TOKEN]", text)
+    # Redact RSA private keys
+    text = re.sub(r"-----BEGIN (?:RSA )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA )?PRIVATE KEY-----", "[REDACTED_PRIVATE_KEY]", text)
+    return text
+
+
 class RAGService:
     """
     Evidence-Grounded Repository Q&A and Retrieval-Augmented Generation Engine.
@@ -55,7 +72,8 @@ class RAGService:
 
     def classify_query(self, query: str) -> Tuple[str, List[str]]:
         """
-        Stage 1 & 2: Classify question type and extract target keywords/identifiers.
+        Stage 1 & 2: Classify question type into 10 canonical intents and extract target keywords/identifiers.
+        Canonical intents: SEARCH, EXPLAIN, IMPACT, ARCHITECTURE, CALL_GRAPH, DEPENDENCY, HISTORY, QUALITY, SECURITY, GENERAL.
         Returns (intent, keywords).
         """
         q = query.strip()
@@ -77,43 +95,44 @@ class RAGService:
             if w.lower() not in stop_words and len(w) > 1 and not w.isdigit()
         ]
 
-        # 0. Impact & Blast Radius (Phase 10)
-        if re.search(r"\b(affected|blast radius|impact|break if|what breaks|change impact|modify|what will break|who depends|what depends)\b", lower_q):
+        # 1. IMPACT (Blast radius, breakage, affected files)
+        if re.search(r"\b(affected|blast radius|impact|break if|what breaks|change impact|modify|what will break|breakage)\b", lower_q):
             return "IMPACT", keywords
 
-        # 1. General Repository / Project Metadata questions
-        if re.search(r"\b(what language|how many files|lines of code|main modules|tech stack|technologies)\b", lower_q):
-            return "GENERAL_METADATA", keywords
-
-        # 2. Architecture & High-level structure
-        if re.search(r"\b(architecture|architectural|structure|overview|high level|layers|components|design)\b", lower_q):
-            return "ARCHITECTURE", keywords
-
-        # 3. Request / Control Flow
-        if re.search(r"\b(flow|request flow|lifecycle|execution|call sequence|what happens when|pipeline)\b", lower_q):
-            return "FLOW", keywords
-
-        # 4. Incoming / Outgoing Dependencies
-        if re.search(r"\b(depend on|depends on|imports|imported by|dependent on|dependencies)\b", lower_q):
-            return "DEPENDENCY", keywords
-
-        # 5. Caller / Callee
-        if re.search(r"\b(who calls|what calls|callees|caller|invokes)\b", lower_q):
+        # 2. CALL_GRAPH (Callers, callees, invocations, call sequence)
+        if re.search(r"\b((?:who|what|which)\s+(?:functions?|methods?|classes?)?\s*calls?|callees?|callers?|call chain|invokes?|invoked by)\b", lower_q):
             return "CALL_GRAPH", keywords
 
-        # 6. Specific Symbol / Function / Class
-        if re.search(r"\b(function|class|method|struct|interface|symbol|service|handler)\b", lower_q) or any("_" in k or (k[0].isupper() and len(k) > 3) for k in keywords):
-            return "SYMBOL", keywords
+        # 3. DEPENDENCY (Incoming/outgoing packages, supply chain, imports)
+        if re.search(r"\b(depend on|depends on|imports|imported by|dependent on|dependencies|dependency|where is .* used|which files use .*|package|packages|pypi|npm|library|libraries)\b", lower_q):
+            return "DEPENDENCY", keywords
 
-        # 7. Specific File
-        if any("." in k for k in keywords) or re.search(r"\b(file|path|directory|folder)\b", lower_q):
-            return "FILE", keywords
+        # 4. ARCHITECTURE (Layers, modules, overview, components, structure)
+        if re.search(r"\b(architecture|architectural|structure|overview|high level|layers?|modules?|components?|entry points?|patterns?|app structure|how is the application structured|api layer|main components)\b", lower_q):
+            return "ARCHITECTURE", keywords
 
-        # 8. Behavior / Implementation
-        if re.search(r"\b(how does|where is|why is|what does)\b", lower_q):
-            return "BEHAVIOR", keywords
+        # 5. HISTORY (Commits, authors, changelog, churn, evolution)
+        if re.search(r"\b(history|commit|commits|author|authors|contributor|contributors|churn|evolution|inactive|ownership|who changed|when was .* changed|what changed recently|blame|modified recently)\b", lower_q):
+            return "HISTORY", keywords
 
-        return "GENERAL_QUERY", keywords
+        # 6. QUALITY (Technical debt, complexity, duplication, maintainability)
+        if re.search(r"\b(quality|complexity|technical debt|debt|duplication|hotspot|maintainability|code smell|dead code|high churn|most complex|concentrated)\b", lower_q):
+            return "QUALITY", keywords
+
+        # 7. SECURITY (Vulnerabilities, secrets, risks, findings)
+        if re.search(r"\b(security|secret|secrets|token|password|key|vulnerability|vulnerabilities|injection|timeout|reliability|spof|auth|crypto|cve|tls|cors|risks|findings)\b", lower_q):
+            return "SECURITY", keywords
+
+        # 8. SEARCH (Finding locations, definitions, implementations)
+        if re.search(r"\b(where is|find|locate|search|which files? implement|which function handles|which components? use|show me the file)\b", lower_q):
+            return "SEARCH", keywords
+
+        # 9. EXPLAIN (Understanding behavior, classes, flows)
+        if re.search(r"\b(explain|how does .* work|how .* works|what does .* do|walkthrough|describe|how .* works?)\b", lower_q):
+            return "EXPLAIN", keywords
+
+        # 10. GENERAL
+        return "GENERAL", keywords
 
     async def retrieve_evidence(
         self,
@@ -170,21 +189,34 @@ class RAGService:
                 "match_reason": match_reason,
             })
 
+        # Helper to compute search root/stem
+        def get_search_stems(word: str) -> List[str]:
+            w = word.strip("'\"`").lower()
+            stems = [w]
+            for suffix in ["ications", "ication", "ations", "ation", "tions", "tion", "sions", "sion", "ings", "ing", "ized", "ised", "izes", "ises", "ize", "ise", "ed", "es", "s"]:
+                if w.endswith(suffix) and len(w) - len(suffix) >= 4:
+                    stems.append(w[:-len(suffix)])
+                    break
+            return stems
+
         # --- A. SYMBOL RETRIEVAL (Stage 4) ---
         for kw in keywords:
             clean_kw = kw.strip("'\"`")
             if not clean_kw:
                 continue
 
+            search_terms = get_search_stems(clean_kw)
+            conditions = []
+            for term in search_terms:
+                conditions.append(Symbol.name.ilike(f"%{term}%"))
+                conditions.append(Symbol.qualified_name.ilike(f"%{term}%"))
+
             sym_q = (
                 select(Symbol, File)
                 .join(File, Symbol.file_id == File.id)
                 .where(
                     Symbol.repository_id == repository_id,
-                    or_(
-                        Symbol.name.ilike(f"%{clean_kw}%"),
-                        Symbol.qualified_name.ilike(f"%{clean_kw}%"),
-                    ),
+                    or_(*conditions),
                 )
             )
             sym_res = await db.execute(sym_q)
@@ -196,9 +228,9 @@ class RAGService:
                 score = 0.65
                 if sym.name.lower() == clean_kw.lower():
                     score = 0.98
-                elif sym.name.lower().startswith(clean_kw.lower()):
+                elif sym.name.lower().startswith(clean_kw.lower()) or any(sym.name.lower().startswith(t) for t in search_terms):
                     score = 0.85
-                elif clean_kw.lower() in sym.name.lower():
+                elif clean_kw.lower() in sym.name.lower() or any(t in sym.name.lower() for t in search_terms):
                     score = 0.75
 
                 # Retrieve real bounded source code for this symbol
@@ -734,7 +766,7 @@ class RAGService:
     ) -> Tuple[str, Dict[str, Dict[str, Any]]]:
         """
         Stage 8: Context Builder.
-        Generates a token-bounded, structured evidence package.
+        Generates a token-bounded, structured evidence package with injection protection and secret redaction.
         Assigns canonical [source_1], [source_2] keys.
         """
         source_id_map: Dict[str, Dict[str, Any]] = {}
@@ -773,12 +805,11 @@ class RAGService:
             if src.get("docstring"):
                 prompt_parts.append(f"Docstring: {src['docstring']}")
             prompt_parts.append(f"Relevance: {src['relevance']}")
-            prompt_parts.append("Source Snippet:")
-            prompt_parts.append("```")
-            # Limit snippet size for token safety
-            content_safe = (src.get("content") or "").strip()
+            prompt_parts.append("<untrusted_source_code>")
+            # Limit snippet size and redact sensitive strings for security
+            content_safe = redact_sensitive_strings((src.get("content") or "").strip())
             prompt_parts.append(content_safe[:1500])
-            prompt_parts.append("```")
+            prompt_parts.append("</untrusted_source_code>")
 
         if relationships_summary:
             prompt_parts.append(f"\nRELATIONSHIPS:\n{relationships_summary}")
@@ -794,9 +825,9 @@ class RAGService:
     ) -> Tuple[str, List[Dict[str, Any]]]:
         """
         Stage 9: Source-Citation Validator Layer.
-        Validates that cited sources exist, belong to active repository, have valid line ranges.
-        Converts internal [source_X] tags to clickable [path:start_line–end_line] citations.
-        Rejects fabricated or ungrounded claims.
+        Validates that cited sources exist, belong strictly to active repository, have valid line ranges.
+        Converts internal [source_X] tags to canonical clickable [path:start_line–end_line] citations.
+        Rejects fabricated or ungrounded claims and redacts sensitive strings.
         """
         validated_sources: List[Dict[str, Any]] = []
         valid_source_ids = set()
@@ -808,27 +839,30 @@ class RAGService:
                 validated_sources.append({
                     "file_id": src["file_id"],
                     "path": src["path"],
+                    "file_path": src["path"],
                     "start_line": src["start_line"],
                     "end_line": src["end_line"],
                     "symbol": src.get("symbol"),
                     "relevance": src["relevance"],
+                    "repository_id": repository_id,
                 })
 
         # If LLM didn't cite explicit [source_X] but valid sources exist, include top verified sources
         if not validated_sources and source_id_map:
-            # Check if answer contains text from the primary source
             top_src = list(source_id_map.values())[0]
             validated_sources.append({
                 "file_id": top_src["file_id"],
                 "path": top_src["path"],
+                "file_path": top_src["path"],
                 "start_line": top_src["start_line"],
                 "end_line": top_src["end_line"],
                 "symbol": top_src.get("symbol"),
                 "relevance": top_src["relevance"],
+                "repository_id": repository_id,
             })
 
         # Replace [source_X] in answer text with canonical citation [path:start–end]
-        formatted_answer = raw_answer
+        formatted_answer = redact_sensitive_strings(raw_answer)
         for s_id, src in source_id_map.items():
             citation_str = f"[{src['path']}:{src['start_line']}–{src['end_line']}]"
             formatted_answer = formatted_answer.replace(f"[{s_id}]", citation_str)
@@ -848,6 +882,7 @@ class RAGService:
     ) -> Dict[str, Any]:
         """
         Main entrypoint for evidence-grounded repository Q&A.
+        Strictly scoped to repository_id.
         """
         start_time = datetime.now(timezone.utc)
 
@@ -866,7 +901,13 @@ class RAGService:
                     "This repository has not been indexed yet.\n\n"
                     "Index the repository before asking CodeAtlas questions about its code."
                 ),
+                "intent": "GENERAL",
+                "evidence": [],
                 "sources": [],
+                "related_symbols": [],
+                "related_files": [],
+                "related_dependencies": [],
+                "duration_ms": 0.0,
             }
 
         # 2. Check Cache
@@ -892,7 +933,7 @@ class RAGService:
             )
             conversation = conv_res.scalars().first()
             if conversation and conversation.messages:
-                # Include last 3 turns
+                # Include last 4 turns for follow-up resolution
                 recent_msgs = conversation.messages[-4:]
                 context_parts = []
                 for m in recent_msgs:
@@ -904,14 +945,14 @@ class RAGService:
         # 4. Stage 1 & 2: Query Classification & Keyword Extraction
         intent, keywords = self.classify_query(question)
         if conversation_context:
-            # Augment keywords from prior conversation context if needed
+            # Augment keywords from prior conversation context for follow-up resolution
             _, prior_keywords = self.classify_query(conversation_context)
             for pk in prior_keywords:
                 if pk not in keywords:
                     keywords.append(pk)
 
-        # 5. Handle General Metadata / Architecture Special Cases
-        if intent == "GENERAL_METADATA":
+        # 5. Handle General Metadata / Overview Special Cases
+        if intent == "GENERAL" and any(k.lower() in ["language", "files", "symbols", "stack", "tech", "statistics", "stats", "lines", "branch"] for k in keywords):
             repo_meta = repository.metadata_json or {}
             analysis_sum = repo_meta.get("analysis_summary", {})
             primary_lang = repo_meta.get("primary_language", "Unknown")
@@ -919,41 +960,50 @@ class RAGService:
             total_symbols = analysis_sum.get("total_symbols", 0)
             total_lines = analysis_sum.get("total_lines", 0)
 
-            # Query top files
             top_files_q = select(File).where(File.repository_id == repository_id).limit(10)
             top_files = (await db.execute(top_files_q)).scalars().all()
             top_file_paths = [f.path for f in top_files if not is_secret_file(f.path)]
 
             meta_answer = (
-                f"### Overview\n"
+                f"## Answer\n"
                 f"Repository **{repository.name}** is written primarily in **{primary_lang}**.\n\n"
-                f"### Repository Statistics\n"
+                f"## Statistics\n"
                 f"- **Total Indexed Files:** {total_files}\n"
                 f"- **Total Extracted Symbols:** {total_symbols}\n"
                 f"- **Total Lines of Code:** {total_lines}\n"
-                f"- **Default Branch:** `{repository.default_branch}`\n"
+                f"- **Default Branch:** `{repository.default_branch}`\n\n"
+                f"## Evidence\n"
             )
             if top_file_paths:
-                meta_answer += f"\n### Key Files\n" + "\n".join(f"- `{p}`" for p in top_file_paths[:5])
+                meta_answer += "\n".join(f"- `{p}`" for p in top_file_paths[:5]) + "\n"
 
             sources = [
                 {
                     "file_id": f.id,
                     "path": f.path,
+                    "file_path": f.path,
                     "start_line": 1,
                     "end_line": min(f.line_count or 50, 50),
                     "symbol": None,
                     "relevance": 0.90,
+                    "repository_id": repository_id,
                 }
                 for f in top_files[:3] if not is_secret_file(f.path)
             ]
             
+            duration_ms = (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
             result = {
                 "repository_id": repository_id,
                 "conversation_id": conversation.id if conversation else None,
                 "question": question,
                 "answer": meta_answer,
+                "intent": intent,
+                "evidence": sources,
                 "sources": sources,
+                "related_symbols": [],
+                "related_files": top_file_paths[:5],
+                "related_dependencies": [],
+                "duration_ms": round(duration_ms, 2),
             }
             if not conversation_id:
                 self._cache[cache_key] = result
@@ -971,7 +1021,7 @@ class RAGService:
 
         # 7. Architecture / Relationship summary
         relationships_summary = ""
-        if intent in ["ARCHITECTURE", "FLOW", "DEPENDENCY"]:
+        if intent in ["ARCHITECTURE", "FLOW", "DEPENDENCY", "CALL_GRAPH"]:
             deps_q = select(Dependency).where(Dependency.repository_id == repository_id).limit(10)
             deps_sample = (await db.execute(deps_q)).scalars().all()
             if deps_sample:
@@ -1004,12 +1054,19 @@ class RAGService:
             cited_ids = llm_result.get("cited_source_ids", [])
         except Exception as e:
             logger.error(f"LLM generation failed: {e}", exc_info=True)
+            duration_ms = (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
             return {
                 "repository_id": repository_id,
                 "conversation_id": conversation.id if conversation else None,
                 "question": question,
                 "answer": f"Unable to generate an AI explanation due to provider error: {str(e)}",
+                "intent": intent,
+                "evidence": [],
                 "sources": [],
+                "related_symbols": [],
+                "related_files": [],
+                "related_dependencies": [],
+                "duration_ms": round(duration_ms, 2),
             }
 
         # 10. Stage 9: Citation Validation Layer
@@ -1019,6 +1076,17 @@ class RAGService:
             source_id_map=source_id_map,
             repository_id=repository_id,
         )
+
+        # Extract related entities from verified sources
+        related_files = sorted(list(set(s["path"] for s in final_sources if s.get("path"))))
+        related_symbols = sorted(list(set(s["symbol"] for s in final_sources if s.get("symbol"))))
+        
+        # Extract related dependencies
+        deps_q = select(Dependency.name).where(Dependency.repository_id == repository_id).limit(20)
+        deps_rows = (await db.execute(deps_q)).scalars().all()
+        related_deps = [d for d in deps_rows if any(d.lower() in question.lower() or d.lower() in formatted_answer.lower() for d in [d])]
+
+        duration_ms = (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
 
         # 11. Conversation State Update
         if conversation:
@@ -1032,6 +1100,7 @@ class RAGService:
                 "role": "assistant",
                 "content": formatted_answer,
                 "sources": final_sources,
+                "intent": intent,
                 "created_at": datetime.now(timezone.utc).isoformat(),
             })
             conversation.messages = current_messages
@@ -1042,12 +1111,24 @@ class RAGService:
             "conversation_id": conversation.id if conversation else None,
             "question": question,
             "answer": formatted_answer,
+            "intent": intent,
+            "evidence": final_sources,
             "sources": final_sources,
+            "related_symbols": related_symbols,
+            "related_files": related_files,
+            "related_dependencies": related_deps[:5],
+            "duration_ms": round(duration_ms, 2),
         }
 
         # Cache only if not part of a conversation thread
         if not conversation_id:
             self._cache[cache_key] = response_payload
+
+        # Observability logging without sensitive data
+        logger.info(
+            f"Repository Query processed: repo_id={repository_id}, intent={intent}, "
+            f"retrieved_count={len(final_sources)}, duration_ms={round(duration_ms, 2)}"
+        )
 
         return response_payload
 
@@ -1062,3 +1143,4 @@ class RAGService:
 
 
 rag_service = RAGService()
+

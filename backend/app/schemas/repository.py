@@ -219,6 +219,16 @@ class DependencySearchMatch(BaseModel):
     match_reason: Optional[str] = None
 
 
+class ArchitectureSearchMatch(BaseModel):
+    id: str
+    name: str
+    node_type: str  # module, layer, entry_point, pattern, group
+    description: Optional[str] = None
+    file_count: Optional[int] = 0
+    score: Optional[int] = None
+    match_reason: Optional[str] = None
+
+
 class RepositorySearchResponse(BaseModel):
     repository_id: str
     query: str
@@ -231,6 +241,8 @@ class RepositorySearchResponse(BaseModel):
     code_matches: list[CodeSearchMatch] = []
     dependencies: list[DependencySearchMatch] = []
     directories: list[DirectorySearchMatch] = []
+    architecture: list[ArchitectureSearchMatch] = []
+    architecture_matches: list[ArchitectureSearchMatch] = []
     limit: int = 50
     offset: int = 0
     has_more: bool = False
@@ -472,10 +484,12 @@ class ArchitectureResponse(BaseModel):
 class SourceCitationItem(BaseModel):
     file_id: str
     path: str
+    file_path: Optional[str] = None
     start_line: int
     end_line: int
     symbol: Optional[str] = None
     relevance: float = 1.0
+    repository_id: Optional[str] = None
 
 
 class RepositoryQueryRequest(BaseModel):
@@ -487,8 +501,14 @@ class RepositoryQueryResponse(BaseModel):
     repository_id: str
     question: str
     answer: str
+    intent: Optional[str] = "GENERAL"
+    evidence: list[SourceCitationItem] = []
     sources: list[SourceCitationItem] = []
+    related_symbols: list[str] = []
+    related_files: list[str] = []
+    related_dependencies: list[str] = []
     conversation_id: Optional[str] = None
+    duration_ms: Optional[float] = None
 
 
 class ConversationMessage(BaseModel):

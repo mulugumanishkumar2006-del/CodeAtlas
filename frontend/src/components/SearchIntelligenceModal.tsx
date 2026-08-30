@@ -32,7 +32,7 @@ interface SearchIntelligenceModalProps {
   onNavigateToSource: (fileId: string, line?: number) => void;
 }
 
-type TabCategory = 'all' | 'symbol' | 'file' | 'code' | 'dependency' | 'directory';
+type TabCategory = 'all' | 'symbol' | 'file' | 'code' | 'dependency' | 'architecture' | 'directory';
 
 const RECENT_SEARCHES_KEY = 'codeatlas_recent_searches';
 
@@ -146,6 +146,7 @@ export const SearchIntelligenceModal: React.FC<SearchIntelligenceModalProps> = (
   const codeCount = results?.code_matches?.length || 0;
   const depCount = results?.dependencies?.length || 0;
   const dirCount = results?.directories?.length || 0;
+  const archCount = (results?.architecture || results?.architecture_matches || []).length;
 
   return (
     <div className="search-intel-overlay" onClick={onClose}>
@@ -219,6 +220,14 @@ export const SearchIntelligenceModal: React.FC<SearchIntelligenceModalProps> = (
           >
             Dependencies ({depCount})
           </button>
+          {archCount > 0 && (
+            <button 
+              className={`cat-pill ${activeTab === 'architecture' ? 'active' : ''}`}
+              onClick={() => { setActiveTab('architecture'); executeSearch(query, 'architecture'); }}
+            >
+              Architecture ({archCount})
+            </button>
+          )}
           {dirCount > 0 && (
             <button 
               className={`cat-pill ${activeTab === 'directory' ? 'active' : ''}`}
@@ -429,7 +438,37 @@ export const SearchIntelligenceModal: React.FC<SearchIntelligenceModalProps> = (
                 </div>
               )}
 
-              {/* 5. DIRECTORIES GROUP */}
+              {/* 5. ARCHITECTURE GROUP */}
+              {(activeTab === 'all' || activeTab === 'architecture') && results && (results.architecture || results.architecture_matches || []).length > 0 && (
+                <div className="result-group-block">
+                  <div className="group-heading">
+                    <FolderTree size={14} style={{ color: '#c084fc' }} />
+                    <span>Architecture ({(results.architecture || results.architecture_matches || []).length})</span>
+                  </div>
+                  <div className="group-items-list">
+                    {(results.architecture || results.architecture_matches || []).map((arch, i) => (
+                      <div key={i} className="search-item-card arch-card">
+                        <div className="card-top-row">
+                          <span className="match-name">{arch.name}</span>
+                          <span className="match-badge type" style={{ background: 'rgba(168, 85, 247, 0.15)', color: '#c084fc' }}>{arch.node_type}</span>
+                        </div>
+                        {arch.description && (
+                          <div className="card-sub-info">
+                            <span>{arch.description}</span>
+                          </div>
+                        )}
+                        {arch.match_reason && (
+                          <div className="match-doc-snippet" style={{ color: 'var(--text-muted)' }}>
+                            {arch.match_reason}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 6. DIRECTORIES GROUP */}
               {(activeTab === 'all' || activeTab === 'directory') && results && results.directories.length > 0 && (
                 <div className="result-group-block">
                   <div className="group-heading">

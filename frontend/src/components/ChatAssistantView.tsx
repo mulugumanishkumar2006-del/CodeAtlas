@@ -136,7 +136,12 @@ export const ChatAssistantView: React.FC<ChatAssistantViewProps> = ({
       const assistantMsg: ChatMessage = {
         role: 'assistant',
         content: response.answer,
-        sources: response.sources || [],
+        intent: response.intent,
+        evidence: response.evidence || response.sources || [],
+        sources: response.sources || response.evidence || [],
+        related_symbols: response.related_symbols,
+        related_files: response.related_files,
+        related_dependencies: response.related_dependencies,
         created_at: new Date().toISOString(),
       };
 
@@ -178,7 +183,6 @@ export const ChatAssistantView: React.FC<ChatAssistantViewProps> = ({
     let match: RegExpExecArray | null;
 
     while ((match = citationRegex.exec(content)) !== null) {
-      // Add text before citation
       if (match.index > lastIndex) {
         parts.push(content.substring(lastIndex, match.index));
       }
@@ -207,13 +211,11 @@ export const ChatAssistantView: React.FC<ChatAssistantViewProps> = ({
       parts.push(content.substring(lastIndex));
     }
 
-    // Basic markdown styling for headers and code blocks
     return (
       <div className="chat-markdown-body">
         {parts.map((part, idx) => {
           if (typeof part !== 'string') return part;
 
-          // Simple line-by-line markdown processor for headings and bullet points
           const lines = part.split('\n');
           return (
             <React.Fragment key={idx}>
@@ -245,10 +247,11 @@ export const ChatAssistantView: React.FC<ChatAssistantViewProps> = ({
   };
 
   const sampleQueries = [
-    'How does authentication work in this codebase?',
+    'Where is authentication implemented?',
     'What is the high-level architecture and structure?',
     'What dependencies does this project have?',
-    'Where is the main entry point defined?',
+    'Where are errors handled in this codebase?',
+    'What calls the main login function?',
   ];
 
   return (
@@ -313,8 +316,9 @@ export const ChatAssistantView: React.FC<ChatAssistantViewProps> = ({
           <div className="chat-messages-thread">
             {messages.map((msg, idx) => {
               const isUser = msg.role === 'user';
-              const hasSources = msg.sources && msg.sources.length > 0;
-              const isSourcesExpanded = expandedSources[idx] ?? false;
+              const sourcesList = msg.evidence || msg.sources || [];
+              const hasSources = sourcesList.length > 0;
+              const isSourcesExpanded = expandedSources[idx] ?? true;
 
               return (
                 <div
@@ -327,7 +331,12 @@ export const ChatAssistantView: React.FC<ChatAssistantViewProps> = ({
 
                   <div className="chat-message-bubble-wrapper">
                     <div className="chat-message-author-tag">
-                      {isUser ? 'You' : 'CodeAtlas Intelligence'}
+                      <span>{isUser ? 'You' : 'CodeAtlas Intelligence'}</span>
+                      {msg.intent && (
+                        <span className="intent-badge-chip" style={{ marginLeft: 8, fontSize: '0.7rem', padding: '2px 6px', borderRadius: 4, background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8' }}>
+                          {msg.intent}
+                        </span>
+                      )}
                       {msg.created_at && (
                         <span className="chat-message-timestamp">
                           {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -339,7 +348,24 @@ export const ChatAssistantView: React.FC<ChatAssistantViewProps> = ({
                       {renderMessageContent(msg.content)}
                     </div>
 
-                    {/* Grounded Sources Panel */}
+                    {/* Related Entities */}
+                    {!isUser && ((msg.related_files && msg.related_files.length > 0) || (msg.related_symbols && msg.related_symbols.length > 0)) && (
+                      <div className="chat-related-chips-panel" style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {msg.related_files?.slice(0, 3).map((rf, rIdx) => (
+                          <button
+                            key={`rf-${rIdx}`}
+                            className="related-chip-btn"
+                            onClick={() => onNavigateToFile?.(rf)}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.75rem', padding: '3px 8px', borderRadius: 4, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: '#cbd5e1', cursor: 'pointer' }}
+                          >
+                            <FileCode size={11} />
+                            <span>{rf}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Grounded Evidence Source Cards */}
                     {!isUser && hasSources && (
                       <div className="chat-sources-panel">
                         <button
@@ -350,13 +376,13 @@ export const ChatAssistantView: React.FC<ChatAssistantViewProps> = ({
                           {isSourcesExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                           <Layers size={13} style={{ marginLeft: 4, marginRight: 4 }} />
                           <span className="sources-count-label">
-                            {msg.sources!.length} Grounded Repository {msg.sources!.length === 1 ? 'Source' : 'Sources'}
+                            {sourcesList.length} Grounded Repository {sourcesList.length === 1 ? 'Evidence Source' : 'Evidence Sources'}
                           </span>
                         </button>
 
                         {isSourcesExpanded && (
                           <div className="sources-list-expanded">
-                            {msg.sources!.map((src, sIdx) => (
+                            {sourcesList.map((src, sIdx) => (
                               <div
                                 key={sIdx}
                                 className="source-item-card"
@@ -369,6 +395,11 @@ export const ChatAssistantView: React.FC<ChatAssistantViewProps> = ({
                                   <span className="source-line-badge">
                                     Lines {src.start_line}–{src.end_line}
                                   </span>
+                                  {src.relevance !== undefined && (
+                                    <span style={{ fontSize: '0.7rem', color: '#94a3b8', marginLeft: 'auto', marginRight: 6 }}>
+                                      {Math.round(src.relevance * 100)}% match
+                                    </span>
+                                  )}
                                   <ExternalLink size={12} className="source-item-ext" />
                                 </div>
                                 {src.symbol && (
