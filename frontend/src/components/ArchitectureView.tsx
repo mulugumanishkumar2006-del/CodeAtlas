@@ -5,7 +5,8 @@ import {
   ArchitectureModuleItem,
   GraphLevel, 
   GraphData, 
-  GraphNodeItem
+  GraphNodeItem,
+  AdvancedArchitectureIntelligence,
 } from '../types';
 import { api } from '../services/api';
 import { ImpactIntelligenceModal } from './ImpactIntelligenceModal';
@@ -27,7 +28,9 @@ import {
   Cpu, 
   Flame, 
   ExternalLink, 
-  ShieldCheck 
+  ShieldCheck,
+  Workflow,
+  ArrowRight,
 } from 'lucide-react';
 
 interface ArchitectureViewProps {
@@ -43,7 +46,8 @@ export const ArchitectureView: React.FC<ArchitectureViewProps> = ({
 }) => {
   const [archData, setArchData] = useState<ArchitectureData | null>(null);
   const [graphData, setGraphData] = useState<GraphData | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'modules' | 'graph' | 'patterns' | 'issues'>('overview');
+  const [advIntel, setAdvIntel] = useState<AdvancedArchitectureIntelligence | null>(null);
+  const [activeTab, setActiveTab] = useState<'overview' | 'modules' | 'graph' | 'dataflows' | 'coupling' | 'patterns' | 'issues'>('overview');
   
   const [level, setLevel] = useState<GraphLevel>('directory');
   const [searchQuery, setSearchQuery] = useState('');
@@ -64,7 +68,7 @@ export const ArchitectureView: React.FC<ArchitectureViewProps> = ({
   const [error, setError] = useState<string | null>(null);
   const canvasRef = useRef<SVGSVGElement | null>(null);
 
-  // Fetch real architecture and graph data on repository change
+  // Fetch real architecture, graph, and advanced intelligence data on repository change
   useEffect(() => {
     let isMounted = true;
     setIsLoading(true);
@@ -77,14 +81,16 @@ export const ArchitectureView: React.FC<ArchitectureViewProps> = ({
 
     const loadData = async () => {
       try {
-        const [archRes, graphRes] = await Promise.all([
+        const [archRes, graphRes, intelRes] = await Promise.all([
           api.getRepositoryArchitecture(repositoryId),
           api.getRepositoryGraph(repositoryId, 'file'),
+          api.getArchitectureIntelligence(repositoryId).catch(() => null),
         ]);
 
         if (isMounted) {
           setArchData(archRes);
           setGraphData(graphRes);
+          setAdvIntel(intelRes);
           if (archRes.modules && archRes.modules.length > 0) {
             setSelectedModule(archRes.modules[0]);
           }
@@ -294,6 +300,18 @@ export const ArchitectureView: React.FC<ArchitectureViewProps> = ({
         </div>
 
         <div className="summary-col stat-mini">
+          <span className="summary-k">Data Flows</span>
+          <span className="stat-v" style={{ color: 'var(--accent-cyan)' }}>{advIntel?.data_flows?.length || 0}</span>
+        </div>
+
+        <div className="summary-col stat-mini">
+          <span className="summary-k">Violations</span>
+          <span className="stat-v" style={{ color: (advIntel?.violations?.length || 0) > 0 ? '#f43f5e' : 'var(--accent-emerald)' }}>
+            {advIntel?.violations?.length || 0}
+          </span>
+        </div>
+
+        <div className="summary-col stat-mini">
           <span className="summary-k">Health</span>
           <span className="stat-v" style={{ color: (health?.score || 100) >= 80 ? 'var(--accent-emerald)' : '#f43f5e' }}>
             {health?.score !== undefined ? `${health.score}/100` : 'N/A'}
@@ -301,7 +319,7 @@ export const ArchitectureView: React.FC<ArchitectureViewProps> = ({
         </div>
       </div>
 
-      {/* 5-Tab Navigation Toolbar */}
+      {/* 7-Tab Navigation Toolbar */}
       <div className="arch-nav-toolbar">
         <div className="arch-tabs-group">
           <button 
@@ -329,6 +347,22 @@ export const ArchitectureView: React.FC<ArchitectureViewProps> = ({
             <span>Graph</span>
           </button>
           <button 
+            id="tab-arch-dataflows"
+            className={`arch-nav-tab ${activeTab === 'dataflows' ? 'active' : ''}`}
+            onClick={() => setActiveTab('dataflows')}
+          >
+            <Workflow size={14} />
+            <span>Data Flows ({advIntel?.data_flows?.length || 0})</span>
+          </button>
+          <button 
+            id="tab-arch-coupling"
+            className={`arch-nav-tab ${activeTab === 'coupling' ? 'active' : ''}`}
+            onClick={() => setActiveTab('coupling')}
+          >
+            <Cpu size={14} />
+            <span>Coupling ({advIntel?.coupling?.module_metrics?.length || 0})</span>
+          </button>
+          <button 
             id="tab-arch-patterns"
             className={`arch-nav-tab ${activeTab === 'patterns' ? 'active' : ''}`}
             onClick={() => setActiveTab('patterns')}
@@ -341,8 +375,8 @@ export const ArchitectureView: React.FC<ArchitectureViewProps> = ({
             className={`arch-nav-tab ${activeTab === 'issues' ? 'active' : ''}`}
             onClick={() => setActiveTab('issues')}
           >
-            <AlertTriangle size={14} style={{ color: violations.length + drift.length > 0 ? '#f43f5e' : undefined }} />
-            <span>Issues & Drift ({violations.length + drift.length + (archData?.cycles?.length || 0)})</span>
+            <AlertTriangle size={14} style={{ color: (violations.length + drift.length + (advIntel?.violations?.length || 0)) > 0 ? '#f43f5e' : undefined }} />
+            <span>Issues & Drift ({violations.length + drift.length + (advIntel?.violations?.length || 0) + (archData?.cycles?.length || 0)})</span>
           </button>
         </div>
 
@@ -835,6 +869,201 @@ export const ArchitectureView: React.FC<ArchitectureViewProps> = ({
               </div>
             )}
 
+            {/* TAB: DATA FLOWS TAB (PHASE 18) */}
+            {activeTab === 'dataflows' && (
+              <div className="arch-tab-pane dataflows-pane" style={{ padding: '16px', overflowY: 'auto' }}>
+                <div style={{ marginBottom: 16 }}>
+                  <h4 style={{ margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: 8, fontSize: 16 }}>
+                    <Workflow size={18} style={{ color: 'var(--accent-cyan)' }} />
+                    Traced Repository Data Flows
+                  </h4>
+                  <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: 12 }}>
+                    Deterministic end-to-end execution paths traced from presentation entry points to backend datastores.
+                  </p>
+                </div>
+
+                {(!advIntel?.data_flows || advIntel.data_flows.length === 0) ? (
+                  <div className="empty-patterns-box" style={{ textAlign: 'center', padding: '48px 16px' }}>
+                    <Workflow size={32} style={{ color: 'var(--text-muted)', margin: '0 auto 12px' }} />
+                    <h5>No High-Confidence Multi-Tier Data Flows Discovered</h5>
+                    <p>Repository entry points either do not persist to database repositories or use dynamic dispatch.</p>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    {advIntel.data_flows.map((df, idx) => (
+                      <div 
+                        key={idx} 
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.03)',
+                          border: '1px solid var(--border-subtle)',
+                          borderRadius: 8,
+                          padding: 16,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 12,
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-primary)' }}>{df.entry_point}</span>
+                            <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, background: 'rgba(56, 189, 248, 0.15)', color: 'var(--accent-cyan)' }}>
+                              Entry: {df.entry_file}
+                            </span>
+                          </div>
+                          <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, background: 'rgba(16, 185, 129, 0.15)', color: 'var(--accent-emerald)' }}>
+                            Target: {df.target_datastore}
+                          </span>
+                        </div>
+
+                        <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>{df.description}</p>
+
+                        {/* Step Sequence Breadcrumb */}
+                        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
+                          {df.flow_steps.map((step, sIdx) => (
+                            <React.Fragment key={sIdx}>
+                              <div style={{
+                                padding: '4px 10px',
+                                background: 'rgba(255, 255, 255, 0.05)',
+                                border: '1px solid rgba(255, 255, 255, 0.1)',
+                                borderRadius: 6,
+                                fontSize: 12,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 6,
+                              }}>
+                                <span style={{ color: 'var(--text-primary)' }}>{step}</span>
+                                {df.layer_sequence[sIdx] && (
+                                  <span style={{ fontSize: 10, color: 'var(--text-muted)', opacity: 0.8 }}>({df.layer_sequence[sIdx]})</span>
+                                )}
+                              </div>
+                              {sIdx < df.flow_steps.length - 1 && (
+                                <ArrowRight size={12} style={{ color: 'var(--accent-cyan)' }} />
+                              )}
+                            </React.Fragment>
+                          ))}
+                        </div>
+
+                        {onNavigateToFile && (
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
+                            <button
+                              className="btn-jump-issue"
+                              onClick={() => onNavigateToFile(df.entry_file, 1)}
+                              style={{ fontSize: 11 }}
+                            >
+                              <ExternalLink size={12} />
+                              <span>View Entry File</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB: COUPLING & STABILITY MATRIX (PHASE 18) */}
+            {activeTab === 'coupling' && (
+              <div className="arch-tab-pane coupling-pane" style={{ padding: '16px', overflowY: 'auto' }}>
+                <div style={{ marginBottom: 16 }}>
+                  <h4 style={{ margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: 8, fontSize: 16 }}>
+                    <Cpu size={18} style={{ color: 'var(--accent-cyan)' }} />
+                    Module Coupling & Martin's Instability Metric
+                  </h4>
+                  <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: 12 }}>
+                    Evaluates Afferent Coupling (Ca), Efferent Coupling (Ce), and Instability index I = Ce / (Ca + Ce). Values near 0 represent stable core packages; values near 1 represent volatile modules prone to change propagation.
+                  </p>
+                </div>
+
+                {/* Hubs and Isolated Modules Highlights */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12, marginBottom: 16 }}>
+                  <div style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-subtle)', borderRadius: 8, padding: 12 }}>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Architectural Hubs</span>
+                    <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {advIntel?.coupling?.architectural_hubs && advIntel.coupling.architectural_hubs.length > 0 ? (
+                        advIntel.coupling.architectural_hubs.map((hub, hIdx) => (
+                          <span key={hIdx} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, background: 'rgba(251, 191, 36, 0.15)', color: '#fbbf24' }}>
+                            {hub.module} (coupling: {hub.total_coupling})
+                          </span>
+                        ))
+                      ) : (
+                        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>No high-centrality architectural hubs detected</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-subtle)', borderRadius: 8, padding: 12 }}>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Isolated / Orphan Modules</span>
+                    <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {advIntel?.coupling?.isolated_modules && advIntel.coupling.isolated_modules.length > 0 ? (
+                        advIntel.coupling.isolated_modules.map((mod, mIdx) => (
+                          <span key={mIdx} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, background: 'rgba(244, 63, 94, 0.15)', color: '#f43f5e' }}>
+                            {mod}
+                          </span>
+                        ))
+                      ) : (
+                        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>All discovered modules have active dependencies</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Coupling Metrics Table */}
+                <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 8, overflow: 'hidden' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                    <thead>
+                      <tr style={{ background: 'rgba(255, 255, 255, 0.04)', textAlign: 'left', borderBottom: '1px solid var(--border-subtle)' }}>
+                        <th style={{ padding: '8px 12px' }}>Module</th>
+                        <th style={{ padding: '8px 12px' }}>Afferent (Ca)</th>
+                        <th style={{ padding: '8px 12px' }}>Efferent (Ce)</th>
+                        <th style={{ padding: '8px 12px' }}>Instability (I)</th>
+                        <th style={{ padding: '8px 12px' }}>Classification</th>
+                        <th style={{ padding: '8px 12px' }}>Total Coupling</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {advIntel?.coupling?.module_metrics && advIntel.coupling.module_metrics.length > 0 ? (
+                        advIntel.coupling.module_metrics.map((m, mIdx) => {
+                          const badgeColor = m.classification.includes('Stable') 
+                            ? 'var(--accent-emerald)' 
+                            : m.classification.includes('Volatile') 
+                              ? '#fbbf24' 
+                              : 'var(--accent-cyan)';
+                          return (
+                            <tr key={mIdx} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                              <td style={{ padding: '8px 12px', fontWeight: 500, color: 'var(--text-primary)' }}>{m.module}</td>
+                              <td style={{ padding: '8px 12px', color: 'var(--text-muted)' }}>{m.afferent_coupling_ca}</td>
+                              <td style={{ padding: '8px 12px', color: 'var(--text-muted)' }}>{m.efferent_coupling_ce}</td>
+                              <td style={{ padding: '8px 12px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  <div style={{ width: 45, height: 6, borderRadius: 3, background: 'rgba(255, 255, 255, 0.1)', overflow: 'hidden' }}>
+                                    <div style={{ width: `${Math.round(m.instability * 100)}%`, height: '100%', background: badgeColor }} />
+                                  </div>
+                                  <span>{m.instability.toFixed(2)}</span>
+                                </div>
+                              </td>
+                              <td style={{ padding: '8px 12px' }}>
+                                <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: `rgba(255,255,255,0.06)`, color: badgeColor }}>
+                                  {m.classification}
+                                </span>
+                              </td>
+                              <td style={{ padding: '8px 12px', color: 'var(--text-muted)' }}>{m.total_coupling}</td>
+                            </tr>
+                          );
+                        })
+                      ) : (
+                        <tr>
+                          <td colSpan={6} style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                            No module coupling metrics available.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
             {/* TAB 4: PATTERNS TAB */}
             {activeTab === 'patterns' && (
               <div className="arch-tab-pane patterns-pane">
@@ -926,6 +1155,32 @@ export const ArchitectureView: React.FC<ArchitectureViewProps> = ({
                             )}
                           </div>
                         ))}
+
+                        {/* Phase 18 Architectural Violations (Service Bypass, Layer Inversion, Test Pollution) */}
+                        {advIntel?.violations?.map((v, i) => (
+                          <div key={`adv-viol-${i}`} className="issue-item-card violation" style={{ borderLeft: '3px solid #f43f5e' }}>
+                            <div className="issue-card-head">
+                              <span className="issue-severity-tag high">{v.severity}</span>
+                              <span className="issue-title">[{v.violation_type}] {v.title}</span>
+                            </div>
+                            <p className="issue-desc">{v.description}</p>
+                            {v.remediation && (
+                              <div style={{ fontSize: 11, color: 'var(--accent-cyan)', marginTop: 4, background: 'rgba(56, 189, 248, 0.08)', padding: '4px 8px', borderRadius: 4 }}>
+                                💡 Remediation: {v.remediation}
+                              </div>
+                            )}
+                            {v.source_file && onNavigateToFile && (
+                              <button
+                                className="btn-jump-issue"
+                                onClick={() => onNavigateToFile(v.source_file, v.line || 1)}
+                                style={{ marginTop: 6 }}
+                              >
+                                <ExternalLink size={12} />
+                                <span>{v.source_file}:{v.line || 1}</span>
+                              </button>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
@@ -964,6 +1219,26 @@ export const ArchitectureView: React.FC<ArchitectureViewProps> = ({
                             </ul>
                           </div>
                         ))
+                      )}
+
+                      {/* Tarjan SCC Circular Dependencies */}
+                      {advIntel?.cycles?.cycles && advIntel.cycles.cycles.length > 0 && (
+                        <div style={{ marginTop: 16 }}>
+                          <div className="issues-header-row">
+                            <AlertTriangle size={16} style={{ color: '#f43f5e' }} />
+                            <h5>Tarjan Circular Dependency Cycles ({advIntel.cycles.cycles.length})</h5>
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+                            {advIntel.cycles.cycles.map((cyc, cIdx) => (
+                              <div key={cIdx} style={{ background: 'rgba(244, 63, 94, 0.08)', border: '1px solid rgba(244, 63, 94, 0.2)', borderRadius: 6, padding: 10 }}>
+                                <span style={{ fontSize: 11, fontWeight: 600, color: '#f43f5e' }}>Cycle #{cIdx + 1} ({cyc.length} files):</span>
+                                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, wordBreak: 'break-all' }}>
+                                  {cyc.join(' ➔ ')} ➔ {cyc[0]}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       )}
                     </div>
                   </div>

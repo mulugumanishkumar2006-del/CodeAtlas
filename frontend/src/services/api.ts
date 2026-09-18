@@ -29,6 +29,12 @@ import {
   DependencyImpact,
   UniversalProfile,
   AnalysisSnapshot,
+  AdvancedArchitectureIntelligence,
+  ArchitectureGraphNode,
+  ArchitectureGraphEdge,
+  ArchitectureDataFlowPath,
+  CouplingMetricItem,
+  ArchitectureSnapshotDiff,
 } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
@@ -463,6 +469,55 @@ class ApiClient {
     return this.request<DependencyImpact>(
       `/repositories/${repositoryId}/dependencies/${encodeURIComponent(dependencyId)}/impact`
     );
+  }
+
+  // Phase 18: Advanced Architecture Intelligence
+  async getArchitectureIntelligence(repositoryId: string): Promise<AdvancedArchitectureIntelligence> {
+    return this.request<AdvancedArchitectureIntelligence>(`/repositories/${repositoryId}/architecture/intelligence`);
+  }
+
+  async getArchitectureGraph(
+    repositoryId: string,
+    params?: { node_type?: string; edge_type?: string }
+  ): Promise<{
+    repository_id: string;
+    nodes: ArchitectureGraphNode[];
+    edges: ArchitectureGraphEdge[];
+    total_nodes: number;
+    total_edges: number;
+    node_types: string[];
+    edge_types: string[];
+  }> {
+    const query = new URLSearchParams();
+    if (params?.node_type) query.set('node_type', params.node_type);
+    if (params?.edge_type) query.set('edge_type', params.edge_type);
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return this.request(`/repositories/${repositoryId}/architecture/graph${qs}`);
+  }
+
+  async getArchitectureDataFlows(
+    repositoryId: string
+  ): Promise<{ repository_id: string; data_flows: ArchitectureDataFlowPath[]; total_data_flows: number }> {
+    return this.request(`/repositories/${repositoryId}/architecture/data-flows`);
+  }
+
+  async getArchitectureCoupling(
+    repositoryId: string
+  ): Promise<{
+    repository_id: string;
+    module_metrics: CouplingMetricItem[];
+    isolated_modules: string[];
+    architectural_hubs: CouplingMetricItem[];
+  }> {
+    return this.request(`/repositories/${repositoryId}/architecture/coupling`);
+  }
+
+  async getArchitectureDiff(
+    repositoryId: string,
+    baseCommit?: string
+  ): Promise<ArchitectureSnapshotDiff> {
+    const query = baseCommit ? `?base_commit=${encodeURIComponent(baseCommit)}` : '';
+    return this.request<ArchitectureSnapshotDiff>(`/repositories/${repositoryId}/architecture/diff${query}`);
   }
 }
 

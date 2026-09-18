@@ -20,6 +20,7 @@ from backend.app.services.code_quality_service import code_quality_service
 from backend.app.services.security_reliability_service import security_reliability_service
 from backend.app.services.git_history_service import git_history_service
 from backend.app.services.dependency_intelligence_service import dependency_intelligence_service
+from backend.app.services.architecture_intelligence_service import architecture_intelligence_service
 from backend.app.services.llm_provider import get_llm_provider, SYSTEM_PROMPT, LLMProvider
 
 logger = logging.getLogger("codeatlas.rag")
@@ -583,6 +584,60 @@ class RAGService:
                             content=f"ARCHITECTURE NODE ({gn.node_type}): {gn.label} (Key: {gn.node_key})",
                             relevance=0.96,
                             match_reason=f"Architecture Node '{gn.label}'",
+                        )
+
+                # 4. Phase 18: Advanced Architecture Intelligence (Data flows, coupling, violations, cycles)
+                adv_intel = await architecture_intelligence_service.get_advanced_architecture_intelligence(
+                    repository_id=repository_id,
+                    db=db,
+                )
+                if adv_intel:
+                    # Data Flows
+                    flows = adv_intel.get("data_flows", [])
+                    if flows:
+                        flow_lines = [f"- {df['entry_point']} -> {df['target_datastore']} ({' -> '.join(df['flow_steps'])})" for df in flows[:4]]
+                        flow_desc = "TRACED ARCHITECTURAL DATA FLOWS:\n" + "\n".join(flow_lines)
+                        add_candidate(
+                            file_id=all_repo_files[0].id if all_repo_files else "",
+                            path=flows[0].get("entry_file", "architecture/data_flows"),
+                            start_line=1,
+                            end_line=20,
+                            symbol=None,
+                            symbol_type="data_flow",
+                            docstring=None,
+                            content=flow_desc,
+                            relevance=0.98,
+                            match_reason="End-to-End Architectural Data Flow Evidence",
+                        )
+
+                    # Coupling & Violations
+                    violations = adv_intel.get("violations", [])
+                    coupling = adv_intel.get("coupling", {})
+                    hubs = coupling.get("architectural_hubs", [])
+                    cycles = adv_intel.get("cycles", {})
+
+                    insights = []
+                    if hubs:
+                        insights.append(f"Architectural Hubs: {', '.join(h['module'] for h in hubs)}")
+                    if cycles.get("has_cycles"):
+                        insights.append(f"Circular Dependencies Detected: {cycles.get('cycle_count')} cycle(s)")
+                    if violations:
+                        insights.append(f"Architectural Boundary Violations: {len(violations)} finding(s)")
+                        for v in violations[:3]:
+                            insights.append(f"  * [{v['violation_type']}] {v['title']}: {v['source_file']} -> {v['target_file']}")
+
+                    if insights:
+                        add_candidate(
+                            file_id=all_repo_files[0].id if all_repo_files else "",
+                            path="architecture/boundaries_and_coupling",
+                            start_line=1,
+                            end_line=25,
+                            symbol=None,
+                            symbol_type="architecture_coupling_violations",
+                            docstring=None,
+                            content="ARCHITECTURE COUPLING & VIOLATIONS EVIDENCE:\n" + "\n".join(insights),
+                            relevance=0.97,
+                            match_reason="Coupling Metrics, Circular Dependencies, and Boundary Violations",
                         )
             except Exception as e:
                 logger.warning(f"Error extracting architecture evidence for RAG: {e}")

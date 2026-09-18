@@ -1239,6 +1239,124 @@ export interface DependencyImpact {
   explanation: string;
 }
 
+export type RepositoryProfile = UniversalProfile;
+
+// =========================================================================
+// Phase 18: Advanced Architecture Intelligence Types
+// =========================================================================
+
+export interface ArchitectureGraphNode {
+  id: string;
+  repository_id: string;
+  node_type: string;
+  name: string;
+  label: string;
+  source_reference?: string | null;
+  properties: Record<string, any>;
+}
+
+export interface ArchitectureGraphEdge {
+  source: string;
+  target: string;
+  relationship_type: string;
+  weight: number;
+  evidence: Record<string, any>;
+}
+
+export interface ArchitectureComponentItem {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  files_count: number;
+  code_lines: number;
+  symbol_count: number;
+  files: string[];
+  incoming_coupling: number;
+  outgoing_coupling: number;
+}
+
+export interface ArchitectureDataFlowPath {
+  entry_point: string;
+  entry_file: string;
+  flow_steps: string[];
+  layer_sequence: string[];
+  target_datastore: string;
+  description: string;
+}
+
+export interface CouplingMetricItem {
+  module: string;
+  afferent_coupling_ca: number;
+  efferent_coupling_ce: number;
+  instability: number;
+  total_coupling: number;
+  classification: string;
+  dependents: string[];
+  dependencies: string[];
+}
+
+export interface ArchitectureViolation {
+  violation_type: string;
+  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+  title: string;
+  description: string;
+  source_file: string;
+  target_file: string;
+  line: number;
+  remediation?: string | null;
+}
+
+export interface ArchitectureSnapshotDiff {
+  base_commit: string;
+  current_commit: string;
+  added_modules: Array<Record<string, any>>;
+  removed_modules: Array<Record<string, any>>;
+  added_services: Array<Record<string, any>>;
+  removed_services: Array<Record<string, any>>;
+  added_api_endpoints: Array<Record<string, any>>;
+  removed_api_endpoints: Array<Record<string, any>>;
+  net_module_delta: number;
+  net_api_delta: number;
+}
+
+export interface AdvancedArchitectureIntelligence {
+  repository_id: string;
+  repository_name: string;
+  analyzed_at: string;
+  graph: {
+    nodes: ArchitectureGraphNode[];
+    edges: ArchitectureGraphEdge[];
+    total_nodes: number;
+    total_edges: number;
+    node_types: string[];
+    edge_types: string[];
+  };
+  components: ArchitectureComponentItem[];
+  data_flows: ArchitectureDataFlowPath[];
+  coupling: {
+    module_metrics: CouplingMetricItem[];
+    isolated_modules: string[];
+    architectural_hubs: CouplingMetricItem[];
+  };
+  cycles: {
+    has_cycles: boolean;
+    cycle_count: number;
+    cycles: string[][];
+  };
+  violations: ArchitectureViolation[];
+  summary: {
+    total_components: number;
+    total_graph_nodes: number;
+    total_graph_edges: number;
+    total_data_flows: number;
+    total_violations: number;
+    has_circular_dependencies: boolean;
+    isolated_modules_count: number;
+  };
+}
+
+
 
 
 

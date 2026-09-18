@@ -60,8 +60,17 @@ from backend.app.schemas.repository import (
     DependencyIntelligenceItem,
     RepositoryProfileResponse,
     AnalysisSnapshotResponse,
+    ArchitectureGraphNode,
+    ArchitectureGraphEdge,
+    ArchitectureComponentItem,
+    ArchitectureDataFlowPath,
+    CouplingMetricItem,
+    ArchitectureViolation,
+    ArchitectureSnapshotDiffResponse,
+    AdvancedArchitectureIntelligenceResponse,
 )
 from backend.app.services.architecture_service import architecture_service
+from backend.app.services.architecture_intelligence_service import architecture_intelligence_service
 from backend.app.services.code_quality_service import code_quality_service
 from backend.app.services.security_reliability_service import security_reliability_service
 from backend.app.services.git_history_service import git_history_service
@@ -392,6 +401,7 @@ async def index_repository_endpoint(
     security_reliability_service.invalidate_cache(repository_id)
     git_history_service.invalidate_cache(repository_id)
     dependency_intelligence_service.invalidate_cache(repository_id)
+    architecture_intelligence_service.invalidate_cache(repository_id)
 
     # Schedule background ingestion worker task
     background_tasks.add_task(run_indexing_task, repository_id)
@@ -2328,3 +2338,172 @@ async def get_repository_impact_analysis(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Impact analysis error: {str(e)}",
         )
+
+
+# =========================================================================
+# Phase 18: Advanced Architecture Intelligence Endpoints
+# =========================================================================
+
+@router.get("/{repository_id}/architecture/intelligence", response_model=AdvancedArchitectureIntelligenceResponse)
+async def get_repository_architecture_intelligence(
+    repository_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> AdvancedArchitectureIntelligenceResponse:
+    """
+    Get comprehensive Advanced Architecture Intelligence for a repository.
+    Includes 12 node types, 11 edge types, canonical component discovery,
+    end-to-end data flows, coupling/instability metrics, circular dependency analysis,
+    and architectural violation detection backed by repository evidence.
+    """
+    repo_res = await db.execute(select(Repository).where(Repository.id == repository_id))
+    repo = repo_res.scalars().first()
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Repository with id '{repository_id}' not found.",
+        )
+
+    try:
+        intel = await architecture_intelligence_service.get_advanced_architecture_intelligence(
+            repository_id=repository_id,
+            db=db,
+        )
+        return AdvancedArchitectureIntelligenceResponse(**intel)
+    except Exception as e:
+        logger.error(f"Error fetching architecture intelligence for repo '{repository_id}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Architecture intelligence error: {str(e)}",
+        )
+
+
+@router.get("/{repository_id}/architecture/graph")
+async def get_advanced_architecture_graph(
+    repository_id: str,
+    node_type: Optional[str] = Query(None, description="Filter by node_type (e.g., service, module, api, database)"),
+    edge_type: Optional[str] = Query(None, description="Filter by edge relationship_type (e.g., CALLS, PERSISTS_TO, EXPOSES)"),
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Get the multi-entity Architecture Graph for a repository.
+    Supports node_type and edge_type filtering.
+    """
+    repo_res = await db.execute(select(Repository).where(Repository.id == repository_id))
+    if not repo_res.scalars().first():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Repository with id '{repository_id}' not found.",
+        )
+
+    intel = await architecture_intelligence_service.get_advanced_architecture_intelligence(
+        repository_id=repository_id,
+        db=db,
+    )
+    graph = intel.get("graph", {})
+    nodes = graph.get("nodes", [])
+    edges = graph.get("edges", [])
+
+    if node_type:
+        nodes = [n for n in nodes if n.get("node_type", "").lower() == node_type.lower()]
+        node_ids = {n["id"] for n in nodes}
+        edges = [e for e in edges if e["source"] in node_ids and e["target"] in node_ids]
+
+    if edge_type:
+        edges = [e for e in edges if e.get("relationship_type", "").upper() == edge_type.upper()]
+
+    return {
+        "repository_id": repository_id,
+        "nodes": nodes,
+        "edges": edges,
+        "total_nodes": len(nodes),
+        "total_edges": len(edges),
+        "node_types": graph.get("node_types", []),
+        "edge_types": graph.get("edge_types", []),
+    }
+
+
+@router.get("/{repository_id}/architecture/data-flows")
+async def get_architecture_data_flows(
+    repository_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Get traced end-to-end data flow paths (e.g. Route -> Controller -> Service -> Repository -> Database)
+    discovered through repository code evidence.
+    """
+    repo_res = await db.execute(select(Repository).where(Repository.id == repository_id))
+    if not repo_res.scalars().first():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Repository with id '{repository_id}' not found.",
+        )
+
+    intel = await architecture_intelligence_service.get_advanced_architecture_intelligence(
+        repository_id=repository_id,
+        db=db,
+    )
+    return {
+        "repository_id": repository_id,
+        "data_flows": intel.get("data_flows", []),
+        "total_data_flows": len(intel.get("data_flows", [])),
+    }
+
+
+@router.get("/{repository_id}/architecture/coupling")
+async def get_architecture_coupling_metrics(
+    repository_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Get component and module coupling analysis including Afferent coupling (Ca),
+    Efferent coupling (Ce), Martin's Instability metric (I = Ce / (Ca + Ce)),
+    architectural hubs, and isolated/orphan modules.
+    """
+    repo_res = await db.execute(select(Repository).where(Repository.id == repository_id))
+    if not repo_res.scalars().first():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Repository with id '{repository_id}' not found.",
+        )
+
+    intel = await architecture_intelligence_service.get_advanced_architecture_intelligence(
+        repository_id=repository_id,
+        db=db,
+    )
+    return {
+        "repository_id": repository_id,
+        **intel.get("coupling", {}),
+    }
+
+
+@router.get("/{repository_id}/architecture/diff", response_model=ArchitectureSnapshotDiffResponse)
+async def get_architecture_snapshot_diff(
+    repository_id: str,
+    base_commit: Optional[str] = Query(None, description="Optional previous commit SHA to diff against"),
+    db: AsyncSession = Depends(get_db),
+) -> ArchitectureSnapshotDiffResponse:
+    """
+    Diff architectural components (modules, services, API endpoints) between repository snapshots.
+    If base_commit is not provided, compares against initial baseline or previous snapshot.
+    """
+    repo_res = await db.execute(select(Repository).where(Repository.id == repository_id))
+    repo = repo_res.scalars().first()
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Repository with id '{repository_id}' not found.",
+        )
+
+    meta = repo.metadata_json or {}
+    curr_profile = meta.get("profile") or {}
+    curr_commit = repo.current_commit_sha or "HEAD"
+    curr_profile["commit_sha"] = curr_commit
+
+    base_profile: Dict[str, Any] = {"commit_sha": base_commit or "INIT", "modules": [], "services": [], "api_endpoints": []}
+
+    diff_result = architecture_intelligence_service.diff_architecture_snapshots(
+        base_profile=base_profile,
+        current_profile=curr_profile,
+    )
+    return ArchitectureSnapshotDiffResponse(**diff_result)
+

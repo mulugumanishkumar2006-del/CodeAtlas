@@ -1171,4 +1171,96 @@ class AnalysisSnapshotResponse(BaseModel):
     statistics: dict[str, Any] = {}
 
 
+# =========================================================================
+# Phase 18: Advanced Architecture Intelligence Schemas
+# =========================================================================
+
+class ArchitectureGraphNode(BaseModel):
+    id: str
+    repository_id: str
+    node_type: str
+    name: str
+    label: str
+    source_reference: Optional[str] = None
+    properties: dict[str, Any] = {}
+
+
+class ArchitectureGraphEdge(BaseModel):
+    source: str
+    target: str
+    relationship_type: str
+    weight: float = 1.0
+    evidence: dict[str, Any] = {}
+
+
+class ArchitectureComponentItem(BaseModel):
+    id: str
+    name: str
+    category: str
+    description: str
+    files_count: int = 0
+    code_lines: int = 0
+    symbol_count: int = 0
+    files: list[str] = []
+    incoming_coupling: int = 0
+    outgoing_coupling: int = 0
+
+
+class ArchitectureDataFlowPath(BaseModel):
+    entry_point: str
+    entry_file: str
+    flow_steps: list[str] = []
+    layer_sequence: list[str] = []
+    target_datastore: str
+    description: str
+
+
+class CouplingMetricItem(BaseModel):
+    module: str
+    afferent_coupling_ca: int = 0
+    efferent_coupling_ce: int = 0
+    instability: float = 0.0
+    total_coupling: int = 0
+    classification: str
+    dependents: list[str] = []
+    dependencies: list[str] = []
+
+
+class ArchitectureViolation(BaseModel):
+    violation_type: str
+    severity: str
+    title: str
+    description: str
+    source_file: str
+    target_file: str
+    line: int = 1
+    remediation: Optional[str] = None
+
+
+class ArchitectureSnapshotDiffResponse(BaseModel):
+    base_commit: str
+    current_commit: str
+    added_modules: list[dict[str, Any]] = []
+    removed_modules: list[dict[str, Any]] = []
+    added_services: list[dict[str, Any]] = []
+    removed_services: list[dict[str, Any]] = []
+    added_api_endpoints: list[dict[str, Any]] = []
+    removed_api_endpoints: list[dict[str, Any]] = []
+    net_module_delta: int = 0
+    net_api_delta: int = 0
+
+
+class AdvancedArchitectureIntelligenceResponse(BaseModel):
+    repository_id: str
+    repository_name: str
+    analyzed_at: str
+    graph: dict[str, Any]
+    components: list[ArchitectureComponentItem]
+    data_flows: list[ArchitectureDataFlowPath]
+    coupling: dict[str, Any]
+    cycles: dict[str, Any]
+    violations: list[ArchitectureViolation]
+    summary: dict[str, Any]
+
+
 
