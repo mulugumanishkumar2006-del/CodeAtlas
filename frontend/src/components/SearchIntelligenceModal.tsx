@@ -5,7 +5,8 @@ import {
   FileSearchMatch, 
   CodeSearchMatch, 
   DependencySearchMatch, 
-  DirectorySearchMatch 
+  DirectorySearchMatch,
+  ArchitectureSearchMatch,
 } from '../types';
 import { api } from '../services/api';
 import { 
@@ -23,6 +24,131 @@ import {
   ChevronRight,
   CornerDownLeft
 } from 'lucide-react';
+
+/* =========================================================================
+   Phase 16 Reusable Result Cards (Requirement 28)
+   ========================================================================= */
+
+export interface SymbolResultCardProps {
+  symbol: SymbolSearchMatch;
+  onSelect: () => void;
+}
+
+export const SymbolResultCard: React.FC<SymbolResultCardProps> = ({ symbol, onSelect }) => (
+  <div 
+    className="search-item-card symbol-card"
+    onClick={onSelect}
+  >
+    <div className="card-top-row">
+      <span className="match-name">{symbol.name}</span>
+      <span className="match-badge type">{symbol.symbol_type}</span>
+      <span className="match-path-tag">{symbol.file_path}:{symbol.start_line}</span>
+      {symbol.relevance !== undefined && (
+        <span style={{ fontSize: '0.72rem', color: '#94a3b8', marginLeft: 'auto' }}>
+          {Math.round(symbol.relevance * 100)}% match
+        </span>
+      )}
+    </div>
+    <div className="card-sub-info">
+      <span className="match-qname">{symbol.qualified_name}</span>
+      <span className="match-range">Lines {symbol.start_line}–{symbol.end_line}</span>
+    </div>
+    {symbol.docstring && (
+      <div className="match-doc-snippet">{symbol.docstring}</div>
+    )}
+  </div>
+);
+
+export interface FileResultCardProps {
+  file: FileSearchMatch;
+  onSelect: () => void;
+}
+
+export const FileResultCard: React.FC<FileResultCardProps> = ({ file, onSelect }) => (
+  <div 
+    className="search-item-card file-card"
+    onClick={onSelect}
+  >
+    <div className="card-top-row">
+      <span className="match-name">{file.path}</span>
+      <span className="match-badge lang">{file.language || 'Plain Text'}</span>
+      {file.relevance !== undefined && (
+        <span style={{ fontSize: '0.72rem', color: '#94a3b8', marginLeft: 'auto' }}>
+          {Math.round(file.relevance * 100)}% match
+        </span>
+      )}
+    </div>
+    <div className="card-sub-info">
+      <span>{file.line_count} lines</span>
+      <span>{((file.size_bytes || 0) / 1024).toFixed(1)} KB</span>
+      <span className="item-action-hint">Open file <ChevronRight size={12} /></span>
+    </div>
+  </div>
+);
+
+export interface DependencyResultCardProps {
+  dependency: DependencySearchMatch;
+  onSelect: () => void;
+}
+
+export const DependencyResultCard: React.FC<DependencyResultCardProps> = ({ dependency, onSelect }) => (
+  <div 
+    className="search-item-card dep-card"
+    onClick={onSelect}
+  >
+    <div className="dep-flow-row">
+      <span className="dep-endpoint">{dependency.source_path || 'Unknown'}</span>
+      <ArrowRight size={13} style={{ color: 'var(--accent-cyan)' }} />
+      <span className="dep-endpoint target">{dependency.target_path || dependency.name}</span>
+      <span className="match-badge type">{dependency.dependency_type}</span>
+      {dependency.relevance !== undefined && (
+        <span style={{ fontSize: '0.72rem', color: '#94a3b8', marginLeft: 'auto' }}>
+          {Math.round(dependency.relevance * 100)}% match
+        </span>
+      )}
+    </div>
+    <div className="card-sub-info">
+      <span>{dependency.relationship_type === 'incoming' ? 'Depended on by file' : 'Outgoing import'}</span>
+      {dependency.line && <span>Line {dependency.line}</span>}
+      {dependency.resolved ? (
+        <span style={{ color: 'var(--accent-emerald)' }}>Internal</span>
+      ) : (
+        <span style={{ color: 'var(--text-muted)' }}>External</span>
+      )}
+    </div>
+  </div>
+);
+
+export interface ArchitectureResultCardProps {
+  architecture: ArchitectureSearchMatch;
+  onSelect?: () => void;
+}
+
+export const ArchitectureResultCard: React.FC<ArchitectureResultCardProps> = ({ architecture, onSelect }) => (
+  <div className="search-item-card arch-card" onClick={onSelect}>
+    <div className="card-top-row">
+      <span className="match-name">{architecture.name}</span>
+      <span className="match-badge type" style={{ background: 'rgba(168, 85, 247, 0.15)', color: '#c084fc' }}>
+        {architecture.node_type}
+      </span>
+      {architecture.relevance !== undefined && (
+        <span style={{ fontSize: '0.72rem', color: '#94a3b8', marginLeft: 'auto' }}>
+          {Math.round(architecture.relevance * 100)}% match
+        </span>
+      )}
+    </div>
+    {architecture.description && (
+      <div className="card-sub-info">
+        <span>{architecture.description}</span>
+      </div>
+    )}
+    {architecture.match_reason && (
+      <div className="match-doc-snippet" style={{ color: 'var(--text-muted)' }}>
+        {architecture.match_reason}
+      </div>
+    )}
+  </div>
+);
 
 interface SearchIntelligenceModalProps {
   isOpen: boolean;
@@ -301,27 +427,14 @@ export const SearchIntelligenceModal: React.FC<SearchIntelligenceModalProps> = (
                   </div>
                   <div className="group-items-list">
                     {results.symbols.map((sym: SymbolSearchMatch) => (
-                      <div 
+                      <SymbolResultCard
                         key={sym.id}
-                        className="search-item-card symbol-card"
-                        onClick={() => {
+                        symbol={sym}
+                        onSelect={() => {
                           onNavigateToSource(sym.file_id, sym.start_line);
                           onClose();
                         }}
-                      >
-                        <div className="card-top-row">
-                          <span className="match-name">{sym.name}</span>
-                          <span className="match-badge type">{sym.symbol_type}</span>
-                          <span className="match-path-tag">{sym.file_path}:{sym.start_line}</span>
-                        </div>
-                        <div className="card-sub-info">
-                          <span className="match-qname">{sym.qualified_name}</span>
-                          <span className="match-range">Lines {sym.start_line}–{sym.end_line}</span>
-                        </div>
-                        {sym.docstring && (
-                          <div className="match-doc-snippet">{sym.docstring}</div>
-                        )}
-                      </div>
+                      />
                     ))}
                   </div>
                 </div>
@@ -336,24 +449,14 @@ export const SearchIntelligenceModal: React.FC<SearchIntelligenceModalProps> = (
                   </div>
                   <div className="group-items-list">
                     {results.files.map((f: FileSearchMatch) => (
-                      <div 
+                      <FileResultCard
                         key={f.id}
-                        className="search-item-card file-card"
-                        onClick={() => {
+                        file={f}
+                        onSelect={() => {
                           onNavigateToSource(f.id);
                           onClose();
                         }}
-                      >
-                        <div className="card-top-row">
-                          <span className="match-name">{f.path}</span>
-                          <span className="match-badge lang">{f.language || 'Plain Text'}</span>
-                        </div>
-                        <div className="card-sub-info">
-                          <span>{f.line_count} lines</span>
-                          <span>{((f.size_bytes || 0) / 1024).toFixed(1)} KB</span>
-                          <span className="item-action-hint">Open file <ChevronRight size={12} /></span>
-                        </div>
-                      </div>
+                      />
                     ))}
                   </div>
                 </div>
@@ -407,32 +510,16 @@ export const SearchIntelligenceModal: React.FC<SearchIntelligenceModalProps> = (
                   </div>
                   <div className="group-items-list">
                     {results.dependencies.map((dep: DependencySearchMatch, i: number) => (
-                      <div 
+                      <DependencyResultCard
                         key={i}
-                        className="search-item-card dep-card"
-                        onClick={() => {
+                        dependency={dep}
+                        onSelect={() => {
                           if (dep.source_file_id) {
                             onNavigateToSource(dep.source_file_id, dep.line || undefined);
                             onClose();
                           }
                         }}
-                      >
-                        <div className="dep-flow-row">
-                          <span className="dep-endpoint">{dep.source_path || 'Unknown'}</span>
-                          <ArrowRight size={13} style={{ color: 'var(--accent-cyan)' }} />
-                          <span className="dep-endpoint target">{dep.target_path || dep.name}</span>
-                          <span className="match-badge type">{dep.dependency_type}</span>
-                        </div>
-                        <div className="card-sub-info">
-                          <span>{dep.relationship_type === 'incoming' ? 'Depended on by file' : 'Outgoing import'}</span>
-                          {dep.line && <span>Line {dep.line}</span>}
-                          {dep.resolved ? (
-                            <span style={{ color: 'var(--accent-emerald)' }}>Internal</span>
-                          ) : (
-                            <span style={{ color: 'var(--text-muted)' }}>External</span>
-                          )}
-                        </div>
-                      </div>
+                      />
                     ))}
                   </div>
                 </div>
@@ -447,22 +534,10 @@ export const SearchIntelligenceModal: React.FC<SearchIntelligenceModalProps> = (
                   </div>
                   <div className="group-items-list">
                     {(results.architecture || results.architecture_matches || []).map((arch, i) => (
-                      <div key={i} className="search-item-card arch-card">
-                        <div className="card-top-row">
-                          <span className="match-name">{arch.name}</span>
-                          <span className="match-badge type" style={{ background: 'rgba(168, 85, 247, 0.15)', color: '#c084fc' }}>{arch.node_type}</span>
-                        </div>
-                        {arch.description && (
-                          <div className="card-sub-info">
-                            <span>{arch.description}</span>
-                          </div>
-                        )}
-                        {arch.match_reason && (
-                          <div className="match-doc-snippet" style={{ color: 'var(--text-muted)' }}>
-                            {arch.match_reason}
-                          </div>
-                        )}
-                      </div>
+                      <ArchitectureResultCard
+                        key={i}
+                        architecture={arch}
+                      />
                     ))}
                   </div>
                 </div>

@@ -27,6 +27,8 @@ import {
   DependencyIntelligence,
   DependencySummary,
   DependencyImpact,
+  UniversalProfile,
+  AnalysisSnapshot,
 } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
@@ -100,6 +102,14 @@ class ApiClient {
 
   async getAnalysisStatus(id: string): Promise<AnalysisProgress> {
     return this.request<AnalysisProgress>(`/repositories/${id}/analysis`);
+  }
+
+  async getRepositoryProfile(id: string): Promise<UniversalProfile> {
+    return this.request<UniversalProfile>(`/repositories/${id}/profile`);
+  }
+
+  async getRepositorySnapshot(id: string): Promise<AnalysisSnapshot> {
+    return this.request<AnalysisSnapshot>(`/repositories/${id}/snapshot`);
   }
 
   async getRepositoryFiles(id: string, language?: string): Promise<FileItem[]> {

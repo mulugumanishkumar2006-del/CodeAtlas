@@ -1,5 +1,5 @@
 export type AcquisitionStatus = 'NOT_CLONED' | 'CLONING' | 'READY' | 'SYNCING' | 'ERROR';
-export type AnalysisStatus = 'pending' | 'running' | 'completed' | 'failed';
+export type AnalysisStatus = 'pending' | 'running' | 'completed' | 'partial' | 'failed';
 export type WorkspaceTab = 'overview' | 'chat' | 'architecture' | 'quality' | 'security' | 'history' | 'files' | 'symbols' | 'dependencies' | 'settings';
 
 export interface LanguageStat {
@@ -8,6 +8,7 @@ export interface LanguageStat {
   line_count: number;
   size_bytes: number;
   percentage: number;
+  is_supported?: boolean;
 }
 
 export interface RepositoryMetadata {
@@ -16,12 +17,15 @@ export interface RepositoryMetadata {
   symbol_count?: number;
   primary_language?: string;
   languages?: LanguageStat[];
+  profile?: UniversalProfile;
   analysis_summary?: {
     total_files: number;
     total_lines: number;
     total_symbols: number;
     primary_language: string;
     languages: LanguageStat[];
+    profile?: UniversalProfile;
+    partial_errors?: Array<{ file: string; language: string; error: string; stage: string }>;
     duration_seconds: number;
   };
 }
@@ -68,7 +72,134 @@ export interface AnalysisProgress {
   symbols_extracted: number;
   progress_percent: number;
   error?: string | null;
+  partial_errors?: Array<{ file: string; language: string; error: string; stage: string }>;
+  unsupported_languages?: Array<{ language: string; file_count: number; percentage: number }>;
   updated_at?: string | null;
+}
+
+export interface FrameworkEvidence {
+  name: string;
+  category: string;
+  confidence: 'HIGH' | 'MEDIUM' | 'LOW';
+  evidence_files: string[];
+  evidence_imports: string[];
+  description: string;
+}
+
+export interface PackageManagerItem {
+  id: string;
+  name: string;
+  evidence_files: string[];
+  confidence: string;
+}
+
+export interface EntryPointItem {
+  file_path: string;
+  symbol?: string | null;
+  line: number;
+  reason: string;
+  framework?: string | null;
+  file_id?: string | null;
+}
+
+export interface ApiEndpointItem {
+  method: string;
+  route: string;
+  file_path: string;
+  line: number;
+  framework: string;
+  file_id?: string | null;
+}
+
+export interface DatabaseEvidenceItem {
+  name: string;
+  category: string;
+  description: string;
+  evidence_imports: string[];
+  evidence_files: string[];
+  confidence: string;
+}
+
+export interface EnvironmentVariableItem {
+  name: string;
+  value: string;
+  source_file: string;
+}
+
+export interface ConfigurationItem {
+  file_path: string;
+  filename: string;
+  category: string;
+  is_env_file: boolean;
+}
+
+export interface InfrastructureItem {
+  type: string;
+  file_path: string;
+  description: string;
+}
+
+export interface UniversalProfile {
+  repository_id: string;
+  commit_sha?: string | null;
+  analyzed_at: string;
+  languages: {
+    primary_language: string;
+    total_files: number;
+    total_lines: number;
+    total_code_lines: number;
+    total_blank_lines: number;
+    total_comment_lines: number;
+    distribution: LanguageStat[];
+    supported_languages: LanguageStat[];
+    unsupported_languages: LanguageStat[];
+  };
+  frameworks: FrameworkEvidence[];
+  package_managers: PackageManagerItem[];
+  monorepo: {
+    is_monorepo: boolean;
+    workspace_type?: string | null;
+    evidence: string[];
+    packages: string[];
+  };
+  entry_points: EntryPointItem[];
+  api_endpoints: ApiEndpointItem[];
+  databases: DatabaseEvidenceItem[];
+  configurations: {
+    config_files: ConfigurationItem[];
+    environment_variables: EnvironmentVariableItem[];
+  };
+  tests: {
+    test_file_count: number;
+    test_files: string[];
+    test_frameworks: string[];
+    test_ratio_percent: number;
+  };
+  documentation: Array<{
+    file_path: string;
+    title: string;
+    type: string;
+    line_count: number;
+  }>;
+  infrastructure: InfrastructureItem[];
+  modules: Array<{
+    name: string;
+    file_count: number;
+  }>;
+  services: Array<{
+    name: string;
+    service_path: string;
+    type: string;
+  }>;
+  architecture_tree: Record<string, any>;
+}
+
+export interface AnalysisSnapshot {
+  repository_id: string;
+  commit_sha: string;
+  snapshot_timestamp: string;
+  profile: UniversalProfile;
+  statistics: Record<string, any>;
 }
 
 export interface FileItem {
@@ -125,6 +256,8 @@ export interface SymbolSearchMatch {
   docstring?: string | null;
   score?: number;
   match_reason?: string | null;
+  repository_id?: string;
+  relevance?: number;
 }
 
 export interface FileSearchMatch {
@@ -135,6 +268,8 @@ export interface FileSearchMatch {
   size_bytes?: number;
   score?: number;
   match_reason?: string | null;
+  repository_id?: string;
+  relevance?: number;
 }
 
 export interface DirectorySearchMatch {
@@ -143,6 +278,7 @@ export interface DirectorySearchMatch {
   line_count: number;
   symbol_count: number;
   match_reason?: string | null;
+  repository_id?: string;
 }
 
 export interface DependencySearchMatch {
@@ -157,6 +293,8 @@ export interface DependencySearchMatch {
   resolved: boolean;
   relationship_type: string;
   match_reason?: string | null;
+  repository_id?: string;
+  relevance?: number;
 }
 
 export interface ArchitectureSearchMatch {
@@ -167,6 +305,8 @@ export interface ArchitectureSearchMatch {
   file_count?: number;
   score?: number;
   match_reason?: string | null;
+  repository_id?: string;
+  relevance?: number;
 }
 
 export interface RepositorySearchResponse {
@@ -480,6 +620,7 @@ export interface SourceCitationItem {
   file_path?: string;
   start_line: number;
   end_line: number;
+  symbol_id?: string | null;
   symbol?: string | null;
   relevance: number;
   repository_id?: string;
@@ -502,6 +643,7 @@ export interface RepositoryQueryResponse {
   related_dependencies?: string[];
   conversation_id?: string | null;
   duration_ms?: number;
+  latency_breakdown?: Record<string, number>;
 }
 
 export interface ChatMessage {
@@ -514,6 +656,8 @@ export interface ChatMessage {
   related_symbols?: string[];
   related_files?: string[];
   related_dependencies?: string[];
+  duration_ms?: number;
+  latency_breakdown?: Record<string, number>;
   created_at?: string;
 }
 

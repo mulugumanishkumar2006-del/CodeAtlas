@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Repository, AnalysisProgress, FileItem, SymbolItem, DependencyItem, GraphData, GraphNodeItem, WorkspaceTab } from '../types';
+import { Repository, AnalysisProgress, FileItem, SymbolItem, DependencyItem, GraphData, GraphNodeItem, WorkspaceTab, UniversalProfile } from '../types';
 import { api } from '../services/api';
 import { ArchitectureView } from './ArchitectureView';
 import { QualityView } from './QualityView';
@@ -10,6 +10,7 @@ import { CodeExplorer } from './CodeExplorer';
 import { ChatAssistantView } from './ChatAssistantView';
 import { SearchIntelligenceModal } from './SearchIntelligenceModal';
 import { ImpactIntelligenceModal } from './ImpactIntelligenceModal';
+import { UniversalRepositoryOverview } from './UniversalRepositoryOverview';
 import { 
   ExternalLink, 
   GitBranch, 
@@ -66,6 +67,7 @@ export const RepositoryDetail: React.FC<RepositoryDetailProps> = ({
   const [dependencies, setDependencies] = useState<DependencyItem[]>([]);
   const [graphData, setGraphData] = useState<GraphData | null>(null);
   const [selectedNode, setSelectedNode] = useState<GraphNodeItem | null>(null);
+  const [profile, setProfile] = useState<UniversalProfile | null>(null);
 
   const [activeTab, setActiveTab] = useState<WorkspaceTab>(currentTab);
   const [explorerTargetFileId, setExplorerTargetFileId] = useState<string | null>(null);
@@ -105,7 +107,7 @@ export const RepositoryDetail: React.FC<RepositoryDetailProps> = ({
   }, []);
 
   const acquisitionStatus = repository.acquisition_status || 'NOT_CLONED';
-  const isAnalyzing = repository.analysis_status === 'running' || analysisProgress?.status === 'running' || analysisProgress?.status === 'DISCOVERING_FILES' || analysisProgress?.status === 'STORING_FILES' || analysisProgress?.status === 'PARSING_METADATA';
+  const isAnalyzing = repository.analysis_status === 'running' || analysisProgress?.status === 'running' || analysisProgress?.status === 'DISCOVERING_FILES' || analysisProgress?.status === 'STORING_FILES' || analysisProgress?.status === 'PARSING_METADATA' || analysisProgress?.status === 'PARSING' || analysisProgress?.status === 'BUILDING_GRAPH' || analysisProgress?.status === 'ANALYZING';
   const isFailed = repository.analysis_status === 'failed' || analysisProgress?.status === 'FAILED';
   const isOperating = acquisitionStatus === 'CLONING' || acquisitionStatus === 'SYNCING' || isAnalyzing || isActionLoading;
 
@@ -133,21 +135,33 @@ export const RepositoryDetail: React.FC<RepositoryDetailProps> = ({
     };
   }, [repository.id, isAnalyzing, repository.analysis_status]);
 
-  // Load files, symbols, dependencies and graph when analysis is completed
+  // Load files, symbols, dependencies, graph and universal profile when analysis is completed or partial
   useEffect(() => {
+    const isFinished = 
+      repository.analysis_status === 'completed' || 
+      repository.analysis_status === 'partial' || 
+      analysisProgress?.status === 'COMPLETED' || 
+      analysisProgress?.status === 'PARTIAL' || 
+      analysisProgress?.status === 'completed' || 
+      analysisProgress?.status === 'partial';
+
     const loadCodeData = async () => {
-      if (repository.analysis_status === 'completed' || analysisProgress?.status === 'COMPLETED' || analysisProgress?.status === 'completed') {
+      if (isFinished) {
         try {
-          const [filesData, symbolsData, depsData, gData] = await Promise.all([
+          const [filesData, symbolsData, depsData, gData, profData] = await Promise.all([
             api.getRepositoryFiles(repository.id),
             api.getRepositorySymbols(repository.id),
             api.getRepositoryDependencies(repository.id),
             api.getRepositoryGraph(repository.id),
+            api.getRepositoryProfile(repository.id).catch(() => null),
           ]);
           setFiles(filesData);
           setSymbols(symbolsData);
           setDependencies(depsData);
           setGraphData(gData);
+          if (profData) {
+            setProfile(profData);
+          }
           if (gData?.nodes?.length > 0 && !selectedNode) {
             setSelectedNode(gData.nodes[0]);
           }
@@ -341,6 +355,8 @@ export const RepositoryDetail: React.FC<RepositoryDetailProps> = ({
                 gap: 6,
                 color: repository.analysis_status === 'completed' 
                   ? 'var(--accent-emerald)' 
+                  : repository.analysis_status === 'partial'
+                  ? '#fbbf24'
                   : isAnalyzing
                   ? 'var(--accent-cyan)'
                   : isFailed
@@ -349,9 +365,10 @@ export const RepositoryDetail: React.FC<RepositoryDetailProps> = ({
               }}
             >
               {repository.analysis_status === 'completed' && <CheckCircle2 size={13} />}
+              {repository.analysis_status === 'partial' && <AlertTriangle size={13} />}
               {isAnalyzing && <Loader2 size={13} className="spin-animation" />}
               {isFailed && <AlertTriangle size={13} />}
-              <span>{isAnalyzing ? 'Analyzing...' : isFailed ? 'Failed' : (repository.analysis_status || 'Pending')}</span>
+              <span>{isAnalyzing ? 'Analyzing...' : isFailed ? 'Failed' : repository.analysis_status === 'partial' ? 'Partial Analysis' : (repository.analysis_status || 'Pending')}</span>
             </div>
           </div>
 
@@ -700,6 +717,15 @@ export const RepositoryDetail: React.FC<RepositoryDetailProps> = ({
                     </div>
                   </div>
                 )}
+
+                {/* Phase 17: Universal Repository Analyzer Profile */}
+                <div style={{ marginTop: 24 }}>
+                  <UniversalRepositoryOverview
+                    profile={profile || metadata.profile || null}
+                    analysisProgress={analysisProgress}
+                    onNavigateToFile={navigateToSource}
+                  />
+                </div>
               </div>
             )}
 

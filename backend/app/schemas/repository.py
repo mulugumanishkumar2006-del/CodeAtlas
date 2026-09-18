@@ -98,6 +98,8 @@ class AnalysisProgressResponse(BaseModel):
     symbols_extracted: int = 0
     progress_percent: int = 0
     error: Optional[str] = None
+    partial_errors: list[dict[str, Any]] = []
+    unsupported_languages: list[dict[str, Any]] = []
     updated_at: Optional[str] = None
 
 
@@ -185,6 +187,8 @@ class SymbolSearchMatch(BaseModel):
     docstring: Optional[str] = None
     score: Optional[int] = None
     match_reason: Optional[str] = None
+    repository_id: Optional[str] = None
+    relevance: Optional[float] = 1.0
 
 
 class FileSearchMatch(BaseModel):
@@ -195,6 +199,8 @@ class FileSearchMatch(BaseModel):
     size_bytes: Optional[int] = 0
     score: Optional[int] = None
     match_reason: Optional[str] = None
+    repository_id: Optional[str] = None
+    relevance: Optional[float] = 1.0
 
 
 class DirectorySearchMatch(BaseModel):
@@ -203,6 +209,7 @@ class DirectorySearchMatch(BaseModel):
     line_count: int = 0
     symbol_count: int = 0
     match_reason: Optional[str] = None
+    repository_id: Optional[str] = None
 
 
 class DependencySearchMatch(BaseModel):
@@ -217,6 +224,8 @@ class DependencySearchMatch(BaseModel):
     resolved: bool = True
     relationship_type: str = "outgoing"
     match_reason: Optional[str] = None
+    repository_id: Optional[str] = None
+    relevance: Optional[float] = 1.0
 
 
 class ArchitectureSearchMatch(BaseModel):
@@ -227,6 +236,8 @@ class ArchitectureSearchMatch(BaseModel):
     file_count: Optional[int] = 0
     score: Optional[int] = None
     match_reason: Optional[str] = None
+    repository_id: Optional[str] = None
+    relevance: Optional[float] = 1.0
 
 
 class RepositorySearchResponse(BaseModel):
@@ -487,6 +498,7 @@ class SourceCitationItem(BaseModel):
     file_path: Optional[str] = None
     start_line: int
     end_line: int
+    symbol_id: Optional[str] = None
     symbol: Optional[str] = None
     relevance: float = 1.0
     repository_id: Optional[str] = None
@@ -509,6 +521,7 @@ class RepositoryQueryResponse(BaseModel):
     related_dependencies: list[str] = []
     conversation_id: Optional[str] = None
     duration_ms: Optional[float] = None
+    latency_breakdown: Optional[dict[str, float]] = None
 
 
 class ConversationMessage(BaseModel):
@@ -1124,6 +1137,38 @@ class DependencyImpactResponse(BaseModel):
     total_affected_files: int = 0
     centrality: str = "LOW"
     explanation: str
+
+
+# =========================================================================
+# Phase 17: Universal Repository Analyzer Schemas
+# =========================================================================
+
+class RepositoryProfileResponse(BaseModel):
+    repository_id: str
+    commit_sha: Optional[str] = None
+    analyzed_at: str
+    languages: dict[str, Any] = {}
+    frameworks: list[dict[str, Any]] = []
+    package_managers: list[dict[str, Any]] = []
+    monorepo: dict[str, Any] = {}
+    entry_points: list[dict[str, Any]] = []
+    api_endpoints: list[dict[str, Any]] = []
+    databases: list[dict[str, Any]] = []
+    configurations: dict[str, Any] = {}
+    tests: dict[str, Any] = {}
+    documentation: list[dict[str, Any]] = []
+    infrastructure: list[dict[str, Any]] = []
+    modules: list[dict[str, Any]] = []
+    services: list[dict[str, Any]] = []
+    architecture_tree: dict[str, Any] = {}
+
+
+class AnalysisSnapshotResponse(BaseModel):
+    repository_id: str
+    commit_sha: str
+    snapshot_timestamp: str
+    profile: dict[str, Any] = {}
+    statistics: dict[str, Any] = {}
 
 
 

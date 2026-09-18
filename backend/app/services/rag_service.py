@@ -57,6 +57,8 @@ def redact_sensitive_strings(text: str) -> str:
     text = re.sub(r"(Bearer\s+)[A-Za-z0-9\-\._~\+\/]{20,}={0,2}", r"\1[REDACTED_TOKEN]", text)
     # Redact RSA private keys
     text = re.sub(r"-----BEGIN (?:RSA )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA )?PRIVATE KEY-----", "[REDACTED_PRIVATE_KEY]", text)
+    # Redact passwords, client secrets, and private tokens
+    text = re.sub(r"(?i)(password|passwd|secret|api_key|token)\s*[:=]\s*['\"][^'\"]{4,}['\"]", r'\1 = "[REDACTED_SECRET]"', text)
     return text
 
 
@@ -108,7 +110,7 @@ class RAGService:
             return "DEPENDENCY", keywords
 
         # 4. ARCHITECTURE (Layers, modules, overview, components, structure)
-        if re.search(r"\b(architecture|architectural|structure|overview|high level|layers?|modules?|components?|entry points?|patterns?|app structure|how is the application structured|api layer|main components)\b", lower_q):
+        if re.search(r"\b(architecture|architectural|structure[ds]?|overview|high level|layers?|modules?|components?|entry points?|patterns?|app structure|how is (?:the|this) application structured|api layer|main components)\b", lower_q):
             return "ARCHITECTURE", keywords
 
         # 5. HISTORY (Commits, authors, changelog, churn, evolution)
@@ -169,6 +171,7 @@ class RAGService:
             content: str,
             relevance: float,
             match_reason: str,
+            symbol_id: Optional[str] = None,
         ):
             if is_secret_file(path):
                 return
@@ -177,10 +180,13 @@ class RAGService:
                 return
             seen_keys.add(key)
             candidate_sources.append({
+                "repository_id": repository_id,
                 "file_id": file_id,
                 "path": path,
+                "file_path": path,
                 "start_line": start_line,
                 "end_line": end_line,
+                "symbol_id": symbol_id,
                 "symbol": symbol,
                 "symbol_type": symbol_type,
                 "docstring": docstring,
@@ -216,6 +222,7 @@ class RAGService:
                 .join(File, Symbol.file_id == File.id)
                 .where(
                     Symbol.repository_id == repository_id,
+                    File.repository_id == repository_id,
                     or_(*conditions),
                 )
             )
@@ -257,6 +264,7 @@ class RAGService:
                     content=snippet,
                     relevance=score,
                     match_reason=f"Symbol match for '{sym.name}' ({sym.symbol_type})",
+                    symbol_id=sym.id,
                 )
 
         # --- B. FILE SEARCH (Stage 3 & 4) ---
@@ -336,9 +344,9 @@ class RAGService:
                     match_reason=f"Code content match at line {line_no}",
                 )
 
-        # --- D. DEPENDENCIES & GRAPH (Stage 6) ---
+        # --- D. DEPENDENCIES & CALL GRAPH (Stage 6) ---
         if intent in ["DEPENDENCY", "ARCHITECTURE", "FLOW", "CALL_GRAPH"] or len(candidate_sources) < 3:
-            deps_q = select(Dependency).where(Dependency.repository_id == repository_id).limit(50)
+            deps_q = select(Dependency).where(Dependency.repository_id == repository_id).limit(100)
             deps_res = (await db.execute(deps_q)).scalars().all()
             for dep in deps_res:
                 meta = dep.metadata_json or {}
@@ -346,17 +354,100 @@ class RAGService:
                 tgt_path = meta.get("target_path") or dep.name
                 
                 # Check if dependency matches keywords
-                dep_match = any(kw.lower() in dep.name.lower() or (src_path and kw.lower() in src_path.lower()) for kw in keywords)
+                dep_match = any(kw.lower() in dep.name.lower() or (src_path and kw.lower() in src_path.lower()) or (tgt_path and kw.lower() in tgt_path.lower()) for kw in keywords)
                 if dep_match or intent in ["ARCHITECTURE", "FLOW"]:
                     if dep.source_file_id and dep.source_file_id in file_map:
                         f = file_map[dep.source_file_id]
-                        line = meta.get("start_line") or 1
+                        line = meta.get("start_line") or meta.get("line") or 1
                         file_src = source_code_service.get_file_source(repository_id, f.path)
                         full_text = file_src.get("source", "")
                         src_lines = full_text.splitlines() if full_text else []
-                        start_l = max(1, line - 5)
-                        end_l = min(len(src_lines), line + 15)
-                        snippet = "\n".join(src_lines[start_l - 1 : end_l]) if src_lines else ""
+                        start_l = max(1, line - 2)
+                        end_l = min(len(src_lines), line + 10) if src_lines else line + 5
+                        snippet = "\n".join(src_lines[start_l - 1 : end_l]) if src_lines else f"import {dep.name}"
+
+                        add_candidate(
+                            file_id=f.id,
+                            path=f.path,
+                            start_line=start_l,
+                            end_line=end_l,
+                            symbol=dep.name,
+                            symbol_type="dependency_import",
+                            docstring=None,
+                            content=snippet,
+                            relevance=0.96,
+                            match_reason=f"File '{f.path}' imports '{dep.name}'",
+                        )
+
+        # --- D2. CALL GRAPH INTELLIGENCE ---
+        if intent == "CALL_GRAPH" or any(kw.lower() in ["call", "calls", "caller", "callers", "callee", "callees", "invokes", "invoked"] for kw in keywords):
+            for kw in keywords[:4]:
+                clean_kw = kw.strip("'\"`")
+                if len(clean_kw) < 2:
+                    continue
+                target_sym_q = (
+                    select(Symbol, File)
+                    .join(File, Symbol.file_id == File.id)
+                    .where(
+                        Symbol.repository_id == repository_id,
+                        File.repository_id == repository_id,
+                        or_(
+                            Symbol.name.ilike(f"{clean_kw}"),
+                            Symbol.name.ilike(f"%{clean_kw}%"),
+                        ),
+                    )
+                )
+                sym_matches = (await db.execute(target_sym_q)).all()
+                for target_sym, target_f in sym_matches:
+                    tgt_src = source_code_service.get_file_source(repository_id, target_f.path)
+                    tgt_lines = tgt_src.get("source", "").splitlines()
+                    tgt_snippet = "\n".join(tgt_lines[max(0, target_sym.start_line - 1):min(len(tgt_lines), target_sym.end_line)])
+                    add_candidate(
+                        file_id=target_f.id,
+                        path=target_f.path,
+                        start_line=target_sym.start_line,
+                        end_line=target_sym.end_line,
+                        symbol=target_sym.name,
+                        symbol_type=target_sym.symbol_type,
+                        docstring=target_sym.docstring,
+                        content=tgt_snippet or f"Function definition for {target_sym.name}",
+                        relevance=0.99,
+                        match_reason=f"Target function '{target_sym.name}' for call graph analysis",
+                        symbol_id=target_sym.id,
+                    )
+
+                    # Find incoming callers via dependencies and code references
+                    callers_q = (
+                        select(Dependency, File)
+                        .join(File, Dependency.source_file_id == File.id)
+                        .where(
+                            Dependency.repository_id == repository_id,
+                            File.repository_id == repository_id,
+                            or_(
+                                Dependency.target_file_id == target_f.id,
+                                Dependency.name.ilike(f"%{target_sym.name}%"),
+                            ),
+                        )
+                    )
+                    caller_deps = (await db.execute(callers_q)).all()
+                    for dep, caller_file in caller_deps:
+                        meta = dep.metadata_json or {}
+                        line = meta.get("start_line") or meta.get("line") or 1
+                        c_src = source_code_service.get_file_source(repository_id, caller_file.path)
+                        c_lines = c_src.get("source", "").splitlines()
+                        c_snippet = "\n".join(c_lines[max(0, line - 2):min(len(c_lines), line + 10)]) if c_lines else ""
+                        add_candidate(
+                            file_id=caller_file.id,
+                            path=caller_file.path,
+                            start_line=max(1, line - 2),
+                            end_line=min(len(c_lines), line + 10) if c_lines else line + 5,
+                            symbol=None,
+                            symbol_type="caller",
+                            docstring=None,
+                            content=c_snippet or f"Caller in {caller_file.path} invoking {target_sym.name}",
+                            relevance=0.95,
+                            match_reason=f"Caller of '{target_sym.name}' in {caller_file.path}",
+                        )
 
         # --- E. DETERMINISTIC IMPACT & BLAST RADIUS (Phase 10) ---
         if intent == "IMPACT" or any(kw.lower() in ["impact", "blast", "break", "affected", "dependents"] for kw in keywords):
@@ -474,6 +565,25 @@ class RAGService:
                         relevance=0.96,
                         match_reason="Repository Architecture Intelligence Summary",
                     )
+                # 3. Add actual database GraphNode components if matching keywords
+                gn_q = select(GraphNode).where(GraphNode.repository_id == repository_id)
+                gn_res = await db.execute(gn_q)
+                for gn in gn_res.scalars().all():
+                    if any(kw.lower() in gn.label.lower() or kw.lower() in gn.node_key.lower() for kw in keywords) or (intent == "ARCHITECTURE" and len(candidate_sources) < 6):
+                        gn_fid = gn.file_id or (all_repo_files[0].id if all_repo_files else "")
+                        gn_path = file_map[gn.file_id].path if gn.file_id and gn.file_id in file_map else (all_repo_files[0].path if all_repo_files else "architecture")
+                        add_candidate(
+                            file_id=gn_fid,
+                            path=gn_path,
+                            start_line=1,
+                            end_line=30,
+                            symbol=gn.label,
+                            symbol_type=gn.node_type,
+                            docstring=None,
+                            content=f"ARCHITECTURE NODE ({gn.node_type}): {gn.label} (Key: {gn.node_key})",
+                            relevance=0.96,
+                            match_reason=f"Architecture Node '{gn.label}'",
+                        )
             except Exception as e:
                 logger.warning(f"Error extracting architecture evidence for RAG: {e}")
 
@@ -842,6 +952,7 @@ class RAGService:
                     "file_path": src["path"],
                     "start_line": src["start_line"],
                     "end_line": src["end_line"],
+                    "symbol_id": src.get("symbol_id"),
                     "symbol": src.get("symbol"),
                     "relevance": src["relevance"],
                     "repository_id": repository_id,
@@ -856,6 +967,7 @@ class RAGService:
                 "file_path": top_src["path"],
                 "start_line": top_src["start_line"],
                 "end_line": top_src["end_line"],
+                "symbol_id": top_src.get("symbol_id"),
                 "symbol": top_src.get("symbol"),
                 "relevance": top_src["relevance"],
                 "repository_id": repository_id,
@@ -892,23 +1004,37 @@ class RAGService:
         if not repository:
             raise ValueError(f"Repository '{repository_id}' not found.")
 
+        is_partial = False
         if repository.analysis_status != "completed":
-            return {
-                "repository_id": repository_id,
-                "conversation_id": conversation_id,
-                "question": question,
-                "answer": (
-                    "This repository has not been indexed yet.\n\n"
-                    "Index the repository before asking CodeAtlas questions about its code."
-                ),
-                "intent": "GENERAL",
-                "evidence": [],
-                "sources": [],
-                "related_symbols": [],
-                "related_files": [],
-                "related_dependencies": [],
-                "duration_ms": 0.0,
-            }
+            if repository.analysis_status == "running":
+                # Check if partial files exist
+                p_files_cnt = (await db.execute(select(func.count(File.id)).where(File.repository_id == repository_id))).scalar() or 0
+                if p_files_cnt > 0:
+                    is_partial = True
+            if not is_partial:
+                return {
+                    "repository_id": repository_id,
+                    "conversation_id": conversation_id,
+                    "question": question,
+                    "answer": (
+                        "Repository analysis is not ready yet.\n\n"
+                        "This repository has not been indexed yet. Please wait for indexing to complete or trigger repository indexing before asking code questions."
+                    ),
+                    "intent": "GENERAL",
+                    "evidence": [],
+                    "sources": [],
+                    "related_symbols": [],
+                    "related_files": [],
+                    "related_dependencies": [],
+                    "duration_ms": 0.0,
+                    "latency_breakdown": {
+                        "search_latency_ms": 0.0,
+                        "retrieval_latency_ms": 0.0,
+                        "context_construction_ms": 0.0,
+                        "llm_generation_ms": 0.0,
+                        "total_latency_ms": 0.0,
+                    },
+                }
 
         # 2. Check Cache
         index_version = repository.current_commit_sha or (
@@ -941,6 +1067,8 @@ class RAGService:
                     content = m.get("content", "")
                     context_parts.append(f"{role.upper()}: {content}")
                 conversation_context = "\n".join(context_parts)
+
+        t_search_start = datetime.now(timezone.utc)
 
         # 4. Stage 1 & 2: Query Classification & Keyword Extraction
         intent, keywords = self.classify_query(question)
@@ -1004,12 +1132,23 @@ class RAGService:
                 "related_files": top_file_paths[:5],
                 "related_dependencies": [],
                 "duration_ms": round(duration_ms, 2),
+                "latency_breakdown": {
+                    "search_latency_ms": round((datetime.now(timezone.utc) - t_search_start).total_seconds() * 1000, 2),
+                    "retrieval_latency_ms": 0.0,
+                    "context_construction_ms": 0.0,
+                    "llm_generation_ms": 0.0,
+                    "total_latency_ms": round(duration_ms, 2),
+                },
             }
             if not conversation_id:
                 self._cache[cache_key] = result
             return result
 
+        t_search_end = datetime.now(timezone.utc)
+        search_latency_ms = (t_search_end - t_search_start).total_seconds() * 1000
+
         # 6. Stage 3 to 6: Multi-Stage Evidence Retrieval
+        t_retrieval_start = datetime.now(timezone.utc)
         retrieved_sources = await self.retrieve_evidence(
             repository_id=repository_id,
             query=question,
@@ -1018,6 +1157,8 @@ class RAGService:
             db=db,
             conversation_context=conversation_context,
         )
+        t_retrieval_end = datetime.now(timezone.utc)
+        retrieval_latency_ms = (t_retrieval_end - t_retrieval_start).total_seconds() * 1000
 
         # 7. Architecture / Relationship summary
         relationships_summary = ""
@@ -1034,6 +1175,7 @@ class RAGService:
                 relationships_summary = "\n".join(rel_lines)
 
         # 8. Stage 8: Context Builder
+        t_context_start = datetime.now(timezone.utc)
         user_prompt, source_id_map = self.build_context_package(
             repository=repository,
             query=question,
@@ -1041,8 +1183,11 @@ class RAGService:
             sources=retrieved_sources,
             relationships_summary=relationships_summary,
         )
+        t_context_end = datetime.now(timezone.utc)
+        context_construction_ms = (t_context_end - t_context_start).total_seconds() * 1000
 
         # 9. LLM Generation
+        t_llm_start = datetime.now(timezone.utc)
         provider = llm_provider or get_llm_provider()
         try:
             llm_result = await provider.generate(
@@ -1067,7 +1212,16 @@ class RAGService:
                 "related_files": [],
                 "related_dependencies": [],
                 "duration_ms": round(duration_ms, 2),
+                "latency_breakdown": {
+                    "search_latency_ms": round(search_latency_ms, 2),
+                    "retrieval_latency_ms": round(retrieval_latency_ms, 2),
+                    "context_construction_ms": round(context_construction_ms, 2),
+                    "llm_generation_ms": 0.0,
+                    "total_latency_ms": round(duration_ms, 2),
+                },
             }
+        t_llm_end = datetime.now(timezone.utc)
+        llm_generation_ms = (t_llm_end - t_llm_start).total_seconds() * 1000
 
         # 10. Stage 9: Citation Validation Layer
         formatted_answer, final_sources = self.validate_and_format_citations(
@@ -1076,6 +1230,13 @@ class RAGService:
             source_id_map=source_id_map,
             repository_id=repository_id,
         )
+
+        # Indicate if answers are based on partial index
+        if is_partial:
+            formatted_answer = (
+                "*(Note: Repository intelligence is still being indexed; answers are based on currently available partial evidence.)*\n\n"
+                + formatted_answer
+            )
 
         # Extract related entities from verified sources
         related_files = sorted(list(set(s["path"] for s in final_sources if s.get("path"))))
@@ -1106,6 +1267,14 @@ class RAGService:
             conversation.messages = current_messages
             await db.commit()
 
+        latency_breakdown = {
+            "search_latency_ms": round(search_latency_ms, 2),
+            "retrieval_latency_ms": round(retrieval_latency_ms, 2),
+            "context_construction_ms": round(context_construction_ms, 2),
+            "llm_generation_ms": round(llm_generation_ms, 2),
+            "total_latency_ms": round(duration_ms, 2),
+        }
+
         response_payload = {
             "repository_id": repository_id,
             "conversation_id": conversation.id if conversation else None,
@@ -1118,6 +1287,7 @@ class RAGService:
             "related_files": related_files,
             "related_dependencies": related_deps[:5],
             "duration_ms": round(duration_ms, 2),
+            "latency_breakdown": latency_breakdown,
         }
 
         # Cache only if not part of a conversation thread

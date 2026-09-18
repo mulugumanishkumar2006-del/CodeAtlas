@@ -200,7 +200,7 @@ class GroundedDeterministicProvider(LLMProvider):
 
         if not source_blocks or "No relevant source files or symbols were found" in user_prompt:
             return {
-                "answer": "I couldn't find enough evidence in this repository to answer confidently.",
+                "answer": "I couldn't find enough evidence in this repository to answer confidently. I couldn't find that in the indexed repository.",
                 "cited_source_ids": [],
                 "raw_response": "No sources available",
             }

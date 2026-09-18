@@ -21,6 +21,7 @@ from backend.app.services.language_detection_service import language_service
 from backend.app.services.ast_parser_service import ast_parser_service
 from backend.app.services.dependency_resolution_service import dependency_resolver
 from backend.app.services.graph_builder_service import graph_builder
+from backend.app.services.universal_analyzer_service import universal_analyzer
 from backend.app.db.session import get_session_factory
 
 logger = logging.getLogger("codeatlas.ingestion")
@@ -57,6 +58,8 @@ class RepositoryIngestionService:
         symbols_extracted: int = 0,
         progress_percent: int = 0,
         error: Optional[str] = None,
+        partial_errors: Optional[List[Dict[str, Any]]] = None,
+        unsupported_languages: Optional[List[Dict[str, Any]]] = None,
     ):
         self._active_progress[repo_id] = {
             "repository_id": repo_id,
@@ -70,6 +73,8 @@ class RepositoryIngestionService:
             "files_indexed": files_processed,
             "symbols_extracted": symbols_extracted,
             "error": error,
+            "partial_errors": partial_errors or [],
+            "unsupported_languages": unsupported_languages or [],
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
 
@@ -96,7 +101,8 @@ class RepositoryIngestionService:
         logger.info(f"Starting repository ingestion pipeline for repository {repository_id}")
 
         # 1. DISCOVER / VERIFY REPOSITORY
-        self._set_progress(repository_id, "PENDING", "Validating repository", progress_percent=5)
+        partial_errors: List[Dict[str, Any]] = []
+        self._set_progress(repository_id, "QUEUED", "Validating repository", progress_percent=5)
         repo_res = await session.execute(select(Repository).where(Repository.id == repository_id))
         repo = repo_res.scalars().first()
         if not repo:
@@ -114,7 +120,7 @@ class RepositoryIngestionService:
             commit_sha=repo.current_commit_sha,
             status="running",
             started_at=datetime.now(timezone.utc),
-            metadata_json={"stage": "PENDING"},
+            metadata_json={"stage": "QUEUED"},
         )
         session.add(analysis)
         await session.commit()
@@ -146,17 +152,17 @@ class RepositoryIngestionService:
             if not source_dir.exists():
                 raise FileNotFoundError(f"Source directory for repository {repository_id} does not exist at {source_dir}")
 
-            # 4. SCAN AND DISCOVER FILES (DISCOVERING_FILES stage)
-            self._set_progress(repository_id, "DISCOVERING_FILES", "Discovering repository source files", progress_percent=30)
+            # 4. SCAN AND DISCOVER FILES (DISCOVERING stage)
+            self._set_progress(repository_id, "DISCOVERING", "Discovering repository source files", progress_percent=30)
             loop = asyncio.get_running_loop()
             discovered_files = await loop.run_in_executor(None, scanner_service.scan_directory, source_dir)
             total_discovered = len(discovered_files)
             logger.info(f"Discovered {total_discovered} source files for repository {repository_id}")
 
-            # 5. PARSING METADATA & INCREMENTAL SYNC (PARSING_METADATA & STORING_FILES stage)
+            # 5. PARSING METADATA & INCREMENTAL SYNC (PARSING stage)
             self._set_progress(
                 repository_id,
-                "PARSING_METADATA",
+                "PARSING",
                 "Parsing file metadata and calculating metrics",
                 files_discovered=total_discovered,
                 files_processed=0,
@@ -182,7 +188,7 @@ class RepositoryIngestionService:
             # Store / Update File records
             self._set_progress(
                 repository_id,
-                "STORING_FILES",
+                "PARSING",
                 "Storing source files in database",
                 files_discovered=total_discovered,
                 files_processed=0,
@@ -254,59 +260,77 @@ class RepositoryIngestionService:
                 db_file = active_file_map.get(rel_path)
 
                 if db_file:
-                    parsed_result = await loop.run_in_executor(
-                        None,
-                        ast_parser_service.parse_file_full,
-                        abs_path,
-                        lang,
-                    )
-
-                    extracted_symbols = parsed_result.get("symbols", [])
-                    extracted_imports = parsed_result.get("imports", [])
-                    extracted_exports = parsed_result.get("exports", [])
-                    parse_status = parsed_result.get("parse_status", "parsed")
-                    parse_error = parsed_result.get("error")
-
-                    # Update File metadata with AST parse details
-                    current_meta = dict(db_file.source_metadata or {})
-                    current_meta.update({
-                        "parse_status": parse_status,
-                        "parse_error": parse_error,
-                        "imports": extracted_imports,
-                        "exports": extracted_exports,
-                        "symbol_count": len(extracted_symbols),
-                    })
-                    db_file.source_metadata = current_meta
-
-                    for sym in extracted_symbols:
-                        symbol_record = Symbol(
-                            repository_id=repository_id,  # Strict repository ownership
-                            file_id=db_file.id,
-                            name=sym["name"],
-                            symbol_type=sym["symbol_type"],
-                            qualified_name=sym.get("qualified_name") or sym["name"],
-                            start_line=sym["start_line"],
-                            end_line=sym["end_line"],
-                            start_column=sym.get("start_column", 0),
-                            end_column=sym.get("end_column"),
-                            docstring=sym.get("docstring"),
-                            ast_metadata=sym.get("ast_metadata"),
+                    try:
+                        parsed_result = await loop.run_in_executor(
+                            None,
+                            ast_parser_service.parse_file_full,
+                            abs_path,
+                            lang,
                         )
-                        symbols_to_add.append(symbol_record)
-                        total_symbols_extracted += 1
-                        all_repo_symbols.append(sym)
+
+                        extracted_symbols = parsed_result.get("symbols", [])
+                        extracted_imports = parsed_result.get("imports", [])
+                        extracted_exports = parsed_result.get("exports", [])
+                        parse_status = parsed_result.get("parse_status", "parsed")
+                        parse_error = parsed_result.get("error")
+
+                        if parse_status == "error":
+                            partial_errors.append({
+                                "file": rel_path,
+                                "language": lang,
+                                "error": parse_error or "Parse error encountered",
+                                "stage": "PARSING",
+                            })
+
+                        # Update File metadata with AST parse details
+                        current_meta = dict(db_file.source_metadata or {})
+                        current_meta.update({
+                            "parse_status": parse_status,
+                            "parse_error": parse_error,
+                            "imports": extracted_imports,
+                            "exports": extracted_exports,
+                            "symbol_count": len(extracted_symbols),
+                        })
+                        db_file.source_metadata = current_meta
+
+                        for sym in extracted_symbols:
+                            symbol_record = Symbol(
+                                repository_id=repository_id,  # Strict repository ownership
+                                file_id=db_file.id,
+                                name=sym["name"],
+                                symbol_type=sym["symbol_type"],
+                                qualified_name=sym.get("qualified_name") or sym["name"],
+                                start_line=sym["start_line"],
+                                end_line=sym["end_line"],
+                                start_column=sym.get("start_column", 0),
+                                end_column=sym.get("end_column"),
+                                docstring=sym.get("docstring"),
+                                ast_metadata=sym.get("ast_metadata"),
+                            )
+                            symbols_to_add.append(symbol_record)
+                            total_symbols_extracted += 1
+                            all_repo_symbols.append(sym)
+                    except Exception as parse_exc:
+                        logger.warning(f"Error parsing file {rel_path} in repository {repository_id}: {parse_exc}")
+                        partial_errors.append({
+                            "file": rel_path,
+                            "language": lang,
+                            "error": str(parse_exc),
+                            "stage": "PARSING",
+                        })
 
                 # Update progress periodically
                 if (idx + 1) % 5 == 0 or idx == len(files_needing_symbol_reparse) - 1:
-                    percent = 60 + int(((idx + 1) / max(len(files_needing_symbol_reparse), 1)) * 30)
+                    percent = 60 + int(((idx + 1) / max(len(files_needing_symbol_reparse), 1)) * 25)
                     self._set_progress(
                         repository_id,
-                        "STORING_FILES",
+                        "PARSING",
                         "Extracting code symbols and AST structures",
                         files_discovered=total_discovered,
                         files_processed=idx + 1,
                         symbols_extracted=total_symbols_extracted,
-                        progress_percent=min(percent, 90),
+                        progress_percent=min(percent, 85),
+                        partial_errors=partial_errors,
                     )
 
             # Batch persist all extracted symbols
@@ -323,15 +347,16 @@ class RepositoryIngestionService:
                 total_symbols_extracted = len(loaded_syms)
                 all_repo_symbols = [{"name": s.name, "symbol_type": s.symbol_type} for s in loaded_syms]
 
-            # 7. DEPENDENCY RESOLUTION & GRAPH BUILDING
+            # 7. DEPENDENCY RESOLUTION & GRAPH BUILDING (BUILDING_GRAPH stage)
             self._set_progress(
                 repository_id,
-                "ANALYZING_DEPENDENCIES",
+                "BUILDING_GRAPH",
                 "Resolving repository imports and building architecture graph",
                 files_discovered=total_discovered,
                 files_processed=total_discovered,
                 symbols_extracted=total_symbols_extracted,
-                progress_percent=92,
+                progress_percent=88,
+                partial_errors=partial_errors,
             )
 
             # Ensure all discovered_files have database IDs and latest source_metadata
@@ -477,10 +502,41 @@ class RepositoryIngestionService:
                     session.add(finding)
                 await session.commit()
 
-            # 8. COMPUTE METRICS & LANGUAGE DISTRIBUTION
+            # 8. COMPUTE METRICS, UNIVERSAL PROFILE & LANGUAGE DISTRIBUTION (ANALYZING stage)
+            self._set_progress(
+                repository_id,
+                "ANALYZING",
+                "Synthesizing universal repository profile and architecture",
+                files_discovered=total_discovered,
+                files_processed=total_discovered,
+                symbols_extracted=total_symbols_extracted,
+                progress_percent=95,
+                partial_errors=partial_errors,
+            )
+
             symbol_metrics = ast_parser_service.calculate_symbol_metrics(all_repo_symbols)
             lang_dist = language_service.calculate_language_distribution(discovered_files)
             duration_sec = round(time.time() - start_time, 2)
+
+            universal_profile = universal_analyzer.build_universal_profile(
+                repository_id=repository_id,
+                files=discovered_files,
+                dependencies=resolved_deps + unresolved_deps,
+                symbols=all_repo_symbols,
+                source_dir=source_dir,
+                commit_sha=repo.current_commit_sha,
+            )
+            analysis_snapshot = universal_analyzer.create_analysis_snapshot(
+                repository_id=repository_id,
+                commit_sha=repo.current_commit_sha,
+                profile=universal_profile,
+                stats={
+                    "total_files": total_discovered,
+                    "total_symbols": total_symbols_extracted,
+                    "total_lines": lang_dist.get("total_lines", 0),
+                    "duration_seconds": duration_sec,
+                },
+            )
 
             # Largest files for overview dashboard
             largest_files = sorted(
@@ -511,19 +567,25 @@ class RepositoryIngestionService:
                     }
                     for f in largest_files
                 ],
+                "profile": universal_profile,
+                "snapshot": analysis_snapshot,
+                "partial_errors": partial_errors,
+                "unsupported_languages": universal_profile.get("languages", {}).get("unsupported_languages", []),
                 "duration_seconds": duration_sec,
             }
 
             # 9. COMPLETE ANALYSIS AND UPDATE REPOSITORY
-            analysis.status = "completed"
+            final_status = "partial" if partial_errors else "completed"
+            analysis.status = final_status
             analysis.summary = (
                 f"Indexed {total_discovered} files, {total_symbols_extracted} symbols, "
                 f"{len(resolved_deps)} internal dependencies in {duration_sec}s."
+                + (f" ({len(partial_errors)} file(s) had parse errors)" if partial_errors else "")
             )
             analysis.completed_at = datetime.now(timezone.utc)
             analysis.metadata_json = analysis_summary
 
-            repo.analysis_status = "completed"
+            repo.analysis_status = final_status
             repo.metadata_json = {
                 **(repo.metadata_json or {}),
                 "analysis_summary": analysis_summary,
@@ -539,34 +601,43 @@ class RepositoryIngestionService:
                 "symbol_count": total_symbols_extracted,
                 "primary_language": lang_dist.get("primary_language", "Unknown"),
                 "largest_files": analysis_summary["largest_files"],
+                "profile": universal_profile,
+                "snapshot": analysis_snapshot,
+                "partial_errors": partial_errors,
             }
 
             await session.commit()
             await session.refresh(analysis)
             await session.refresh(repo)
 
+            prog_status = "PARTIAL" if partial_errors else "COMPLETED"
+            prog_stage = f"Repository partially analyzed ({len(partial_errors)} error(s))" if partial_errors else "Repository ready"
             self._set_progress(
                 repository_id,
-                "COMPLETED",
-                "Repository ready",
+                prog_status,
+                prog_stage,
                 files_discovered=total_discovered,
                 files_processed=total_discovered,
                 symbols_extracted=total_symbols_extracted,
                 progress_percent=100,
+                partial_errors=partial_errors,
+                unsupported_languages=universal_profile.get("languages", {}).get("unsupported_languages", []),
             )
 
             logger.info(
-                f"Repository ingestion completed for {repository_id}: "
+                f"Repository ingestion completed ({final_status}) for {repository_id}: "
                 f"{total_discovered} files, {total_symbols_extracted} symbols in {duration_sec}s"
             )
 
             return {
                 "repository_id": repository_id,
                 "analysis_id": analysis.id,
-                "status": "completed",
+                "status": final_status,
                 "files_discovered": total_discovered,
                 "symbols_extracted": total_symbols_extracted,
                 "language_distribution": lang_dist,
+                "partial_errors": partial_errors,
+                "profile": universal_profile,
                 "duration_seconds": duration_sec,
             }
 
@@ -598,5 +669,8 @@ class RepositoryIngestionService:
                 "duration_seconds": duration_sec,
             }
 
+    run_analysis = ingest_repository
+
 
 ingestion_service = RepositoryIngestionService()
+repository_ingestion_service = ingestion_service

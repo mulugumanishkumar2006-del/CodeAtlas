@@ -8,6 +8,7 @@ from backend.app.models.file import File
 from backend.app.models.symbol import Symbol
 from backend.app.models.dependency import Dependency
 from backend.app.models.repository import Repository
+from backend.app.models.graph import GraphNode, GraphRelationship
 from backend.app.services.source_code_service import source_code_service
 
 logger = logging.getLogger("codeatlas.search")
@@ -155,9 +156,9 @@ class SearchIntelligenceService:
         # Map files in repo
         file_query = select(File).where(File.repository_id == repository_id)
         if path_filter:
-            file_query = file_query.where(File.path.ilike(f"%{self.sanitize_sql_pattern(path_filter)}%"))
+            file_query = file_query.where(File.path.ilike(f"%{self.sanitize_sql_pattern(path_filter)}%", escape="\\"))
         if language_filter:
-            file_query = file_query.where(File.language.ilike(f"%{self.sanitize_sql_pattern(language_filter)}%"))
+            file_query = file_query.where(File.language.ilike(f"%{self.sanitize_sql_pattern(language_filter)}%", escape="\\"))
 
         files_res = await db.execute(file_query)
         repo_files = files_res.scalars().all()
@@ -167,40 +168,41 @@ class SearchIntelligenceService:
         # -------------------------------------------------------------
         # 1. SYMBOL SEARCH (Ranked with Deterministic Signals)
         # -------------------------------------------------------------
-        if search_type in ["all", "symbol", "query"] and intent in ["KEYWORD_SEARCH", "SYMBOL_SEARCH", "CALLER_SEARCH", "CALLEE_SEARCH", "ARCHITECTURE_SEARCH"]:
+        if search_type in ["all", "symbol", "query"]:
             sym_q = (
                 select(Symbol, File)
                 .join(File, Symbol.file_id == File.id)
                 .where(
                     Symbol.repository_id == repository_id,
+                    File.repository_id == repository_id,
                     or_(
-                        Symbol.name.ilike(f"%{escaped_target}%"),
-                        Symbol.qualified_name.ilike(f"%{escaped_target}%"),
+                        Symbol.name.ilike(f"%{escaped_target}%", escape="\\"),
+                        Symbol.qualified_name.ilike(f"%{escaped_target}%", escape="\\"),
                     ),
                 )
             )
             if path_filter:
-                sym_q = sym_q.where(File.path.ilike(f"%{self.sanitize_sql_pattern(path_filter)}%"))
+                sym_q = sym_q.where(File.path.ilike(f"%{self.sanitize_sql_pattern(path_filter)}%", escape="\\"))
             if language_filter:
-                sym_q = sym_q.where(File.language.ilike(f"%{self.sanitize_sql_pattern(language_filter)}%"))
+                sym_q = sym_q.where(File.language.ilike(f"%{self.sanitize_sql_pattern(language_filter)}%", escape="\\"))
 
             sym_rows = (await db.execute(sym_q)).all()
 
             for sym, f in sym_rows:
                 # Deterministic ranking score:
                 # 100: Exact symbol name match
-                # 80: Starts-with symbol name match
-                # 60: Substring symbol name match
-                # 45: Qualified name substring match
+                # 85: Starts-with symbol name match
+                # 75: Substring symbol name match
+                # 70: Qualified name substring match
                 score = 30
                 if sym.name.lower() == clean_target.lower():
                     score = 100
                 elif sym.name.lower().startswith(clean_target.lower()):
-                    score = 80
+                    score = 85
                 elif clean_target.lower() in sym.name.lower():
-                    score = 60
+                    score = 75
                 elif sym.qualified_name and clean_target.lower() in sym.qualified_name.lower():
-                    score = 45
+                    score = 70
 
                 symbols_list.append({
                     "id": sym.id,
@@ -214,6 +216,8 @@ class SearchIntelligenceService:
                     "language": f.language,
                     "docstring": sym.docstring,
                     "score": score,
+                    "relevance": round(score / 100.0, 2),
+                    "repository_id": repository_id,
                     "match_reason": f"Matches symbol name '{sym.name}' ({sym.symbol_type})",
                 })
 
@@ -222,32 +226,39 @@ class SearchIntelligenceService:
         # -------------------------------------------------------------
         # 2. FILE SEARCH (Ranked with Deterministic Signals)
         # -------------------------------------------------------------
-        if search_type in ["all", "file", "query"] and intent in ["KEYWORD_SEARCH", "FILE_SEARCH", "SYMBOL_SEARCH", "ARCHITECTURE_SEARCH"]:
+        if search_type in ["all", "file", "query"]:
             for f in repo_files:
-                f_basename = f.path.split("/")[-1]
+                f_basename = f.path.split("/")[-1].lower()
+                f_path = f.path.lower()
+                clean_path = clean_target.lower()
                 score = 0
                 # Deterministic ranking:
                 # 95: Exact filename match
-                # 75: Starts-with filename match
-                # 55: Substring filename match
-                # 35: Path substring match
-                if f_basename.lower() == clean_target.lower():
+                # 90: Exact path match
+                # 65: Starts-with filename match
+                # 60: Substring filename match
+                # 55: Path substring match
+                if f_basename == clean_path:
                     score = 95
-                elif f_basename.lower().startswith(clean_target.lower()):
-                    score = 75
-                elif clean_target.lower() in f_basename.lower():
+                elif f_path == clean_path or f_path.endswith("/" + clean_path):
+                    score = 90
+                elif f_basename.startswith(clean_path):
+                    score = 65
+                elif clean_path in f_basename:
+                    score = 60
+                elif clean_path in f_path:
                     score = 55
-                elif clean_target.lower() in f.path.lower():
-                    score = 35
 
                 if score > 0:
                     files_list.append({
                         "id": f.id,
                         "path": f.path,
                         "language": f.language,
-                        "line_count": f.line_count,
-                        "size_bytes": f.size_bytes,
+                        "line_count": f.line_count or 0,
+                        "size_bytes": f.size_bytes or 0,
                         "score": score,
+                        "relevance": round(score / 100.0, 2),
+                        "repository_id": repository_id,
                         "match_reason": f"File path matches '{clean_target}'",
                     })
 
@@ -279,6 +290,7 @@ class SearchIntelligenceService:
                     "file_count": stats["file_count"],
                     "line_count": stats["line_count"],
                     "symbol_count": stats["symbol_count"],
+                    "repository_id": repository_id,
                     "match_reason": f"Directory matching '{clean_target}'",
                 })
             dirs_list.sort(key=lambda d: (-d["file_count"], d["directory"]))
@@ -286,7 +298,7 @@ class SearchIntelligenceService:
         # -------------------------------------------------------------
         # 4. DEPENDENCY SEARCH (Ranked)
         # -------------------------------------------------------------
-        if search_type in ["all", "dependency", "query"] or intent in ["DEPENDENCY_INCOMING", "DEPENDENCY_OUTGOING", "CALLER_SEARCH", "CALLEE_SEARCH"]:
+        if search_type in ["all", "dependency", "query"]:
             all_repo_deps_q = select(Dependency).where(Dependency.repository_id == repository_id)
             all_repo_deps = (await db.execute(all_repo_deps_q)).scalars().all()
 
@@ -306,11 +318,11 @@ class SearchIntelligenceService:
                 )
 
                 if is_match:
-                    score = 60
+                    score = 40
                     if dep.name.lower() == clean_target.lower():
-                        score = 85
+                        score = 50
                     elif dep.name.lower().startswith(clean_target.lower()):
-                        score = 75
+                        score = 45
 
                     rel_type = "outgoing" if (src_path and clean_target.lower() in src_path.lower()) else "incoming"
                     deps_list.append({
@@ -325,15 +337,43 @@ class SearchIntelligenceService:
                         "resolved": meta.get("resolved", dep.target_file_id is not None),
                         "relationship_type": rel_type,
                         "score": score,
+                        "relevance": round(score / 100.0, 2),
+                        "repository_id": repository_id,
                         "match_reason": f"'{src_path or 'Module'}' imports '{dep.name}'",
                     })
 
             deps_list.sort(key=lambda d: (-d.get("score", 0), d["name"]))
 
         # -------------------------------------------------------------
-        # 5. ARCHITECTURE SEARCH (Modules, Layers, Patterns, Entry Points)
+        # 5. ARCHITECTURE SEARCH (GraphNode DB records + Modules, Layers, Patterns)
         # -------------------------------------------------------------
-        if search_type in ["all", "architecture", "query"] or intent == "ARCHITECTURE_SEARCH":
+        if search_type in ["all", "architecture", "query"]:
+            # 5a. Query real database GraphNode and GraphRelationship records
+            try:
+                gn_q = select(GraphNode).where(GraphNode.repository_id == repository_id)
+                gn_res = await db.execute(gn_q)
+                for gn in gn_res.scalars().all():
+                    gn_label = gn.label.lower()
+                    gn_key = gn.node_key.lower()
+                    gn_type = gn.node_type.lower()
+                    ct = clean_target.lower()
+                    if ct in gn_label or ct in gn_key or ct in gn_type:
+                        score = 50 if gn_label == ct else 40
+                        arch_list.append({
+                            "id": gn.id,
+                            "name": gn.label,
+                            "node_type": gn.node_type,
+                            "description": f"Graph node ({gn.node_type}): {gn.node_key}",
+                            "file_count": 1 if gn.file_id else 0,
+                            "score": score,
+                            "relevance": round(score / 100.0, 2),
+                            "repository_id": repository_id,
+                            "match_reason": f"Architecture graph node matching '{clean_target}'",
+                        })
+            except Exception as e:
+                logger.warning(f"Error querying GraphNodes for search in repo '{repository_id}': {e}")
+
+            # 5b. Architecture Model modules, layers, entry points, and patterns
             try:
                 from backend.app.services.architecture_service import architecture_service
                 files_data = [
@@ -360,7 +400,7 @@ class SearchIntelligenceService:
                 # Search Modules
                 for m in arch_model.get("modules", []):
                     if clean_target.lower() in m.get("name", "").lower() or clean_target.lower() in m.get("layer", "").lower():
-                        score = 90 if m.get("name", "").lower() == clean_target.lower() else 70
+                        score = 48 if m.get("name", "").lower() == clean_target.lower() else 38
                         arch_list.append({
                             "id": m.get("id"),
                             "name": m.get("name"),
@@ -368,13 +408,15 @@ class SearchIntelligenceService:
                             "description": m.get("description"),
                             "file_count": m.get("file_count", 0),
                             "score": score,
+                            "relevance": round(score / 100.0, 2),
+                            "repository_id": repository_id,
                             "match_reason": f"Architecture module in '{m.get('layer')}' layer",
                         })
 
                 # Search Layers
                 for lyr in arch_model.get("layers", []):
                     if clean_target.lower() in lyr.get("name", "").lower() or clean_target.lower() in lyr.get("category", "").lower():
-                        score = 85 if lyr.get("name", "").lower() == clean_target.lower() else 65
+                        score = 46 if lyr.get("name", "").lower() == clean_target.lower() else 36
                         arch_list.append({
                             "id": f"layer_{lyr.get('name')}",
                             "name": lyr.get("name"),
@@ -382,6 +424,8 @@ class SearchIntelligenceService:
                             "description": lyr.get("description"),
                             "file_count": lyr.get("file_count", 0),
                             "score": score,
+                            "relevance": round(score / 100.0, 2),
+                            "repository_id": repository_id,
                             "match_reason": f"Architecture layer ({lyr.get('category')})",
                         })
 
@@ -394,7 +438,9 @@ class SearchIntelligenceService:
                             "node_type": "entry_point",
                             "description": f"Entry point: {ep.get('reason')} ({ep.get('framework') or 'Application'})",
                             "file_count": 1,
-                            "score": 80,
+                            "score": 45,
+                            "relevance": 0.45,
+                            "repository_id": repository_id,
                             "match_reason": f"Application entry point at {ep.get('file_path')}:{ep.get('line', 1)}",
                         })
 
@@ -407,7 +453,9 @@ class SearchIntelligenceService:
                             "node_type": "pattern",
                             "description": pat.get("description"),
                             "file_count": len(pat.get("evidence", [])),
-                            "score": 75,
+                            "score": 42,
+                            "relevance": 0.42,
+                            "repository_id": repository_id,
                             "match_reason": f"Detected architectural pattern ({pat.get('confidence')} confidence)",
                         })
 
@@ -499,6 +547,8 @@ class SearchIntelligenceService:
             "offset": offset,
             "has_more": has_more,
         }
+
+    search = search_repository
 
 
 search_intelligence_service = SearchIntelligenceService()

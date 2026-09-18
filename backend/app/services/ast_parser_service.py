@@ -5,6 +5,10 @@ from typing import List, Dict, Any, Optional
 from backend.app.services.parsers.python_parser import PythonParser
 from backend.app.services.parsers.javascript_parser import JavaScriptParser
 from backend.app.services.parsers.typescript_parser import TypeScriptParser
+from backend.app.services.parsers.java_parser import JavaParser
+from backend.app.services.parsers.go_parser import GoParser
+from backend.app.services.parsers.rust_parser import RustParser
+from backend.app.services.parsers.cpp_parser import CppParser
 
 logger = logging.getLogger("codeatlas.ast_parser")
 
@@ -13,15 +17,19 @@ class ASTParserService:
     """
     Unified AST parsing orchestration service for CodeAtlas.
     Extracts real code symbols (classes, methods, functions, async functions, interfaces,
-    components, type aliases, enums), imports, and exports without ever executing untrusted source code.
+    components, type aliases, enums, structs, modules), imports, and exports without ever executing untrusted source code.
     """
 
-    SUPPORTED_LANGUAGES = {"Python", "JavaScript", "TypeScript", "TSX"}
+    SUPPORTED_LANGUAGES = {"Python", "JavaScript", "TypeScript", "TSX", "Java", "Go", "Rust", "C", "C++"}
 
     def __init__(self):
         self._python_parser = PythonParser()
         self._js_parser = JavaScriptParser()
         self._ts_parser = TypeScriptParser()
+        self._java_parser = JavaParser()
+        self._go_parser = GoParser()
+        self._rust_parser = RustParser()
+        self._cpp_parser = CppParser()
 
     def is_language_supported(self, language: str) -> bool:
         return language in self.SUPPORTED_LANGUAGES
@@ -92,6 +100,14 @@ class ASTParserService:
             return self._js_parser.parse(source_code, file_path)
         elif language in ("TypeScript", "TSX"):
             return self._ts_parser.parse(source_code, file_path)
+        elif language == "Java":
+            return self._java_parser.parse(source_code, file_path)
+        elif language == "Go":
+            return self._go_parser.parse(source_code, file_path)
+        elif language == "Rust":
+            return self._rust_parser.parse(source_code, file_path)
+        elif language in ("C", "C++"):
+            return self._cpp_parser.parse(source_code, file_path)
         else:
             return {
                 "symbols": [],
@@ -100,6 +116,8 @@ class ASTParserService:
                 "parse_status": "unsupported",
                 "error": None,
             }
+
+    parse_content = parse_source_code
 
     def calculate_symbol_metrics(self, symbols: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
@@ -116,6 +134,8 @@ class ASTParserService:
             "components": 0,
             "type_aliases": 0,
             "enums": 0,
+            "structs": 0,
+            "modules": 0,
             "other": 0,
         }
 
@@ -139,6 +159,10 @@ class ASTParserService:
                 type_counts["type_aliases"] += 1
             elif stype == "enum":
                 type_counts["enums"] += 1
+            elif stype == "struct":
+                type_counts["structs"] += 1
+            elif stype == "module":
+                type_counts["modules"] += 1
             else:
                 type_counts["other"] += 1
 

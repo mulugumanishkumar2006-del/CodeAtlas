@@ -58,6 +58,8 @@ from backend.app.schemas.repository import (
     DependencyDetailResponse,
     DependencyImpactResponse,
     DependencyIntelligenceItem,
+    RepositoryProfileResponse,
+    AnalysisSnapshotResponse,
 )
 from backend.app.services.architecture_service import architecture_service
 from backend.app.services.code_quality_service import code_quality_service
@@ -68,6 +70,7 @@ from backend.app.services.source_code_service import source_code_service
 from backend.app.services.search_intelligence_service import search_intelligence_service
 from backend.app.services.rag_service import rag_service
 from backend.app.services.impact_analysis_service import impact_service
+from backend.app.services.universal_analyzer_service import universal_analyzer
 from backend.app.services.git_repository_service import (
     git_service,
     GitValidationError,
@@ -438,7 +441,7 @@ async def get_repository_analysis(
 
     # 1. Check live in-memory progress first
     live_progress = ingestion_service.get_progress(repository_id)
-    if live_progress and live_progress.get("status") == "running":
+    if live_progress and live_progress.get("status") in ["running", "QUEUED", "CLONING", "DISCOVERING", "PARSING", "BUILDING_GRAPH", "ANALYZING"]:
         return AnalysisProgressResponse(**live_progress)
 
     # 2. Check latest Analysis record in database
@@ -458,8 +461,10 @@ async def get_repository_analysis(
             files_discovered=meta.get("total_files", 0),
             files_processed=meta.get("total_files", 0),
             symbols_extracted=meta.get("total_symbols", 0),
-            progress_percent=100 if latest_analysis.status == "completed" else 0,
+            progress_percent=100 if latest_analysis.status in ["completed", "partial"] else 0,
             error=latest_analysis.error_message,
+            partial_errors=meta.get("partial_errors", []),
+            unsupported_languages=meta.get("unsupported_languages", []),
             updated_at=latest_analysis.updated_at.isoformat() if latest_analysis.updated_at else None,
         )
 
@@ -472,6 +477,120 @@ async def get_repository_analysis(
         symbols_extracted=0,
         progress_percent=0,
     )
+
+
+@router.get("/{repository_id}/profile", response_model=RepositoryProfileResponse)
+async def get_repository_profile(
+    repository_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> RepositoryProfileResponse:
+    """
+    Get the universal repository profile: languages, frameworks, package managers,
+    monorepo info, entry points, API routes, databases, configs, tests, documentation,
+    infrastructure, modules, services, and normalized architecture.
+    """
+    repo_res = await db.execute(select(Repository).where(Repository.id == repository_id))
+    repo = repo_res.scalars().first()
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Repository with id '{repository_id}' not found.",
+        )
+
+    # 1. Check if profile already exists in repo metadata
+    meta = repo.metadata_json or {}
+    if "profile" in meta and meta["profile"]:
+        return RepositoryProfileResponse(**meta["profile"])
+
+    # 2. Check latest Analysis in database
+    analysis_res = await db.execute(
+        select(Analysis)
+        .where(Analysis.repository_id == repository_id)
+        .order_by(Analysis.created_at.desc())
+    )
+    latest_analysis = analysis_res.scalars().first()
+    if latest_analysis and latest_analysis.metadata_json and "profile" in latest_analysis.metadata_json:
+        return RepositoryProfileResponse(**latest_analysis.metadata_json["profile"])
+
+    # 3. If not pre-built, build on-the-fly dynamically from indexed database records
+    files_res = await db.execute(select(File).where(File.repository_id == repository_id))
+    files = files_res.scalars().all()
+    files_data = [
+        {"id": f.id, "path": f.path, "language": f.language, "line_count": f.line_count or 0, "size_bytes": f.size_bytes or 0, "source_metadata": f.source_metadata or {}}
+        for f in files
+    ]
+
+    syms_res = await db.execute(select(Symbol).where(Symbol.repository_id == repository_id).limit(500))
+    syms_data = [
+        {"id": s.id, "file_id": s.file_id, "name": s.name, "symbol_type": s.symbol_type, "start_line": s.start_line, "end_line": s.end_line, "ast_metadata": s.ast_metadata or {}}
+        for s in syms_res.scalars().all()
+    ]
+
+    deps_res = await db.execute(select(Dependency).where(Dependency.repository_id == repository_id).limit(500))
+    deps_data = [
+        {"id": d.id, "name": d.name, "source_path": (d.metadata_json or {}).get("source_path") if d.metadata_json else None, "target_path": (d.metadata_json or {}).get("target_path") if d.metadata_json else d.name, "resolved": (d.metadata_json or {}).get("resolved", d.target_file_id is not None)}
+        for d in deps_res.scalars().all()
+    ]
+
+    source_dir = git_service.get_storage_path(repository_id) if git_service.verify_repository_source(repository_id)[0] else None
+
+    profile_dict = universal_analyzer.build_universal_profile(
+        repository_id=repository_id,
+        files=files_data,
+        dependencies=deps_data,
+        symbols=syms_data,
+        source_dir=source_dir,
+        commit_sha=repo.current_commit_sha,
+    )
+    return RepositoryProfileResponse(**profile_dict)
+
+
+@router.get("/{repository_id}/snapshot", response_model=AnalysisSnapshotResponse)
+async def get_repository_snapshot(
+    repository_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> AnalysisSnapshotResponse:
+    """
+    Get point-in-time analysis snapshot for a repository.
+    """
+    repo_res = await db.execute(select(Repository).where(Repository.id == repository_id))
+    repo = repo_res.scalars().first()
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Repository with id '{repository_id}' not found.",
+        )
+
+    # 1. Check if snapshot is cached in repo metadata
+    meta = repo.metadata_json or {}
+    if "snapshot" in meta and meta["snapshot"]:
+        return AnalysisSnapshotResponse(**meta["snapshot"])
+
+    # 2. Check latest Analysis in database
+    analysis_res = await db.execute(
+        select(Analysis)
+        .where(Analysis.repository_id == repository_id)
+        .order_by(Analysis.created_at.desc())
+    )
+    latest_analysis = analysis_res.scalars().first()
+    if latest_analysis and latest_analysis.metadata_json and "snapshot" in latest_analysis.metadata_json:
+        return AnalysisSnapshotResponse(**latest_analysis.metadata_json["snapshot"])
+
+    # 3. Otherwise build from profile
+    profile_resp = await get_repository_profile(repository_id, db)
+    files_res = await db.execute(select(File).where(File.repository_id == repository_id))
+    total_files = len(files_res.scalars().all())
+
+    snapshot_dict = universal_analyzer.create_analysis_snapshot(
+        repository_id=repository_id,
+        commit_sha=repo.current_commit_sha,
+        profile=profile_resp.model_dump(),
+        stats={
+            "total_files": total_files,
+            "commit_sha": repo.current_commit_sha,
+        },
+    )
+    return AnalysisSnapshotResponse(**snapshot_dict)
 
 
 @router.get("/{repository_id}/index/status", response_model=IndexStatusResponse)
@@ -743,6 +862,8 @@ async def search_repository(
             code_matches=[],
             dependencies=[],
             directories=[],
+            architecture=[],
+            architecture_matches=[],
             limit=limit,
             offset=offset,
             has_more=False,
