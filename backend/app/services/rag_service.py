@@ -21,6 +21,8 @@ from backend.app.services.security_reliability_service import security_reliabili
 from backend.app.services.git_history_service import git_history_service
 from backend.app.services.dependency_intelligence_service import dependency_intelligence_service
 from backend.app.services.architecture_intelligence_service import architecture_intelligence_service
+from backend.app.services.technical_debt_service import technical_debt_service
+from backend.app.services.risk_intelligence_service import risk_intelligence_service
 from backend.app.services.llm_provider import get_llm_provider, SYSTEM_PROMPT, LLMProvider
 
 logger = logging.getLogger("codeatlas.rag")
@@ -713,6 +715,44 @@ class RAGService:
                     )
             except Exception as e:
                 logger.warning(f"Error extracting quality evidence for RAG: {e}")
+
+        # --- G2. PHASE 21 TECHNICAL DEBT & RISK INTELLIGENCE ---
+        if intent in ["QUALITY", "SECURITY"] or any(kw.lower() in ["debt", "technical debt", "risk", "risks", "hotspot", "hotspots", "coupling", "test gap", "untested"] for kw in keywords):
+            try:
+                debt_data = await technical_debt_service.analyze_technical_debt(db=db, repository_id=repository_id)
+                risk_data = await risk_intelligence_service.analyze_repository_risk(db=db, repository_id=repository_id)
+
+                debt_insights = [
+                    f"Repository Technical Debt Score: {debt_data.get('debt_score')}/100",
+                    f"Overall Repository Risk Level: {risk_data.get('risk_level')} (Composite Score: {risk_data.get('overall_risk_score')}/100)",
+                    f"Total Technical Debt Findings: {debt_data.get('total_findings')}",
+                    f"Engineering Hotspots Identified: {risk_data.get('hotspots_count')}",
+                ]
+                for h in risk_data.get("hotspots", [])[:4]:
+                    debt_insights.append(
+                        f"  * Hotspot #{h['severity_rank']}: {h['file_path']} (Score: {h['composite_score']}/100) - {h['explanation']}"
+                    )
+                for f in debt_data.get("findings", [])[:4]:
+                    debt_insights.append(
+                        f"  * Finding [{f.get('category')} - {f.get('severity')}]: {f.get('title')} in {f.get('file_path')} - {f.get('remediation')}"
+                    )
+
+                top_file = all_repo_files[0] if all_repo_files else None
+                if top_file:
+                    add_candidate(
+                        file_id=top_file.id,
+                        path="reports/technical_debt_and_risk_intelligence",
+                        start_line=1,
+                        end_line=30,
+                        symbol=None,
+                        symbol_type="technical_debt_risk_summary",
+                        docstring=None,
+                        content="PHASE 21 TECHNICAL DEBT & RISK INTELLIGENCE:\n" + "\n".join(debt_insights),
+                        relevance=0.99,
+                        match_reason="Technical Debt, Engineering Hotspots, and Repository Risk Analysis",
+                    )
+            except Exception as e:
+                logger.warning(f"Error extracting Phase 21 technical debt evidence for RAG: {e}")
 
         # --- H. SECURITY & RELIABILITY INTELLIGENCE (Phase 13) ---
         if any(kw.lower() in ["security", "secret", "token", "password", "key", "vulnerability", "injection", "timeout", "reliability", "spof", "auth", "crypto", "cve", "tls", "cors"] for kw in keywords):

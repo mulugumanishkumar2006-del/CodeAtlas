@@ -280,14 +280,14 @@ class ArchitectureIntelligenceService:
                 ext_id = f"ext:{repository_id}:{dep_name.lower()}"
                 if ext_id not in nodes:
                     add_node(ext_id, "external_dependency", dep_name, dep_name, props={"dependency_type": "external"})
-                src_file = ed.get("source_path", "").replace("\\", "/")
+                src_file = (ed.get("source_path") or "").replace("\\", "/")
                 if src_file in file_node_ids:
                     add_edge(file_node_ids[src_file], ext_id, "USES", evidence={"line": ed.get("start_line") or 1})
 
         # 9. Infrastructure Nodes
         infra_items = prof.get("infrastructure", [])
         for inf in infra_items:
-            i_path = inf.get("file_path", "").replace("\\", "/")
+            i_path = (inf.get("file_path") or "").replace("\\", "/")
             i_type = inf.get("type", "Infrastructure")
             inf_id = f"infra:{repository_id}:{i_path.replace('/', '_')}"
             add_node(inf_id, "infrastructure", Path(i_path).name, f"{i_type} ({Path(i_path).name})", source_ref=i_path, props={

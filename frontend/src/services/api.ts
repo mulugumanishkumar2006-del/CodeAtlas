@@ -40,6 +40,13 @@ import {
   CommitDetailPhase20Response,
   CommitCompareRequest,
   CommitCompareResponse,
+  TechnicalDebtSummary,
+  TechnicalDebtFindingItem,
+  HotspotsListResponse,
+  RepositoryRiskSummaryResponse,
+  EntityRiskResponse,
+  DebtRiskTrendsResponse,
+  FindingDetailResponse,
 } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
@@ -546,6 +553,48 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify(request),
     });
+  }
+
+  // =========================================================================
+  // Phase 21: Technical Debt & Risk Intelligence API Methods
+  // =========================================================================
+
+  async getTechnicalDebt(repositoryId: string): Promise<TechnicalDebtSummary> {
+    return this.request<TechnicalDebtSummary>(`/repositories/${repositoryId}/debt`);
+  }
+
+  async getRepositoryRisk(repositoryId: string): Promise<RepositoryRiskSummaryResponse> {
+    return this.request<RepositoryRiskSummaryResponse>(`/repositories/${repositoryId}/risk`);
+  }
+
+  async getDebtFindings(
+    repositoryId: string,
+    params?: { category?: string; severity?: string; status?: string; limit?: number; offset?: number }
+  ): Promise<{ repository_id: string; total_findings: number; findings: TechnicalDebtFindingItem[] }> {
+    const searchParams = new URLSearchParams();
+    if (params?.category) searchParams.append('category', params.category);
+    if (params?.severity) searchParams.append('severity', params.severity);
+    if (params?.status) searchParams.append('status', params.status);
+    if (params?.limit !== undefined) searchParams.append('limit', String(params.limit));
+    if (params?.offset !== undefined) searchParams.append('offset', String(params.offset));
+    const qs = searchParams.toString() ? `?${searchParams.toString()}` : '';
+    return this.request(`/repositories/${repositoryId}/findings${qs}`);
+  }
+
+  async getFindingDetail(repositoryId: string, findingId: string): Promise<FindingDetailResponse> {
+    return this.request<FindingDetailResponse>(`/repositories/${repositoryId}/findings/${encodeURIComponent(findingId)}`);
+  }
+
+  async getEngineeringHotspots(repositoryId: string): Promise<HotspotsListResponse> {
+    return this.request<HotspotsListResponse>(`/repositories/${repositoryId}/hotspots`);
+  }
+
+  async getEntityRisk(repositoryId: string, entityType: string, entityId: string): Promise<EntityRiskResponse> {
+    return this.request<EntityRiskResponse>(`/repositories/${repositoryId}/risk/${encodeURIComponent(entityType)}/${encodeURIComponent(entityId)}`);
+  }
+
+  async getRiskTrends(repositoryId: string): Promise<DebtRiskTrendsResponse> {
+    return this.request<DebtRiskTrendsResponse>(`/repositories/${repositoryId}/risk/trends`);
   }
 }
 

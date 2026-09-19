@@ -82,8 +82,20 @@ from backend.app.schemas.repository import (
     CommitDetailPhase20Response,
     CommitCompareRequest,
     CommitCompareResponse,
+    TechnicalDebtFindingItem,
+    TechnicalDebtSummaryResponse,
+    RiskSignalItem,
+    EngineeringHotspotItem,
+    HotspotsListResponse,
+    EntityRiskResponse,
+    DebtRiskTrendItem,
+    DebtRiskTrendsResponse,
+    RepositoryRiskSummaryResponse,
+    FindingDetailResponse,
 )
 from backend.app.services.time_machine_service import time_machine_service
+from backend.app.services.technical_debt_service import technical_debt_service
+from backend.app.services.risk_intelligence_service import risk_intelligence_service
 from backend.app.services.architecture_service import architecture_service
 from backend.app.services.architecture_intelligence_service import architecture_intelligence_service
 from backend.app.services.code_quality_service import code_quality_service
@@ -2707,5 +2719,228 @@ async def compare_repository_commits(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
         )
+
+
+# =========================================================================
+# Phase 21: Technical Debt & Risk Intelligence Endpoints
+# =========================================================================
+
+@router.get("/{repository_id}/debt", response_model=TechnicalDebtSummaryResponse)
+async def get_repository_technical_debt(
+    repository_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> TechnicalDebtSummaryResponse:
+    """
+    Get comprehensive technical debt intelligence for the repository:
+    - Debt score (0–100)
+    - Findings distribution by category (Complexity, Duplication, Dependency, Architecture, Test Gap, Documentation)
+    - Estimated remediation effort in engineering hours
+    """
+    try:
+        data = await technical_debt_service.analyze_technical_debt(db=db, repository_id=repository_id)
+        return TechnicalDebtSummaryResponse(**data)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        )
+
+
+@router.get("/{repository_id}/risk", response_model=RepositoryRiskSummaryResponse)
+async def get_repository_risk(
+    repository_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> RepositoryRiskSummaryResponse:
+    """
+    Get repository-wide risk intelligence and explainable signals:
+    - Multi-signal composite risk score
+    - Risk distribution across files/modules
+    - Top contributing risk factors
+    - Signals breakdown (Complexity, Historical Churn, Coupling, Findings)
+    """
+    try:
+        data = await risk_intelligence_service.analyze_repository_risk(db=db, repository_id=repository_id)
+        return RepositoryRiskSummaryResponse(**data)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        )
+
+
+@router.get("/{repository_id}/findings", response_model=List[TechnicalDebtFindingItem])
+async def get_repository_debt_findings(
+    repository_id: str,
+    category: Optional[str] = Query(None, description="Filter by category (COMPLEXITY, DUPLICATION, DEPENDENCY, ARCHITECTURE, TEST_GAP, DOCUMENTATION)"),
+    severity: Optional[str] = Query(None, description="Filter by severity (CRITICAL, HIGH, MEDIUM, LOW, INFO)"),
+    rule: Optional[str] = Query(None, description="Filter by rule type"),
+    file_path: Optional[str] = Query(None, description="Filter by file path"),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db),
+) -> List[TechnicalDebtFindingItem]:
+    """
+    Get paginated technical debt & risk findings with exact line coordinates and remediation steps.
+    """
+    try:
+        data = await technical_debt_service.analyze_technical_debt(db=db, repository_id=repository_id)
+        findings = data.get("findings", [])
+
+        if category:
+            findings = [f for f in findings if f.get("category", "").upper() == category.upper()]
+        if severity:
+            findings = [f for f in findings if f.get("severity", "").upper() == severity.upper()]
+        if rule:
+            findings = [f for f in findings if rule.lower() in f.get("type", "").lower()]
+        if file_path:
+            norm_p = file_path.lower()
+            findings = [f for f in findings if norm_p in (f.get("file_path") or "").lower() or any(norm_p in af.lower() for af in f.get("affected_files", []))]
+
+        paged = findings[offset : offset + limit]
+        return [TechnicalDebtFindingItem(**f) for f in paged]
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        )
+
+
+@router.get("/{repository_id}/findings/{finding_id}", response_model=FindingDetailResponse)
+async def get_repository_finding_detail(
+    repository_id: str,
+    finding_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> FindingDetailResponse:
+    """
+    Get deep inspection for a specific technical debt finding:
+    - Traceable code evidence and line coordinates
+    - Impact analysis context and blast radius
+    - Code Time Machine commit context
+    - Actionable remediation advice
+    """
+    try:
+        data = await technical_debt_service.analyze_technical_debt(db=db, repository_id=repository_id)
+        findings = data.get("findings", [])
+        target = next((f for f in findings if f.get("id") == finding_id), None)
+
+        if not target:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Finding '{finding_id}' not found in repository '{repository_id}'",
+            )
+
+        # Build impact context if file_path available
+        impact_context = None
+        if target.get("file_path"):
+            try:
+                imp = await impact_service.calculate_impact(
+                    db=db, repository_id=repository_id, target_identifier=target["file_path"], target_type="FILE", max_depth=2
+                )
+                impact_context = {
+                    "blast_radius": imp.impact.affected_files + imp.impact.affected_symbols,
+                    "direct_dependents": len(imp.direct_dependents),
+                    "affected_files_count": len(imp.affected_files),
+                }
+            except Exception:
+                pass
+
+        # Build time machine context if file_path available
+        time_machine_context = None
+        if target.get("file_path"):
+            try:
+                evol = await time_machine_service.get_file_evolution(
+                    db=db, repository_id=repository_id, file_identifier=target["file_path"]
+                )
+                time_machine_context = {
+                    "commit_count": evol.get("commit_count", 0),
+                    "churn": evol.get("churn", 0),
+                    "last_modified": evol.get("last_modified_at"),
+                    "authors": evol.get("authors", []),
+                }
+            except Exception:
+                pass
+
+        return FindingDetailResponse(
+            finding=TechnicalDebtFindingItem(**target),
+            traceable_evidence=target.get("evidence", {}),
+            impact_context=impact_context,
+            time_machine_context=time_machine_context,
+        )
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        )
+
+
+@router.get("/{repository_id}/hotspots", response_model=HotspotsListResponse)
+async def get_repository_hotspots(
+    repository_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> HotspotsListResponse:
+    """
+    Get ranked engineering hotspots where multiple risk vectors intersect
+    (e.g. High Churn + High Complexity, High Blast Radius + Weak Tests).
+    """
+    try:
+        data = await risk_intelligence_service.analyze_repository_risk(db=db, repository_id=repository_id)
+        hotspots = data.get("hotspots", [])
+        return HotspotsListResponse(
+            repository_id=repository_id,
+            total_hotspots=len(hotspots),
+            hotspots=[EngineeringHotspotItem(**h) for h in hotspots],
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        )
+
+
+@router.get("/{repository_id}/risk/trends", response_model=DebtRiskTrendsResponse)
+async def get_repository_risk_trends(
+    repository_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> DebtRiskTrendsResponse:
+    """
+    Get historical risk and technical debt trends across repository commits:
+    - Overall trajectory (INCREASING, DECREASING, STABLE)
+    - Timeline of historical risk and debt snapshots
+    """
+    try:
+        data = await risk_intelligence_service.get_debt_risk_trends(db=db, repository_id=repository_id)
+        return DebtRiskTrendsResponse(**data)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        )
+
+
+@router.get("/{repository_id}/risk/{entity_type}/{entity_id:path}", response_model=EntityRiskResponse)
+async def get_repository_entity_risk(
+    repository_id: str,
+    entity_type: str,
+    entity_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> EntityRiskResponse:
+    """
+    Get granular risk assessment for any repository entity:
+    - REPOSITORY, DIRECTORY, FILE, MODULE, SYMBOL, SERVICE, DEPENDENCY, API
+    - Composite risk level, signals, evidence, dependents, and blast radius
+    """
+    try:
+        data = await risk_intelligence_service.get_entity_risk(
+            db=db, repository_id=repository_id, entity_type=entity_type, entity_id=entity_id
+        )
+        return EntityRiskResponse(**data)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        )
+
 
 

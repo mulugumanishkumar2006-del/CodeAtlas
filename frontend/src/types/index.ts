@@ -1551,6 +1551,143 @@ export interface CommitCompareResponse {
   metrics_changes: Record<string, any>;
 }
 
+// =========================================================================
+// Phase 21: Technical Debt & Risk Intelligence Types
+// =========================================================================
+
+export interface TechnicalDebtFindingItem {
+  id: string;
+  repository_id: string;
+  category: 'COMPLEXITY' | 'DUPLICATION' | 'DEPENDENCY' | 'ARCHITECTURE' | 'TEST_GAP' | 'DOCUMENTATION' | 'CODE_SMELL';
+  type: string;
+  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
+  confidence: 'HIGH' | 'MEDIUM' | 'LOW';
+  title: string;
+  description: string;
+  evidence: Record<string, any>;
+  file_path?: string | null;
+  line_start?: number | null;
+  line_end?: number | null;
+  symbol_name?: string | null;
+  affected_files: string[];
+  affected_symbols: string[];
+  related_dependencies: string[];
+  historical_context?: Record<string, any> | null;
+  impact?: string | null;
+  remediation?: string | null;
+  detection_source: string;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface TechnicalDebtSummary {
+  repository_id: string;
+  debt_score: number;
+  total_findings: number;
+  findings_by_severity: Record<string, number>;
+  findings_by_category: Record<string, number>;
+  top_categories: Array<{ category: string; count: number; percentage: number }>;
+  estimated_remediation_hours: number;
+  summary_text: string;
+}
+
+export interface RiskSignalItem {
+  signal_name: string;
+  value: number;
+  threshold: number;
+  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+  weight: number;
+  explanation: string;
+}
+
+export interface EngineeringHotspotItem {
+  id: string;
+  file_path: string;
+  entity_type: string;
+  severity_rank: number;
+  composite_score: number;
+  risk_level: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+  signals_intersected: string[];
+  underlying_signals: RiskSignalItem[];
+  churn_count: number;
+  complexity_score: number;
+  blast_radius: number;
+  has_test_coverage: boolean;
+  explanation: string;
+}
+
+export interface HotspotsListResponse {
+  repository_id: string;
+  total_hotspots: number;
+  hotspots: EngineeringHotspotItem[];
+}
+
+export interface EntityRiskResponse {
+  repository_id: string;
+  entity_type: string;
+  entity_id: string;
+  entity_name: string;
+  risk_level: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+  risk_score: number;
+  risk_factors: string[];
+  signals: RiskSignalItem[];
+  evidence: Array<Record<string, any>>;
+  related_findings: TechnicalDebtFindingItem[];
+  change_frequency: number;
+  churn: number;
+  complexity: number;
+  test_evidence?: string | null;
+  dependents_count: number;
+  dependencies_count: number;
+  blast_radius: number;
+  remediation?: string | null;
+}
+
+export interface DebtRiskTrendItem {
+  commit_hash: string;
+  timestamp: string;
+  risk_score: number;
+  debt_finding_count: number;
+  complexity_delta: number;
+  hotspot_count: number;
+  trend_direction: 'INCREASING' | 'DECREASING' | 'STABLE';
+}
+
+export interface DebtRiskTrendsResponse {
+  repository_id: string;
+  overall_trend: 'INCREASING' | 'DECREASING' | 'STABLE' | 'INSUFFICIENT_DATA';
+  timeline: DebtRiskTrendItem[];
+  summary: string;
+}
+
+export interface RepositoryRiskSummaryResponse {
+  repository_id: string;
+  overall_risk_score: number;
+  risk_level: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+  risk_distribution: Record<string, number>;
+  top_risk_factors: string[];
+  signals_breakdown: RiskSignalItem[];
+  hotspots_count: number;
+  methodology: string;
+}
+
+export interface FindingDetailResponse {
+  finding: TechnicalDebtFindingItem;
+  traceable_evidence: Record<string, any>;
+  impact_context?: {
+    blast_radius: number;
+    direct_dependents: number;
+    affected_files_count: number;
+  } | null;
+  time_machine_context?: {
+    commit_count: number;
+    churn: number;
+    last_modified?: string | null;
+    authors: string[];
+  } | null;
+}
+
+
 
 
 

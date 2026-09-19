@@ -1470,5 +1470,133 @@ class CommitCompareResponse(BaseModel):
     metrics_changes: dict[str, Any] = {}
 
 
+# =========================================================================
+# Phase 21: Technical Debt & Risk Intelligence Schemas
+# =========================================================================
+
+class TechnicalDebtFindingItem(BaseModel):
+    id: str
+    repository_id: str
+    category: str  # COMPLEXITY, DUPLICATION, DEPENDENCY, ARCHITECTURE, TEST_GAP, DOCUMENTATION, CODE_SMELL
+    type: str
+    severity: str  # CRITICAL, HIGH, MEDIUM, LOW, INFO
+    confidence: str = "HIGH"  # HIGH, MEDIUM, LOW
+    title: str
+    description: str
+    evidence: dict[str, Any] = {}
+    file_path: Optional[str] = None
+    line_start: Optional[int] = None
+    line_end: Optional[int] = None
+    symbol_name: Optional[str] = None
+    affected_files: list[str] = []
+    affected_symbols: list[str] = []
+    related_dependencies: list[str] = []
+    historical_context: Optional[dict[str, Any]] = None
+    impact: Optional[str] = None
+    remediation: Optional[str] = None
+    detection_source: str = "STATIC_AST_ANALYZER"
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class TechnicalDebtSummaryResponse(BaseModel):
+    repository_id: str
+    debt_score: float  # 0 to 100 (100 = debt free)
+    total_findings: int = 0
+    findings_by_severity: dict[str, int] = {}
+    findings_by_category: dict[str, int] = {}
+    top_categories: list[dict[str, Any]] = []
+    estimated_remediation_hours: float = 0.0
+    summary_text: str = ""
+
+
+class RiskSignalItem(BaseModel):
+    signal_name: str
+    value: float
+    threshold: float
+    severity: str  # CRITICAL, HIGH, MEDIUM, LOW
+    weight: float = 1.0
+    explanation: str
+
+
+class EngineeringHotspotItem(BaseModel):
+    id: str
+    file_path: str
+    entity_type: str = "FILE"
+    severity_rank: int = 1
+    composite_score: float = 0.0
+    risk_level: str = "LOW"  # CRITICAL, HIGH, MEDIUM, LOW
+    signals_intersected: list[str] = []
+    underlying_signals: list[RiskSignalItem] = []
+    churn_count: int = 0
+    complexity_score: int = 0
+    blast_radius: int = 0
+    has_test_coverage: bool = True
+    explanation: str
+
+
+class HotspotsListResponse(BaseModel):
+    repository_id: str
+    total_hotspots: int = 0
+    hotspots: list[EngineeringHotspotItem] = []
+
+
+class EntityRiskResponse(BaseModel):
+    repository_id: str
+    entity_type: str  # REPOSITORY, DIRECTORY, FILE, MODULE, SYMBOL, SERVICE, DEPENDENCY, API
+    entity_id: str
+    entity_name: str
+    risk_level: str  # CRITICAL, HIGH, MEDIUM, LOW
+    risk_score: float = 0.0
+    risk_factors: list[str] = []
+    signals: list[RiskSignalItem] = []
+    evidence: list[dict[str, Any]] = []
+    related_findings: list[TechnicalDebtFindingItem] = []
+    change_frequency: int = 0
+    churn: int = 0
+    complexity: int = 0
+    test_evidence: Optional[str] = None
+    dependents_count: int = 0
+    dependencies_count: int = 0
+    blast_radius: int = 0
+    remediation: Optional[str] = None
+
+
+class DebtRiskTrendItem(BaseModel):
+    commit_hash: str
+    timestamp: str
+    risk_score: float
+    debt_finding_count: int
+    complexity_delta: int = 0
+    hotspot_count: int = 0
+    trend_direction: str = "STABLE"  # INCREASING, DECREASING, STABLE
+
+
+class DebtRiskTrendsResponse(BaseModel):
+    repository_id: str
+    overall_trend: str = "STABLE"  # INCREASING, DECREASING, STABLE, INSUFFICIENT_DATA
+    timeline: list[DebtRiskTrendItem] = []
+    summary: str = ""
+
+
+class RepositoryRiskSummaryResponse(BaseModel):
+    repository_id: str
+    overall_risk_score: float = 0.0  # 0 to 100
+    risk_level: str = "LOW"  # CRITICAL, HIGH, MEDIUM, LOW
+    risk_distribution: dict[str, int] = {}
+    top_risk_factors: list[str] = []
+    signals_breakdown: list[RiskSignalItem] = []
+    hotspots_count: int = 0
+    methodology: str = "Evidence-weighted multi-signal risk synthesis"
+
+
+class FindingDetailResponse(BaseModel):
+    finding: TechnicalDebtFindingItem
+    traceable_evidence: dict[str, Any] = {}
+    impact_context: Optional[dict[str, Any]] = None
+    time_machine_context: Optional[dict[str, Any]] = None
+
+
+
 
 
