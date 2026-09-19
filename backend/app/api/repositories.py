@@ -38,6 +38,9 @@ from backend.app.schemas.repository import (
     ConversationListResponse,
     ConversationCreateRequest,
     ImpactAnalysisResponse,
+    ImpactTargetItem,
+    ImpactTargetResolveRequest,
+    ImpactExplainRequest,
     TargetDependencyResponse,
     QualitySummaryResponse,
     QualityFindingsResponse,
@@ -68,7 +71,19 @@ from backend.app.schemas.repository import (
     ArchitectureViolation,
     ArchitectureSnapshotDiffResponse,
     AdvancedArchitectureIntelligenceResponse,
+    HistoricalSnapshotItem,
+    HistoricalSnapshotListResponse,
+    FileRenameItem,
+    FileCommitItem,
+    FileEvolutionHistoryResponse,
+    DiffHunk,
+    FileDiffItem,
+    SymbolDiffItem,
+    CommitDetailPhase20Response,
+    CommitCompareRequest,
+    CommitCompareResponse,
 )
+from backend.app.services.time_machine_service import time_machine_service
 from backend.app.services.architecture_service import architecture_service
 from backend.app.services.architecture_intelligence_service import architecture_intelligence_service
 from backend.app.services.code_quality_service import code_quality_service
@@ -2281,22 +2296,25 @@ async def delete_repository_conversation(
 
 
 # =========================================================================
-# Phase 10: Dependency & Impact Intelligence Endpoints
+# Phase 10 & Phase 19: Dependency & Impact Intelligence Endpoints
 # =========================================================================
 
 @router.get("/{repository_id}/impact/{target_id}", response_model=ImpactAnalysisResponse)
 async def get_repository_impact_analysis(
     repository_id: str,
     target_id: str,
+    target_type: Optional[str] = Query(None, description="Optional target type: FILE, SYMBOL, CLASS, FUNCTION, METHOD, MODULE, API, DEPENDENCY, COMPONENT"),
     direction: str = Query("both", pattern="^(upstream|downstream|both)$", description="Traversal direction"),
     max_depth: int = Query(3, ge=1, le=10, description="Maximum traversal depth (1..10)"),
     limit: int = Query(500, ge=1, le=1000, description="Maximum number of nodes in impact graph"),
     db: AsyncSession = Depends(get_db),
 ) -> ImpactAnalysisResponse:
     """
-    Real Dependency and Impact Intelligence for CodeAtlas.
+    Real Phase 19 Impact Intelligence for CodeAtlas.
     Calculates upstream dependencies, downstream impact, blast radius, cycles,
-    and deterministic risk score for a selected file, symbol, class, function, or graph node.
+    callers, callees, affected files, modules, APIs, tests, dependencies,
+    architecture boundary crossings, line-level evidence, uncertainty analysis,
+    and deterministic risk score for a selected normalized target.
     Strictly repository-isolated.
     """
     repo_res = await db.execute(select(Repository).where(Repository.id == repository_id))
@@ -2321,6 +2339,7 @@ async def get_repository_impact_analysis(
             db=db,
             repository_id=repository_id,
             target_id=target_id,
+            target_type=target_type,
             direction=direction,
             max_depth=max_depth,
             limit=limit,
@@ -2337,6 +2356,83 @@ async def get_repository_impact_analysis(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Impact analysis error: {str(e)}",
+        )
+
+
+@router.post("/{repository_id}/impact/resolve", response_model=ImpactTargetItem)
+async def resolve_repository_impact_target(
+    repository_id: str,
+    payload: ImpactTargetResolveRequest,
+    db: AsyncSession = Depends(get_db),
+) -> ImpactTargetItem:
+    """
+    Phase 19: Resolves a normalized impact target (FILE, SYMBOL, CLASS, FUNCTION, METHOD, MODULE, API, DEPENDENCY, COMPONENT)
+    scoped strictly to the given repository with database identity verification.
+    """
+    repo_res = await db.execute(select(Repository).where(Repository.id == repository_id))
+    repo = repo_res.scalars().first()
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Repository with id '{repository_id}' not found.",
+        )
+
+    resolved = await impact_service.resolve_target(
+        db=db,
+        repository_id=repository_id,
+        target_id=payload.target,
+        target_type=payload.target_type,
+    )
+    if not resolved:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Target '{payload.target}' could not be resolved in repository '{repository_id}'.",
+        )
+    return resolved
+
+
+@router.post("/{repository_id}/impact/explain", response_model=ImpactAnalysisResponse)
+async def explain_repository_impact(
+    repository_id: str,
+    payload: ImpactExplainRequest,
+    db: AsyncSession = Depends(get_db),
+) -> ImpactAnalysisResponse:
+    """
+    Phase 19: Generates a complete impact analysis and structured AI explanation answering the 12 core questions
+    with line-level evidence and uncertainty warnings.
+    """
+    repo_res = await db.execute(select(Repository).where(Repository.id == repository_id))
+    repo = repo_res.scalars().first()
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Repository with id '{repository_id}' not found.",
+        )
+
+    meta = repo.metadata_json or {}
+    index_version = meta.get("head_commit_hash") or meta.get("analysis_summary", {}).get("total_files", "v1")
+
+    try:
+        impact_result = await impact_service.analyze_impact(
+            db=db,
+            repository_id=repository_id,
+            target_id=payload.target_id,
+            target_type=payload.target_type,
+            direction=payload.direction or "both",
+            max_depth=payload.max_depth or 3,
+            index_version=str(index_version),
+        )
+        return impact_result
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        )
+    except Exception as e:
+        logger.error(f"Error during impact explain for target '{payload.target_id}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Impact explain error: {str(e)}",
         )
 
 
@@ -2506,4 +2602,110 @@ async def get_architecture_snapshot_diff(
         current_profile=curr_profile,
     )
     return ArchitectureSnapshotDiffResponse(**diff_result)
+
+
+# =========================================================================
+# Phase 20: Code Time Machine Endpoints
+# =========================================================================
+
+@router.get("/{repository_id}/history/snapshots", response_model=HistoricalSnapshotListResponse)
+async def get_repository_historical_snapshots(
+    repository_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> HistoricalSnapshotListResponse:
+    """
+    Get historical repository snapshots representing states at specific commits.
+    Combines persisted architecture/index snapshots with git commit points.
+    """
+    try:
+        data = await time_machine_service.get_historical_snapshots(db=db, repository_id=repository_id)
+        return HistoricalSnapshotListResponse(**data)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        )
+
+
+@router.get("/{repository_id}/history/files/{file_id:path}", response_model=FileEvolutionHistoryResponse)
+async def get_repository_file_history(
+    repository_id: str,
+    file_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> FileEvolutionHistoryResponse:
+    """
+    Get real historical evolution for a tracked file:
+    - First appearance and last modification commits
+    - Total additions, deletions, commit count, and churn
+    - Author contributions & sequence
+    - Rename history via git log --follow
+    - Available analysis snapshots
+    """
+    try:
+        data = await time_machine_service.get_file_evolution(
+            db=db, repository_id=repository_id, file_identifier=file_id
+        )
+        return FileEvolutionHistoryResponse(**data)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        )
+
+
+@router.get("/{repository_id}/history/commits/{commit_hash}", response_model=CommitDetailPhase20Response)
+async def get_repository_commit_details(
+    repository_id: str,
+    commit_hash: str,
+    db: AsyncSession = Depends(get_db),
+) -> CommitDetailPhase20Response:
+    """
+    Get detailed information for a specific Git commit:
+    - Commit metadata (hash, parent, author, email, timestamp, message, branch)
+    - Changed files with unified diff hunks and line-level coordinates
+    - AST symbol changes mapped with evidence and uncertainty detection
+    - Architectural layer changes
+    """
+    try:
+        data = await time_machine_service.get_commit_details(
+            db=db, repository_id=repository_id, commit_hash=commit_hash
+        )
+        return CommitDetailPhase20Response(**data)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        )
+
+
+@router.post("/{repository_id}/history/compare", response_model=CommitCompareResponse)
+async def compare_repository_commits(
+    repository_id: str,
+    request: CommitCompareRequest,
+    db: AsyncSession = Depends(get_db),
+) -> CommitCompareResponse:
+    """
+    Compare two commits in a repository:
+    - Added, deleted, modified, and renamed files
+    - Real file-level diff hunks with line coordinates
+    - Added, deleted, modified, and renamed symbols mapped from AST
+    - Dependency manifest changes
+    - API changes
+    - Architectural layer changes
+    - Quantitative metrics deltas
+    """
+    try:
+        data = await time_machine_service.compare_commits(
+            db=db,
+            repository_id=repository_id,
+            from_commit=request.from_commit,
+            to_commit=request.to_commit,
+        )
+        return CommitCompareResponse(**data)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+
 

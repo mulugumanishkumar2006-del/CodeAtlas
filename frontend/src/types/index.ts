@@ -677,21 +677,25 @@ export interface ConversationListResponse {
 }
 
 // =========================================================================
-// Phase 10: Dependency & Impact Intelligence Types
+// Phase 10 & Phase 19: Dependency & Impact Intelligence Types
 // =========================================================================
 
 export interface ImpactTargetItem {
   id: string;
+  repository_id?: string;
   name: string;
-  target_type: string; // file, symbol, class, function, method, graph_node
+  target_type: string; // FILE, SYMBOL, CLASS, FUNCTION, METHOD, MODULE, API, DEPENDENCY, COMPONENT
+  target_id?: string;
   file_id?: string | null;
   file_path?: string | null;
+  symbol_id?: string | null;
   qualified_name?: string | null;
   start_line?: number | null;
   end_line?: number | null;
   symbol_count: number;
   direct_dependencies_count: number;
   direct_dependents_count: number;
+  metadata?: Record<string, any>;
 }
 
 export interface ImpactEvidenceItem {
@@ -709,7 +713,7 @@ export interface ImpactEvidenceItem {
 export interface ImpactNodeItem {
   id: string;
   label: string;
-  node_type: string; // file, symbol, class, function, method, module
+  node_type: string; // file, symbol, class, function, method, module, api, dependency, component
   depth: number;
   direction: 'target' | 'upstream' | 'downstream' | 'both';
   file_path?: string | null;
@@ -725,6 +729,51 @@ export interface ImpactEdgeItem {
   relationship: string;
   depth: number;
   evidence?: ImpactEvidenceItem | null;
+}
+
+export interface CallItem {
+  name: string;
+  symbol_id?: string | null;
+  symbol_type?: string | null;
+  file_path?: string | null;
+  line_number?: number | null;
+  call_expression?: string | null;
+  caller_context?: string | null;
+}
+
+export interface AffectedApiItem {
+  method: string;
+  path: string;
+  file_path: string;
+  line_number?: number | null;
+  framework?: string | null;
+  distance: number;
+  handler_symbol?: string | null;
+}
+
+export interface AffectedTestItem {
+  test_file: string;
+  test_type: string;
+  framework?: string | null;
+  affected_test_cases?: string[];
+  distance: number;
+}
+
+export interface BoundaryCrossingItem {
+  source_layer: string;
+  target_layer: string;
+  source_component?: string | null;
+  target_component?: string | null;
+  violation_type?: string | null;
+  description: string;
+}
+
+export interface UncertaintyItem {
+  category: string;
+  severity: 'LOW' | 'MEDIUM' | 'HIGH';
+  description: string;
+  file_path?: string | null;
+  line_number?: number | null;
 }
 
 export interface ImpactMetrics {
@@ -756,6 +805,19 @@ export interface ImpactAnalysisResponse {
   cycles: string[][];
   is_truncated: boolean;
   total_nodes_found: number;
+
+  // Phase 19 12-dimension extensions
+  callers?: CallItem[];
+  callees?: CallItem[];
+  affected_files?: string[];
+  affected_modules?: string[];
+  affected_apis?: AffectedApiItem[];
+  affected_tests?: AffectedTestItem[];
+  affected_dependencies?: string[];
+  boundaries_crossed?: BoundaryCrossingItem[];
+  evidence?: ImpactEvidenceItem[];
+  uncertainty?: UncertaintyItem[];
+  explanation?: string | null;
 }
 
 export interface TargetDependencyItem {
@@ -1355,6 +1417,140 @@ export interface AdvancedArchitectureIntelligence {
     isolated_modules_count: number;
   };
 }
+
+// =========================================================================
+// Phase 20: Code Time Machine Types
+// =========================================================================
+
+export interface HistoricalSnapshotItem {
+  snapshot_id: string;
+  repository_id: string;
+  commit_hash: string;
+  commit_timestamp?: string | null;
+  branch?: string | null;
+  analysis_version: string;
+  status: string;
+  created_at: string;
+  summary: Record<string, any>;
+}
+
+export interface HistoricalSnapshotListResponse {
+  repository_id: string;
+  snapshots: HistoricalSnapshotItem[];
+  total_snapshots: number;
+}
+
+export interface FileRenameItem {
+  from_path: string;
+  to_path: string;
+  commit_hash: string;
+  timestamp?: string | null;
+  similarity_score?: number | null;
+}
+
+export interface FileCommitItem {
+  commit_hash: string;
+  author: string;
+  author_email?: string | null;
+  timestamp: string;
+  message: string;
+  additions: number;
+  deletions: number;
+  is_rename: boolean;
+  old_path?: string | null;
+}
+
+export interface FileEvolutionHistoryResponse {
+  file_id?: string | null;
+  repository_id: string;
+  file_path: string;
+  created_at?: string | null;
+  first_commit_hash?: string | null;
+  last_modified_at?: string | null;
+  last_commit_hash?: string | null;
+  commit_count: number;
+  authors: string[];
+  total_additions: number;
+  total_deletions: number;
+  churn: number;
+  commits: FileCommitItem[];
+  rename_history: FileRenameItem[];
+  available_snapshots: string[];
+}
+
+export interface DiffHunk {
+  old_start: number;
+  old_lines: number;
+  new_start: number;
+  new_lines: number;
+  heading?: string | null;
+  lines: string[];
+}
+
+export interface FileDiffItem {
+  old_path?: string | null;
+  new_path?: string | null;
+  change_type: string;
+  additions: number;
+  deletions: number;
+  hunks: DiffHunk[];
+}
+
+export interface SymbolDiffItem {
+  symbol_name: string;
+  symbol_type: string;
+  file_path: string;
+  change_type: string;
+  old_start_line?: number | null;
+  old_end_line?: number | null;
+  new_start_line?: number | null;
+  new_end_line?: number | null;
+  commit_hash: string;
+  evidence: string;
+  is_uncertain: boolean;
+}
+
+export interface CommitDetailPhase20Response {
+  commit_hash: string;
+  parent_hashes: string[];
+  author: string;
+  author_email?: string | null;
+  timestamp: string;
+  message: string;
+  branch?: string | null;
+  files_changed_count: number;
+  insertions: number;
+  deletions: number;
+  changed_files: FileDiffItem[];
+  symbol_changes: SymbolDiffItem[];
+  architecture_changes: string[];
+  metrics: Record<string, any>;
+}
+
+export interface CommitCompareRequest {
+  from_commit: string;
+  to_commit: string;
+}
+
+export interface CommitCompareResponse {
+  repository_id: string;
+  from_commit: string;
+  to_commit: string;
+  added_files: string[];
+  deleted_files: string[];
+  modified_files: string[];
+  renamed_files: Array<{ from: string; to: string }>;
+  file_diffs: FileDiffItem[];
+  added_symbols: SymbolDiffItem[];
+  deleted_symbols: SymbolDiffItem[];
+  modified_symbols: SymbolDiffItem[];
+  renamed_symbols: SymbolDiffItem[];
+  dependency_changes: Array<Record<string, any>>;
+  api_changes: Array<Record<string, any>>;
+  architecture_changes: Array<Record<string, any>>;
+  metrics_changes: Record<string, any>;
+}
+
 
 
 

@@ -555,21 +555,25 @@ class ConversationListResponse(BaseModel):
 
 
 # =========================================================================
-# Phase 10: Dependency & Impact Intelligence Schemas
+# Phase 10 & Phase 19: Dependency & Impact Intelligence Schemas
 # =========================================================================
 
 class ImpactTargetItem(BaseModel):
     id: str
+    repository_id: Optional[str] = None
+    target_type: str  # FILE, SYMBOL, CLASS, FUNCTION, METHOD, MODULE, API, DEPENDENCY, COMPONENT
+    target_id: Optional[str] = None
     name: str
-    target_type: str  # file, symbol, class, function, method, graph_node
     file_id: Optional[str] = None
     file_path: Optional[str] = None
+    symbol_id: Optional[str] = None
     qualified_name: Optional[str] = None
     start_line: Optional[int] = None
     end_line: Optional[int] = None
     symbol_count: int = 0
     direct_dependencies_count: int = 0
     direct_dependents_count: int = 0
+    metadata: Optional[dict[str, Any]] = None
 
 
 class ImpactEvidenceItem(BaseModel):
@@ -587,7 +591,7 @@ class ImpactEvidenceItem(BaseModel):
 class ImpactNodeItem(BaseModel):
     id: str
     label: str
-    node_type: str  # file, symbol, class, function, method, module
+    node_type: str  # file, symbol, class, function, method, module, api, dependency, component
     depth: int = 0
     direction: str = "target"  # target, upstream, downstream, both
     file_path: Optional[str] = None
@@ -603,6 +607,51 @@ class ImpactEdgeItem(BaseModel):
     relationship: str
     depth: int = 1
     evidence: Optional[ImpactEvidenceItem] = None
+
+
+class CallItem(BaseModel):
+    name: str
+    symbol_id: Optional[str] = None
+    symbol_type: Optional[str] = "function"
+    file_path: Optional[str] = None
+    line_number: Optional[int] = None
+    call_expression: Optional[str] = None
+    caller_context: Optional[str] = None
+
+
+class AffectedApiItem(BaseModel):
+    method: str
+    path: str
+    file_path: str
+    line_number: Optional[int] = None
+    framework: Optional[str] = None
+    distance: int = 1
+    handler_symbol: Optional[str] = None
+
+
+class AffectedTestItem(BaseModel):
+    test_file: str
+    test_type: str = "unit"  # unit, integration, e2e
+    framework: Optional[str] = None
+    affected_test_cases: list[str] = []
+    distance: int = 1
+
+
+class BoundaryCrossingItem(BaseModel):
+    source_layer: str
+    target_layer: str
+    source_component: Optional[str] = None
+    target_component: Optional[str] = None
+    violation_type: Optional[str] = None
+    description: str
+
+
+class UncertaintyItem(BaseModel):
+    category: str  # DYNAMIC_DISPATCH, WILDCARD_IMPORT, REFLECTION, UNTESTED, DYNAMIC_EVAL, UNINDEXED_DEPENDENCY
+    severity: str = "MEDIUM"  # LOW, MEDIUM, HIGH
+    description: str
+    file_path: Optional[str] = None
+    line_number: Optional[int] = None
 
 
 class ImpactMetrics(BaseModel):
@@ -635,6 +684,19 @@ class ImpactAnalysisResponse(BaseModel):
     is_truncated: bool = False
     total_nodes_found: int = 0
 
+    # Phase 19 12-dimension extensions
+    callers: list[CallItem] = []
+    callees: list[CallItem] = []
+    affected_files: list[str] = []
+    affected_modules: list[str] = []
+    affected_apis: list[AffectedApiItem] = []
+    affected_tests: list[AffectedTestItem] = []
+    affected_dependencies: list[str] = []
+    boundaries_crossed: list[BoundaryCrossingItem] = []
+    evidence: list[ImpactEvidenceItem] = []
+    uncertainty: list[UncertaintyItem] = []
+    explanation: Optional[str] = None
+
 
 class TargetDependencyItem(BaseModel):
     id: str
@@ -653,6 +715,18 @@ class TargetDependencyResponse(BaseModel):
     direct_dependents: list[TargetDependencyItem] = []
     transitive_dependencies: list[TargetDependencyItem] = []
     transitive_dependents: list[TargetDependencyItem] = []
+
+
+class ImpactTargetResolveRequest(BaseModel):
+    target: str
+    target_type: Optional[str] = None
+
+
+class ImpactExplainRequest(BaseModel):
+    target_id: str
+    target_type: Optional[str] = None
+    direction: Optional[str] = "both"
+    max_depth: Optional[int] = 3
 
 
 # =========================================================================
@@ -1261,6 +1335,140 @@ class AdvancedArchitectureIntelligenceResponse(BaseModel):
     cycles: dict[str, Any]
     violations: list[ArchitectureViolation]
     summary: dict[str, Any]
+
+
+# =========================================================================
+# Phase 20: Code Time Machine Schemas
+# =========================================================================
+
+class HistoricalSnapshotItem(BaseModel):
+    snapshot_id: str
+    repository_id: str
+    commit_hash: str
+    commit_timestamp: Optional[str] = None
+    branch: Optional[str] = None
+    analysis_version: str = "1.0.0"
+    status: str = "COMPLETED"
+    created_at: str
+    summary: dict[str, Any] = {}
+
+
+class HistoricalSnapshotListResponse(BaseModel):
+    repository_id: str
+    snapshots: list[HistoricalSnapshotItem] = []
+    total_snapshots: int = 0
+
+
+class FileRenameItem(BaseModel):
+    from_path: str
+    to_path: str
+    commit_hash: str
+    timestamp: Optional[str] = None
+    similarity_score: Optional[int] = None
+
+
+class FileCommitItem(BaseModel):
+    commit_hash: str
+    author: str
+    author_email: Optional[str] = None
+    timestamp: str
+    message: str
+    additions: int = 0
+    deletions: int = 0
+    is_rename: bool = False
+    old_path: Optional[str] = None
+
+
+class FileEvolutionHistoryResponse(BaseModel):
+    file_id: Optional[str] = None
+    repository_id: str
+    file_path: str
+    created_at: Optional[str] = None
+    first_commit_hash: Optional[str] = None
+    last_modified_at: Optional[str] = None
+    last_commit_hash: Optional[str] = None
+    commit_count: int = 0
+    authors: list[str] = []
+    total_additions: int = 0
+    total_deletions: int = 0
+    churn: int = 0
+    commits: list[FileCommitItem] = []
+    rename_history: list[FileRenameItem] = []
+    available_snapshots: list[str] = []
+
+
+class DiffHunk(BaseModel):
+    old_start: int
+    old_lines: int
+    new_start: int
+    new_lines: int
+    heading: Optional[str] = None
+    lines: list[str] = []
+
+
+class FileDiffItem(BaseModel):
+    old_path: Optional[str] = None
+    new_path: Optional[str] = None
+    change_type: str  # ADDED, DELETED, MODIFIED, RENAMED
+    additions: int = 0
+    deletions: int = 0
+    hunks: list[DiffHunk] = []
+
+
+class SymbolDiffItem(BaseModel):
+    symbol_name: str
+    symbol_type: str  # function, class, method, interface
+    file_path: str
+    change_type: str  # CREATED, MODIFIED, DELETED, RENAMED
+    old_start_line: Optional[int] = None
+    old_end_line: Optional[int] = None
+    new_start_line: Optional[int] = None
+    new_end_line: Optional[int] = None
+    commit_hash: str
+    evidence: str
+    is_uncertain: bool = False
+
+
+class CommitDetailPhase20Response(BaseModel):
+    commit_hash: str
+    parent_hashes: list[str] = []
+    author: str
+    author_email: Optional[str] = None
+    timestamp: str
+    message: str
+    branch: Optional[str] = None
+    files_changed_count: int = 0
+    insertions: int = 0
+    deletions: int = 0
+    changed_files: list[FileDiffItem] = []
+    symbol_changes: list[SymbolDiffItem] = []
+    architecture_changes: list[str] = []
+    metrics: dict[str, Any] = {}
+
+
+class CommitCompareRequest(BaseModel):
+    from_commit: str
+    to_commit: str
+
+
+class CommitCompareResponse(BaseModel):
+    repository_id: str
+    from_commit: str
+    to_commit: str
+    added_files: list[str] = []
+    deleted_files: list[str] = []
+    modified_files: list[str] = []
+    renamed_files: list[dict[str, str]] = []
+    file_diffs: list[FileDiffItem] = []
+    added_symbols: list[SymbolDiffItem] = []
+    deleted_symbols: list[SymbolDiffItem] = []
+    modified_symbols: list[SymbolDiffItem] = []
+    renamed_symbols: list[SymbolDiffItem] = []
+    dependency_changes: list[dict[str, Any]] = []
+    api_changes: list[dict[str, Any]] = []
+    architecture_changes: list[dict[str, Any]] = []
+    metrics_changes: dict[str, Any] = {}
+
 
 
 

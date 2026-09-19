@@ -35,6 +35,11 @@ import {
   ArchitectureDataFlowPath,
   CouplingMetricItem,
   ArchitectureSnapshotDiff,
+  HistoricalSnapshotListResponse,
+  FileEvolutionHistoryResponse,
+  CommitDetailPhase20Response,
+  CommitCompareRequest,
+  CommitCompareResponse,
 } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
@@ -519,9 +524,33 @@ class ApiClient {
     const query = baseCommit ? `?base_commit=${encodeURIComponent(baseCommit)}` : '';
     return this.request<ArchitectureSnapshotDiff>(`/repositories/${repositoryId}/architecture/diff${query}`);
   }
+
+  // =========================================================================
+  // Phase 20: Code Time Machine API Methods
+  // =========================================================================
+
+  async getHistoricalSnapshots(repositoryId: string): Promise<HistoricalSnapshotListResponse> {
+    return this.request<HistoricalSnapshotListResponse>(`/repositories/${repositoryId}/history/snapshots`);
+  }
+
+  async getFileEvolutionHistory(repositoryId: string, fileIdOrPath: string): Promise<FileEvolutionHistoryResponse> {
+    return this.request<FileEvolutionHistoryResponse>(`/repositories/${repositoryId}/history/files/${encodeURIComponent(fileIdOrPath)}`);
+  }
+
+  async getCommitDetailPhase20(repositoryId: string, commitHash: string): Promise<CommitDetailPhase20Response> {
+    return this.request<CommitDetailPhase20Response>(`/repositories/${repositoryId}/history/commits/${encodeURIComponent(commitHash)}`);
+  }
+
+  async compareCommits(repositoryId: string, request: CommitCompareRequest): Promise<CommitCompareResponse> {
+    return this.request<CommitCompareResponse>(`/repositories/${repositoryId}/history/compare`, {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  }
 }
 
 export const api = new ApiClient();
+
 
 
 

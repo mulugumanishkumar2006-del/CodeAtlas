@@ -163,7 +163,7 @@ async def test_01_basic_direct_dependency_and_dependents(client: AsyncClient, se
     data = res.json()
 
     assert data["target"]["name"] == "service.py"
-    assert data["target"]["target_type"] == "file"
+    assert data["target"]["target_type"].lower() == "file"
     
     # Direct outgoing dependency of service.py is repository.py
     direct_deps = [d["label"] for d in data["direct_dependencies"]]

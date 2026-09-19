@@ -469,13 +469,18 @@ class RAGService:
                     m = impact_data.impact
                     
                     impact_summary = (
-                        f"IMPACT ANALYSIS FOR '{t.name}' ({t.target_type}):\n"
+                        f"PHASE 19 IMPACT ANALYSIS FOR '{t.name}' ({t.target_type}):\n"
                         f"- Risk Level: {m.risk} (Score: {m.risk_score})\n"
                         f"- Blast Radius: {m.affected_files} files, {m.affected_symbols} symbols, max depth {m.max_depth}\n"
                         f"- Direct Dependents ({len(impact_data.direct_dependents)}): {', '.join(d.label for d in impact_data.direct_dependents[:5]) or 'None'}\n"
                         f"- Indirect Dependents ({len(impact_data.transitive_dependents)}): {', '.join(d.label for d in impact_data.transitive_dependents[:5]) or 'None'}\n"
-                        f"- Direct Dependencies ({len(impact_data.direct_dependencies)}): {', '.join(d.label for d in impact_data.direct_dependencies[:5]) or 'None'}\n"
-                        f"- Reasons: {'; '.join(m.risk_reasons)}"
+                        f"- Callers ({len(impact_data.callers)}): {', '.join(c.name for c in impact_data.callers[:4]) or 'None'}\n"
+                        f"- Affected APIs ({len(impact_data.affected_apis)}): {', '.join(f'{a.method} {a.path}' for a in impact_data.affected_apis[:3]) or 'None'}\n"
+                        f"- Affected Tests ({len(impact_data.affected_tests)}): {', '.join(t.test_file for t in impact_data.affected_tests[:3]) or 'None'}\n"
+                        f"- Boundaries Crossed ({len(impact_data.boundaries_crossed)}): {', '.join(f'{b.source_layer}->{b.target_layer}' for b in impact_data.boundaries_crossed[:3]) or 'None'}\n"
+                        f"- Uncertainty ({len(impact_data.uncertainty)}): {', '.join(u.category for u in impact_data.uncertainty[:3]) or 'None'}\n"
+                        f"- Reasons: {'; '.join(m.risk_reasons)}\n\n"
+                        f"EXPLANATION:\n{impact_data.explanation or ''}"
                     )
 
                     t_file_id = t.file_id or file_path_map.get(t.file_path or t.name)
