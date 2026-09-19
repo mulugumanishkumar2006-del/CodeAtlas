@@ -92,7 +92,12 @@ from backend.app.schemas.repository import (
     DebtRiskTrendsResponse,
     RepositoryRiskSummaryResponse,
     FindingDetailResponse,
+    SimulationCreateRequest,
+    SimulationDetailResponse,
+    SimulationListItem,
+    SimulationListResponse,
 )
+from backend.app.services.future_impact_simulator_service import future_impact_simulator_service
 from backend.app.services.time_machine_service import time_machine_service
 from backend.app.services.technical_debt_service import technical_debt_service
 from backend.app.services.risk_intelligence_service import risk_intelligence_service
@@ -2126,6 +2131,7 @@ async def delete_repository(
     security_reliability_service.invalidate_cache(repository_id)
     git_history_service.invalidate_cache(repository_id)
     dependency_intelligence_service.invalidate_cache(repository_id)
+    future_impact_simulator_service.invalidate_cache(repository_id)
 
     # 2. Remove repository record from database (cascades to files, symbols, analyses)
     await db.execute(delete(Repository).where(Repository.id == repository_id))
@@ -2941,6 +2947,193 @@ async def get_repository_entity_risk(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(e),
         )
+
+
+# =========================================================================
+# Phase 22: Future Impact Simulator Endpoints
+# =========================================================================
+
+@router.post("/{repository_id}/simulations", response_model=SimulationDetailResponse, status_code=status.HTTP_201_CREATED)
+async def create_repository_simulation(
+    repository_id: str,
+    payload: SimulationCreateRequest,
+    db: AsyncSession = Depends(get_db),
+) -> SimulationDetailResponse:
+    """
+    Phase 22: Run a hypothetical change simulation against the repository and persist the result.
+    Evaluates:
+    - Target resolution across files, symbols, modules, APIs, and dependencies
+    - Static dependency and call graph impact
+    - Architecture boundaries crossed
+    - Technical debt and engineering risk propagation
+    - Historical churn and evolution signals
+    - Epistemic triad: Known vs Predicted vs Unknown consequences
+    - Hypothetical before/after structural model and diff
+    - Deterministic validation checklist
+    Strictly repository-isolated.
+    """
+    repo_res = await db.execute(select(Repository).where(Repository.id == repository_id))
+    repo = repo_res.scalars().first()
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Repository with id '{repository_id}' not found.",
+        )
+
+    try:
+        sim_data = await future_impact_simulator_service.create_and_save_simulation(
+            db=db,
+            repository_id=repository_id,
+            proposed_change=payload.proposed_change,
+            operation=payload.operation,
+            target_id=payload.target_id,
+            target_type=payload.target_type,
+            parameters=payload.parameters,
+        )
+        return SimulationDetailResponse(**sim_data)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+    except Exception as e:
+        logger.error(f"Error creating simulation for repo '{repository_id}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Simulation engine error: {str(e)}",
+        )
+
+
+@router.get("/{repository_id}/simulations", response_model=SimulationListResponse)
+async def list_repository_simulations(
+    repository_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> SimulationListResponse:
+    """
+    Phase 22: List past simulation runs strictly scoped to the specified repository.
+    """
+    repo_res = await db.execute(select(Repository).where(Repository.id == repository_id))
+    repo = repo_res.scalars().first()
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Repository with id '{repository_id}' not found.",
+        )
+
+    try:
+        items = await future_impact_simulator_service.list_simulations(
+            db=db, repository_id=repository_id
+        )
+        return SimulationListResponse(
+            repository_id=repository_id,
+            total_simulations=len(items),
+            simulations=items,
+        )
+    except Exception as e:
+        logger.error(f"Error listing simulations for repo '{repository_id}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to list simulations: {str(e)}",
+        )
+
+
+@router.get("/{repository_id}/simulations/{simulation_id}", response_model=SimulationDetailResponse)
+async def get_repository_simulation(
+    repository_id: str,
+    simulation_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> SimulationDetailResponse:
+    """
+    Phase 22: Retrieve a saved simulation by ID with strict repository isolation.
+    """
+    repo_res = await db.execute(select(Repository).where(Repository.id == repository_id))
+    repo = repo_res.scalars().first()
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Repository with id '{repository_id}' not found.",
+        )
+
+    sim_data = await future_impact_simulator_service.get_simulation(
+        db=db, repository_id=repository_id, simulation_id=simulation_id
+    )
+    if not sim_data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Simulation '{simulation_id}' not found in repository '{repository_id}'.",
+        )
+
+    return SimulationDetailResponse(**sim_data)
+
+
+@router.delete("/{repository_id}/simulations/{simulation_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_repository_simulation(
+    repository_id: str,
+    simulation_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """
+    Phase 22: Delete a saved simulation by ID with strict repository isolation.
+    """
+    repo_res = await db.execute(select(Repository).where(Repository.id == repository_id))
+    repo = repo_res.scalars().first()
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Repository with id '{repository_id}' not found.",
+        )
+
+    deleted = await future_impact_simulator_service.delete_simulation(
+        db=db, repository_id=repository_id, simulation_id=simulation_id
+    )
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Simulation '{simulation_id}' not found in repository '{repository_id}'.",
+        )
+
+
+@router.post("/{repository_id}/simulations/target", response_model=SimulationDetailResponse)
+async def simulate_target_change(
+    repository_id: str,
+    payload: SimulationCreateRequest,
+    db: AsyncSession = Depends(get_db),
+) -> SimulationDetailResponse:
+    """
+    Phase 22: Interactive preview simulation endpoint without persisting to DB.
+    Allows rapid parameter exploration and what-if queries.
+    """
+    repo_res = await db.execute(select(Repository).where(Repository.id == repository_id))
+    repo = repo_res.scalars().first()
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Repository with id '{repository_id}' not found.",
+        )
+
+    try:
+        sim_data = await future_impact_simulator_service.run_simulation(
+            db=db,
+            repository_id=repository_id,
+            proposed_change=payload.proposed_change,
+            explicit_operation=payload.operation,
+            explicit_target_id=payload.target_id,
+            explicit_target_type=payload.target_type,
+            parameters=payload.parameters,
+        )
+        return SimulationDetailResponse(**sim_data)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+    except Exception as e:
+        logger.error(f"Error simulating target change for repo '{repository_id}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Simulation engine error: {str(e)}",
+        )
+
 
 
 

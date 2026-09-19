@@ -11,6 +11,7 @@ import { ChatAssistantView } from './ChatAssistantView';
 import { SearchIntelligenceModal } from './SearchIntelligenceModal';
 import { ImpactIntelligenceModal } from './ImpactIntelligenceModal';
 import { UniversalRepositoryOverview } from './UniversalRepositoryOverview';
+import { SimulationView } from './SimulationView';
 import { 
   ExternalLink, 
   GitBranch, 
@@ -32,6 +33,7 @@ import {
   Network,
   ArrowRightLeft,
   MessageSquareCode,
+  PlayCircle,
 } from 'lucide-react';
 
 interface RepositoryDetailProps {
@@ -601,6 +603,13 @@ export const RepositoryDetail: React.FC<RepositoryDetailProps> = ({
                 <span>Architecture Graph ({graphData?.edges?.length || 0})</span>
               </button>
               <button 
+                className={`explorer-tab-btn ${activeTab === 'simulation' ? 'active' : ''}`}
+                onClick={() => handleTabSelect('simulation')}
+              >
+                <PlayCircle size={14} style={{ color: 'var(--accent-cyan)' }} />
+                <span>Future Simulator</span>
+              </button>
+              <button 
                 className={`explorer-tab-btn ${activeTab === 'dependencies' ? 'active' : ''}`}
                 onClick={() => handleTabSelect('dependencies')}
               >
@@ -748,6 +757,24 @@ export const RepositoryDetail: React.FC<RepositoryDetailProps> = ({
                   repositoryId={repository.id} 
                   repositoryName={repository.name} 
                   onNavigateToFile={navigateToSource}
+                />
+              </div>
+            )}
+
+            {/* Phase 22: Future Impact Simulator Tab */}
+            {activeTab === 'simulation' && (
+              <div className="tab-panel-body" style={{ padding: 0 }}>
+                <SimulationView 
+                  repositoryId={repository.id} 
+                  onOpenFile={(filePath, line) => {
+                    const targetFile = files.find(f => f.path === filePath);
+                    if (targetFile) {
+                      navigateToSource(targetFile.id, line);
+                    }
+                  }}
+                  onOpenImpact={(targetId) => {
+                    setImpactTargetId(targetId);
+                  }}
                 />
               </div>
             )}

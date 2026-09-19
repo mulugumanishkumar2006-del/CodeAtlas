@@ -23,6 +23,7 @@ from backend.app.services.dependency_intelligence_service import dependency_inte
 from backend.app.services.architecture_intelligence_service import architecture_intelligence_service
 from backend.app.services.technical_debt_service import technical_debt_service
 from backend.app.services.risk_intelligence_service import risk_intelligence_service
+from backend.app.services.future_impact_simulator_service import future_impact_simulator_service
 from backend.app.services.llm_provider import get_llm_provider, SYSTEM_PROMPT, LLMProvider
 
 logger = logging.getLogger("codeatlas.rag")
@@ -99,6 +100,10 @@ class RAGService:
             w.strip(".") for w in raw_words 
             if w.lower() not in stop_words and len(w) > 1 and not w.isdigit()
         ]
+
+        # 0. SIMULATION (Future Impact Simulator: what happens if I change/remove/rename/replace, simulate change)
+        if re.search(r"\b(what happens if|what would happen if|simulate|what if i (?:remove|delete|rename|change|move|replace)|consequences of (?:removing|changing|renaming))\b", lower_q):
+            return "SIMULATION", keywords
 
         # 1. IMPACT (Blast radius, breakage, affected files)
         if re.search(r"\b(affected|blast radius|impact|break if|what breaks|change impact|modify|what will break|breakage)\b", lower_q):
@@ -451,6 +456,56 @@ class RAGService:
                             relevance=0.95,
                             match_reason=f"Caller of '{target_sym.name}' in {caller_file.path}",
                         )
+
+        # --- E0. PHASE 22: FUTURE IMPACT SIMULATOR ---
+        if intent == "SIMULATION" or any(kw.lower() in ["simulate", "what happens if"] for kw in keywords):
+            try:
+                sim_res = await future_impact_simulator_service.run_simulation(
+                    db=db,
+                    repository_id=repository_id,
+                    proposed_change=query,
+                )
+                tgt = sim_res.get("target") or {}
+                consequences = sim_res.get("consequences") or {}
+                known_list = consequences.get("known", [])
+                pred_list = consequences.get("predicted", [])
+                unkn_list = consequences.get("unknown", [])
+                validations = sim_res.get("recommended_validation", [])
+                b_after = sim_res.get("before_after") or {}
+
+                sim_summary = (
+                    f"PHASE 22 FUTURE IMPACT SIMULATION: '{sim_res.get('name')}'\n"
+                    f"- Proposed Change: {sim_res.get('proposed_change')}\n"
+                    f"- Operation: {sim_res.get('operation')} on target '{tgt.get('name')}' ({tgt.get('target_type')})\n"
+                    f"- Confidence: {sim_res.get('confidence')}\n\n"
+                    f"1. KNOWN CONSEQUENCES (Static Evidence Grounded):\n" +
+                    ("\n".join(f"  * {k}" for k in known_list[:6]) or "  * None identified") + "\n\n"
+                    f"2. PREDICTED CONSEQUENCES (Graph & Historical Inference):\n" +
+                    ("\n".join(f"  * {p}" for p in pred_list[:6]) or "  * None identified") + "\n\n"
+                    f"3. UNKNOWN CONSEQUENCES (Runtime / Execution Required):\n" +
+                    ("\n".join(f"  * {u}" for u in unkn_list[:6]) or "  * None identified") + "\n\n"
+                    f"STRUCTURAL DIFF:\n{b_after.get('structural_diff_summary', 'None')}\n\n"
+                    f"RECOMMENDED VALIDATION CHECKLIST:\n" +
+                    ("\n".join(f"  [ ] {v}" for v in validations[:5]) or "  [ ] Review code changes")
+                )
+
+                t_path = tgt.get("file_path") or tgt.get("name") or "simulation_summary.md"
+                t_fid = tgt.get("file_id") or file_path_map.get(t_path) or list(file_map.keys())[0] if file_map else "sim"
+
+                add_candidate(
+                    file_id=t_fid,
+                    path=t_path,
+                    start_line=tgt.get("start_line") or 1,
+                    end_line=tgt.get("end_line") or 50,
+                    symbol=tgt.get("name"),
+                    symbol_type=tgt.get("target_type"),
+                    docstring=None,
+                    content=sim_summary,
+                    relevance=0.99,
+                    match_reason="Phase 22 Future Impact Simulation Results",
+                )
+            except Exception as e:
+                logger.warning(f"RAG future impact simulation error: {e}")
 
         # --- E. DETERMINISTIC IMPACT & BLAST RADIUS (Phase 10) ---
         if intent == "IMPACT" or any(kw.lower() in ["impact", "blast", "break", "affected", "dependents"] for kw in keywords):

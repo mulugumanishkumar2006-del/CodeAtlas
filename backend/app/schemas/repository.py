@@ -1597,6 +1597,111 @@ class FindingDetailResponse(BaseModel):
     time_machine_context: Optional[dict[str, Any]] = None
 
 
+# =========================================================================
+# Phase 22: Future Impact Simulator Schemas
+# =========================================================================
+
+class SimulationOperationType(str):
+    REMOVE = "REMOVE"
+    RENAME = "RENAME"
+    SIGNATURE_CHANGE = "SIGNATURE_CHANGE"
+    MOVE = "MOVE"
+    DEPENDENCY_REMOVE = "DEPENDENCY_REMOVE"
+    DEPENDENCY_REPLACE = "DEPENDENCY_REPLACE"
+    API_CHANGE = "API_CHANGE"
+    MODULE_SPLIT = "MODULE_SPLIT"
+    MODULE_MERGE = "MODULE_MERGE"
+    MODIFY = "MODIFY"
+
+
+class SimulationIntent(BaseModel):
+    operation: str = "MODIFY"
+    target_type: str = "FILE"
+    target_identifier: str = ""
+    parameters: dict[str, Any] = {}
+    requires_clarification: bool = False
+    clarification_prompt: Optional[str] = None
+
+
+class SimulationConsequences(BaseModel):
+    known: list[str] = []
+    predicted: list[str] = []
+    unknown: list[str] = []
+
+
+class SimulationBeforeAfterNode(BaseModel):
+    id: str
+    label: str
+    node_type: str
+    status: str = "UNCHANGED"  # UNCHANGED, MODIFIED, REMOVED, REDIRECTED, ADDED
+
+
+class SimulationBeforeAfterEdge(BaseModel):
+    source: str
+    target: str
+    relationship: str
+    status: str = "ACTIVE"  # ACTIVE, BROKEN, REDIRECTED, HYPOTHETICAL
+
+
+class SimulationBeforeAfterModel(BaseModel):
+    current_nodes: list[SimulationBeforeAfterNode] = []
+    current_edges: list[SimulationBeforeAfterEdge] = []
+    simulated_nodes: list[SimulationBeforeAfterNode] = []
+    simulated_edges: list[SimulationBeforeAfterEdge] = []
+    structural_diff_summary: str = ""
+
+
+class SimulationCreateRequest(BaseModel):
+    proposed_change: str = Field(..., min_length=2, description="Natural-language or structured change proposal")
+    operation: Optional[str] = None  # REMOVE, RENAME, SIGNATURE_CHANGE, MOVE, etc.
+    target_id: Optional[str] = None
+    target_type: Optional[str] = None  # FILE, SYMBOL, FUNCTION, CLASS, MODULE, DIRECTORY, API, DEPENDENCY, COMPONENT
+    parameters: Optional[dict[str, Any]] = None
+
+
+class SimulationDetailResponse(BaseModel):
+    id: str
+    repository_id: str
+    name: str
+    status: str = "completed"
+    proposed_change: str
+    operation: str
+    confidence: str = "MEDIUM"  # HIGH, MEDIUM, LOW
+    target: Optional[ImpactTargetItem] = None
+    direct_impact: dict[str, Any] = {}
+    indirect_impact: dict[str, Any] = {}
+    architecture_impact: dict[str, Any] = {}
+    risk_impact: dict[str, Any] = {}
+    historical_evidence: dict[str, Any] = {}
+    test_impact: dict[str, Any] = {}
+    dependency_impact: dict[str, Any] = {}
+    consequences: SimulationConsequences = Field(default_factory=SimulationConsequences)
+    recommended_validation: list[str] = []
+    before_after: Optional[SimulationBeforeAfterModel] = None
+    graph: Optional[dict[str, Any]] = None
+    created_at: Optional[str] = None
+
+
+class SimulationListItem(BaseModel):
+    id: str
+    repository_id: str
+    name: str
+    simulation_type: str
+    status: str
+    proposed_change: Optional[str] = None
+    target_name: Optional[str] = None
+    confidence: Optional[str] = None
+    affected_files_count: int = 0
+    created_at: Optional[str] = None
+
+
+class SimulationListResponse(BaseModel):
+    repository_id: str
+    total_simulations: int = 0
+    simulations: list[SimulationListItem] = []
+
+
+
 
 
 

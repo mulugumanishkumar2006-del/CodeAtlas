@@ -113,16 +113,14 @@ class ImpactAnalysisService:
         # 1.1 Resolution by File
         # ---------------------------------------------------------------------
         if not inferred_type or inferred_type == "FILE":
-            stmt_file = select(File).where(File.repository_id == repository_id)
-            if len(clean_target) == 36 and "-" in clean_target:
-                stmt_file = stmt_file.where(File.id == clean_target)
-            else:
-                norm_tgt = clean_target.replace("\\", "/")
-                stmt_file = stmt_file.where(
-                    (File.path == norm_tgt) |
-                    (File.path.endswith("/" + norm_tgt)) |
-                    (File.path == norm_tgt.lstrip("/"))
-                )
+            norm_tgt = clean_target.replace("\\", "/")
+            stmt_file = select(File).where(
+                File.repository_id == repository_id,
+                (File.id == clean_target) |
+                (File.path == norm_tgt) |
+                (File.path.endswith("/" + norm_tgt)) |
+                (File.path == norm_tgt.lstrip("/"))
+            )
             
             file_res = await db.execute(stmt_file)
             target_file = file_res.scalars().first()
@@ -165,13 +163,12 @@ class ImpactAnalysisService:
         # 1.2 Resolution by Symbol / Class / Function / Method
         # ---------------------------------------------------------------------
         if not inferred_type or inferred_type in ["SYMBOL", "CLASS", "FUNCTION", "METHOD"]:
-            stmt_sym = select(Symbol).where(Symbol.repository_id == repository_id)
-            if len(clean_target) == 36 and "-" in clean_target:
-                stmt_sym = stmt_sym.where(Symbol.id == clean_target)
-            else:
-                stmt_sym = stmt_sym.where(
-                    (Symbol.name == clean_target) | (Symbol.qualified_name == clean_target)
-                )
+            stmt_sym = select(Symbol).where(
+                Symbol.repository_id == repository_id,
+                (Symbol.id == clean_target) |
+                (Symbol.name == clean_target) |
+                (Symbol.qualified_name == clean_target)
+            )
 
             if inferred_type in ["CLASS", "FUNCTION", "METHOD"]:
                 if inferred_type == "FUNCTION":
@@ -387,7 +384,30 @@ class ImpactAnalysisService:
 
     # =========================================================================
     # 2. CORE IMPACT ANALYSIS (12 DIMENSIONS)
-    # =========================================================================
+    async def calculate_impact(
+        self,
+        db: AsyncSession,
+        repository_id: str,
+        target_identifier: Optional[str] = None,
+        target_id: Optional[str] = None,
+        target_type: Optional[str] = None,
+        direction: str = "both",
+        max_depth: int = 3,
+        limit: int = 500,
+        index_version: str = "v1",
+    ) -> ImpactAnalysisResponse:
+        """Alias method for analyze_impact supporting target_identifier."""
+        tid = target_identifier or target_id or ""
+        return await self.analyze_impact(
+            db=db,
+            repository_id=repository_id,
+            target_id=tid,
+            target_type=target_type,
+            direction=direction,
+            max_depth=max_depth,
+            limit=limit,
+            index_version=index_version,
+        )
 
     async def analyze_impact(
         self,

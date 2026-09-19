@@ -47,6 +47,9 @@ import {
   EntityRiskResponse,
   DebtRiskTrendsResponse,
   FindingDetailResponse,
+  SimulationCreateRequest,
+  SimulationDetailResponse,
+  SimulationListResponse,
 } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
@@ -595,6 +598,38 @@ class ApiClient {
 
   async getRiskTrends(repositoryId: string): Promise<DebtRiskTrendsResponse> {
     return this.request<DebtRiskTrendsResponse>(`/repositories/${repositoryId}/risk/trends`);
+  }
+
+  // =========================================================================
+  // Phase 22: Future Impact Simulator API Methods
+  // =========================================================================
+
+  async createSimulation(repositoryId: string, payload: SimulationCreateRequest): Promise<SimulationDetailResponse> {
+    return this.request<SimulationDetailResponse>(`/repositories/${repositoryId}/simulations`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async listSimulations(repositoryId: string): Promise<SimulationListResponse> {
+    return this.request<SimulationListResponse>(`/repositories/${repositoryId}/simulations`);
+  }
+
+  async getSimulation(repositoryId: string, simulationId: string): Promise<SimulationDetailResponse> {
+    return this.request<SimulationDetailResponse>(`/repositories/${repositoryId}/simulations/${encodeURIComponent(simulationId)}`);
+  }
+
+  async deleteSimulation(repositoryId: string, simulationId: string): Promise<void> {
+    return this.request<void>(`/repositories/${repositoryId}/simulations/${encodeURIComponent(simulationId)}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async simulateTarget(repositoryId: string, payload: SimulationCreateRequest): Promise<SimulationDetailResponse> {
+    return this.request<SimulationDetailResponse>(`/repositories/${repositoryId}/simulations/target`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
   }
 }
 

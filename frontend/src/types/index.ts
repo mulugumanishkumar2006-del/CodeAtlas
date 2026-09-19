@@ -1,6 +1,6 @@
 export type AcquisitionStatus = 'NOT_CLONED' | 'CLONING' | 'READY' | 'SYNCING' | 'ERROR';
 export type AnalysisStatus = 'pending' | 'running' | 'completed' | 'partial' | 'failed';
-export type WorkspaceTab = 'overview' | 'chat' | 'architecture' | 'quality' | 'security' | 'history' | 'files' | 'symbols' | 'dependencies' | 'settings';
+export type WorkspaceTab = 'overview' | 'chat' | 'architecture' | 'simulation' | 'quality' | 'security' | 'history' | 'files' | 'symbols' | 'dependencies' | 'settings';
 
 export interface LanguageStat {
   language: string;
@@ -1686,6 +1686,101 @@ export interface FindingDetailResponse {
     authors: string[];
   } | null;
 }
+
+// =========================================================================
+// Phase 22: Future Impact Simulator Types
+// =========================================================================
+
+export type SimulationOperation =
+  | 'REMOVE'
+  | 'RENAME'
+  | 'SIGNATURE_CHANGE'
+  | 'MOVE'
+  | 'DEPENDENCY_REMOVE'
+  | 'DEPENDENCY_REPLACE'
+  | 'API_CHANGE'
+  | 'MODULE_SPLIT'
+  | 'MODULE_MERGE'
+  | 'MODIFY';
+
+export interface SimulationConsequences {
+  known: string[];
+  predicted: string[];
+  unknown: string[];
+}
+
+export interface SimulationBeforeAfterNode {
+  id: string;
+  label: string;
+  node_type: string;
+  status: 'UNCHANGED' | 'MODIFIED' | 'REMOVED' | 'REDIRECTED' | 'ADDED';
+}
+
+export interface SimulationBeforeAfterEdge {
+  source: string;
+  target: string;
+  relationship: string;
+  status: 'ACTIVE' | 'BROKEN' | 'REDIRECTED' | 'HYPOTHETICAL';
+}
+
+export interface SimulationBeforeAfterModel {
+  current_nodes: SimulationBeforeAfterNode[];
+  current_edges: SimulationBeforeAfterEdge[];
+  simulated_nodes: SimulationBeforeAfterNode[];
+  simulated_edges: SimulationBeforeAfterEdge[];
+  structural_diff_summary: string;
+}
+
+export interface SimulationCreateRequest {
+  proposed_change: string;
+  operation?: string;
+  target_id?: string;
+  target_type?: string;
+  parameters?: Record<string, any>;
+}
+
+export interface SimulationDetailResponse {
+  id: string;
+  repository_id: string;
+  name: string;
+  status: string;
+  proposed_change: string;
+  operation: string;
+  confidence: 'HIGH' | 'MEDIUM' | 'LOW';
+  target?: ImpactTargetItem | null;
+  direct_impact: Record<string, any>;
+  indirect_impact: Record<string, any>;
+  architecture_impact: Record<string, any>;
+  risk_impact: Record<string, any>;
+  historical_evidence: Record<string, any>;
+  test_impact: Record<string, any>;
+  dependency_impact: Record<string, any>;
+  consequences: SimulationConsequences;
+  recommended_validation: string[];
+  before_after?: SimulationBeforeAfterModel | null;
+  graph?: Record<string, any> | null;
+  created_at?: string | null;
+}
+
+export interface SimulationListItem {
+  id: string;
+  repository_id: string;
+  name: string;
+  simulation_type: string;
+  status: string;
+  proposed_change?: string | null;
+  target_name?: string | null;
+  confidence?: string | null;
+  affected_files_count: number;
+  created_at?: string | null;
+}
+
+export interface SimulationListResponse {
+  repository_id: string;
+  total_simulations: number;
+  simulations: SimulationListItem[];
+}
+
 
 
 
