@@ -1,6 +1,6 @@
 import React from 'react';
 import { WorkspaceTab, Repository } from '../types';
-import { LayoutGrid, MessageSquareCode, Network, PlayCircle, ShieldAlert, ShieldCheck, History, FolderTree, Blocks, Settings2, LucideIcon } from 'lucide-react';
+import { LayoutGrid, MessageSquareCode, Network, PlayCircle, Compass, ShieldAlert, ShieldCheck, History, FolderTree, Blocks, Settings2, LucideIcon } from 'lucide-react';
 
 interface WorkspaceNavProps {
   currentTab: WorkspaceTab;
@@ -18,6 +18,7 @@ export const WorkspaceNav: React.FC<WorkspaceNavProps> = ({
     { id: 'chat', label: 'Assistant / Q&A', icon: MessageSquareCode },
     { id: 'architecture', label: 'Architecture', icon: Network },
     { id: 'simulation', label: 'Future Simulator', icon: PlayCircle },
+    { id: 'engineering', label: 'AI CTO / Planning', icon: Compass },
     { id: 'quality', label: 'Quality & Debt', icon: ShieldAlert },
     { id: 'security', label: 'Security & Reliability', icon: ShieldCheck },
     { id: 'history', label: 'History & Evolution', icon: History },

@@ -12,6 +12,7 @@ import { SearchIntelligenceModal } from './SearchIntelligenceModal';
 import { ImpactIntelligenceModal } from './ImpactIntelligenceModal';
 import { UniversalRepositoryOverview } from './UniversalRepositoryOverview';
 import { SimulationView } from './SimulationView';
+import { EngineeringDashboardView } from './EngineeringDashboardView';
 import { 
   ExternalLink, 
   GitBranch, 
@@ -34,6 +35,7 @@ import {
   ArrowRightLeft,
   MessageSquareCode,
   PlayCircle,
+  Compass,
 } from 'lucide-react';
 
 interface RepositoryDetailProps {
@@ -610,6 +612,13 @@ export const RepositoryDetail: React.FC<RepositoryDetailProps> = ({
                 <span>Future Simulator</span>
               </button>
               <button 
+                className={`explorer-tab-btn ${activeTab === 'engineering' ? 'active' : ''}`}
+                onClick={() => handleTabSelect('engineering')}
+              >
+                <Compass size={14} style={{ color: 'var(--accent-cyan)' }} />
+                <span>AI CTO / Planning</span>
+              </button>
+              <button 
                 className={`explorer-tab-btn ${activeTab === 'dependencies' ? 'active' : ''}`}
                 onClick={() => handleTabSelect('dependencies')}
               >
@@ -765,6 +774,24 @@ export const RepositoryDetail: React.FC<RepositoryDetailProps> = ({
             {activeTab === 'simulation' && (
               <div className="tab-panel-body" style={{ padding: 0 }}>
                 <SimulationView 
+                  repositoryId={repository.id} 
+                  onOpenFile={(filePath, line) => {
+                    const targetFile = files.find(f => f.path === filePath);
+                    if (targetFile) {
+                      navigateToSource(targetFile.id, line);
+                    }
+                  }}
+                  onOpenImpact={(targetId) => {
+                    setImpactTargetId(targetId);
+                  }}
+                />
+              </div>
+            )}
+
+            {/* Phase 23: AI CTO / Engineering Planning Tab */}
+            {activeTab === 'engineering' && (
+              <div className="tab-panel-body" style={{ padding: 0 }}>
+                <EngineeringDashboardView 
                   repositoryId={repository.id} 
                   onOpenFile={(filePath, line) => {
                     const targetFile = files.find(f => f.path === filePath);

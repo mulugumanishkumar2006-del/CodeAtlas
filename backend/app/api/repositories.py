@@ -96,7 +96,19 @@ from backend.app.schemas.repository import (
     SimulationDetailResponse,
     SimulationListItem,
     SimulationListResponse,
+    EngineeringHealthResponse,
+    EngineeringPrioritiesResponse,
+    EngineeringRoadmapResponse,
+    WhatShouldWeDoNextResponse,
+    StrategyComparisonResponse,
+    SimulateIgnoreResponse,
+    EngineeringPlanCreateRequest,
+    EngineeringPlanGenerateRequest,
+    EngineeringPlanResponse,
+    EngineeringPlanListItem,
+    EngineeringPlanListResponse,
 )
+from backend.app.services.engineering_planning_service import engineering_planning_service
 from backend.app.services.future_impact_simulator_service import future_impact_simulator_service
 from backend.app.services.time_machine_service import time_machine_service
 from backend.app.services.technical_debt_service import technical_debt_service
@@ -3133,6 +3145,397 @@ async def simulate_target_change(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Simulation engine error: {str(e)}",
         )
+
+
+# =========================================================================
+# Phase 23: AI CTO / Engineering Planning Endpoints
+# =========================================================================
+
+@router.get("/{repository_id}/engineering/health", response_model=EngineeringHealthResponse)
+async def get_engineering_health(
+    repository_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> EngineeringHealthResponse:
+    """
+    Phase 23: Multi-dimensional engineering health assessment across 7 dimensions.
+    """
+    repo = await db.get(Repository, repository_id)
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Repository with id '{repository_id}' not found.",
+        )
+    try:
+        data = await engineering_planning_service.get_engineering_health(db, repository_id)
+        return EngineeringHealthResponse(**data)
+    except Exception as e:
+        logger.error(f"Error assessing engineering health for '{repository_id}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Health assessment error: {str(e)}",
+        )
+
+
+@router.get("/{repository_id}/engineering/priorities", response_model=EngineeringPrioritiesResponse)
+async def get_engineering_priorities(
+    repository_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> EngineeringPrioritiesResponse:
+    """
+    Phase 23: Grounded engineering priorities with problem statements, recommended actions,
+    validation plans, and dependency prerequisite sequencing.
+    """
+    repo = await db.get(Repository, repository_id)
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Repository with id '{repository_id}' not found.",
+        )
+    try:
+        data = await engineering_planning_service.get_engineering_priorities(db, repository_id)
+        return EngineeringPrioritiesResponse(**data)
+    except Exception as e:
+        logger.error(f"Error fetching engineering priorities for '{repository_id}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Priorities calculation error: {str(e)}",
+        )
+
+
+@router.get("/{repository_id}/engineering/roadmap", response_model=EngineeringRoadmapResponse)
+async def get_engineering_roadmap(
+    repository_id: str,
+    time_frame: str = Query("1_month", description="Roadmap horizon: 1_week, 1_month, 3_months, long_term"),
+    db: AsyncSession = Depends(get_db),
+) -> EngineeringRoadmapResponse:
+    """
+    Phase 23: Technical roadmap categorized into Now, Next, and Later horizons.
+    """
+    repo = await db.get(Repository, repository_id)
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Repository with id '{repository_id}' not found.",
+        )
+    try:
+        data = await engineering_planning_service.generate_roadmap(db, repository_id, time_frame=time_frame)
+        return EngineeringRoadmapResponse(**data)
+    except Exception as e:
+        logger.error(f"Error generating engineering roadmap for '{repository_id}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Roadmap generation error: {str(e)}",
+        )
+
+
+@router.get("/{repository_id}/engineering/next", response_model=WhatShouldWeDoNextResponse)
+async def what_should_we_do_next(
+    repository_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> WhatShouldWeDoNextResponse:
+    """
+    Phase 23: Single highest-impact engineering action recommendation justified by evidence.
+    """
+    repo = await db.get(Repository, repository_id)
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Repository with id '{repository_id}' not found.",
+        )
+    try:
+        data = await engineering_planning_service.what_should_we_do_next(db, repository_id)
+        return WhatShouldWeDoNextResponse(**data)
+    except Exception as e:
+        logger.error(f"Error answering 'what should we do next' for '{repository_id}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Next action error: {str(e)}",
+        )
+
+
+@router.get("/{repository_id}/engineering/strategies", response_model=StrategyComparisonResponse)
+async def compare_engineering_strategies(
+    repository_id: str,
+    work_item_id: Optional[str] = Query(None, description="Optional target work item ID"),
+    topic: Optional[str] = Query(None, description="Optional topic or component to compare"),
+    db: AsyncSession = Depends(get_db),
+) -> StrategyComparisonResponse:
+    """
+    Phase 23: Compare 4 engineering strategies (Minimal Change, Structural Refactor,
+    Incremental Migration, Containment).
+    """
+    repo = await db.get(Repository, repository_id)
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Repository with id '{repository_id}' not found.",
+        )
+    try:
+        data = await engineering_planning_service.compare_strategies(
+            db, repository_id, work_item_id=work_item_id, topic=topic
+        )
+        return StrategyComparisonResponse(**data)
+    except Exception as e:
+        logger.error(f"Error comparing engineering strategies for '{repository_id}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Strategy comparison error: {str(e)}",
+        )
+
+
+@router.post("/{repository_id}/engineering/simulate-ignore", response_model=SimulateIgnoreResponse)
+async def simulate_ignore(
+    repository_id: str,
+    work_item_id: str = Query(..., description="Work item ID to simulate ignoring"),
+    db: AsyncSession = Depends(get_db),
+) -> SimulateIgnoreResponse:
+    """
+    Phase 23: Simulates what happens if a specific engineering work item is ignored.
+    """
+    repo = await db.get(Repository, repository_id)
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Repository with id '{repository_id}' not found.",
+        )
+    try:
+        data = await engineering_planning_service.simulate_ignore(db, repository_id, work_item_id=work_item_id)
+        return SimulateIgnoreResponse(**data)
+    except Exception as e:
+        logger.error(f"Error simulating ignore for work item '{work_item_id}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Simulate ignore error: {str(e)}",
+        )
+
+
+@router.get("/{repository_id}/engineering/plans", response_model=EngineeringPlanListResponse)
+async def list_engineering_plans(
+    repository_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> EngineeringPlanListResponse:
+    """
+    Phase 23: List all persisted engineering plans for a repository.
+    """
+    repo = await db.get(Repository, repository_id)
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Repository with id '{repository_id}' not found.",
+        )
+    try:
+        plans = await engineering_planning_service.list_plans(db, repository_id)
+        items = [
+            EngineeringPlanListItem(
+                id=p.id,
+                repository_id=p.repository_id,
+                title=p.title,
+                status=p.status,
+                version=p.version,
+                time_horizon=p.time_horizon,
+                work_item_count=len(p.work_items or []),
+                created_at=p.created_at.isoformat() if p.created_at else None,
+                updated_at=p.updated_at.isoformat() if p.updated_at else None,
+            )
+            for p in plans
+        ]
+        return EngineeringPlanListResponse(
+            repository_id=repository_id,
+            total_plans=len(items),
+            plans=items,
+        )
+    except Exception as e:
+        logger.error(f"Error listing engineering plans for '{repository_id}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to list plans: {str(e)}",
+        )
+
+
+@router.post("/{repository_id}/engineering/plans/generate", response_model=EngineeringPlanResponse, status_code=status.HTTP_201_CREATED)
+async def generate_engineering_plan(
+    repository_id: str,
+    payload: EngineeringPlanGenerateRequest,
+    db: AsyncSession = Depends(get_db),
+) -> EngineeringPlanResponse:
+    """
+    Phase 23: Autonomous AI CTO Plan Generation with Auto-Versioning (Plan v1 -> Plan v2).
+    """
+    repo = await db.get(Repository, repository_id)
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Repository with id '{repository_id}' not found.",
+        )
+    try:
+        plan = await engineering_planning_service.generate_plan(
+            db=db,
+            repository_id=repository_id,
+            title=payload.title,
+            time_horizon=payload.time_horizon,
+            focus_areas=payload.focus_areas,
+        )
+        return EngineeringPlanResponse(
+            id=plan.id,
+            repository_id=plan.repository_id,
+            title=plan.title,
+            status=plan.status,
+            version=plan.version,
+            time_horizon=plan.time_horizon,
+            summary=plan.summary or "",
+            health_snapshot=plan.health_snapshot or {},
+            work_items=plan.work_items or [],
+            roadmaps=plan.roadmaps or {},
+            source_evidence={"evidence": plan.source_evidence or []},
+            created_at=plan.created_at.isoformat() if plan.created_at else None,
+            updated_at=plan.updated_at.isoformat() if plan.updated_at else None,
+        )
+    except Exception as e:
+        logger.error(f"Error generating engineering plan for '{repository_id}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Plan generation failed: {str(e)}",
+        )
+
+
+@router.post("/{repository_id}/engineering/plans", response_model=EngineeringPlanResponse, status_code=status.HTTP_201_CREATED)
+async def create_custom_engineering_plan(
+    repository_id: str,
+    payload: EngineeringPlanCreateRequest,
+    db: AsyncSession = Depends(get_db),
+) -> EngineeringPlanResponse:
+    """
+    Phase 23: Create or save a customized engineering plan with auto-versioning.
+    """
+    repo = await db.get(Repository, repository_id)
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Repository with id '{repository_id}' not found.",
+        )
+    try:
+        plan = await engineering_planning_service.create_plan(
+            db=db,
+            repository_id=repository_id,
+            title=payload.title,
+            time_horizon=payload.time_horizon,
+            summary=payload.summary,
+            work_items=payload.work_items,
+            roadmaps=payload.roadmaps,
+        )
+        return EngineeringPlanResponse(
+            id=plan.id,
+            repository_id=plan.repository_id,
+            title=plan.title,
+            status=plan.status,
+            version=plan.version,
+            time_horizon=plan.time_horizon,
+            summary=plan.summary or "",
+            health_snapshot=plan.health_snapshot or {},
+            work_items=plan.work_items or [],
+            roadmaps=plan.roadmaps or {},
+            source_evidence={"evidence": plan.source_evidence or []},
+            created_at=plan.created_at.isoformat() if plan.created_at else None,
+            updated_at=plan.updated_at.isoformat() if plan.updated_at else None,
+        )
+    except Exception as e:
+        logger.error(f"Error creating custom engineering plan for '{repository_id}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Plan creation failed: {str(e)}",
+        )
+
+
+@router.get("/{repository_id}/engineering/plans/{plan_id}", response_model=EngineeringPlanResponse)
+async def get_engineering_plan(
+    repository_id: str,
+    plan_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> EngineeringPlanResponse:
+    """
+    Phase 23: Fetch single engineering plan with strict repository isolation.
+    """
+    repo = await db.get(Repository, repository_id)
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Repository with id '{repository_id}' not found.",
+        )
+    try:
+        plan = await engineering_planning_service.get_plan(db, repository_id, plan_id)
+        return EngineeringPlanResponse(
+            id=plan.id,
+            repository_id=plan.repository_id,
+            title=plan.title,
+            status=plan.status,
+            version=plan.version,
+            time_horizon=plan.time_horizon,
+            summary=plan.summary or "",
+            health_snapshot=plan.health_snapshot or {},
+            work_items=plan.work_items or [],
+            roadmaps=plan.roadmaps or {},
+            source_evidence={"evidence": plan.source_evidence or []},
+            created_at=plan.created_at.isoformat() if plan.created_at else None,
+            updated_at=plan.updated_at.isoformat() if plan.updated_at else None,
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        )
+    except Exception as e:
+        logger.error(f"Error retrieving plan '{plan_id}' for repo '{repository_id}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch plan: {str(e)}",
+        )
+
+
+@router.patch("/{repository_id}/engineering/plans/{plan_id}", response_model=EngineeringPlanResponse)
+async def update_engineering_plan_status(
+    repository_id: str,
+    plan_id: str,
+    new_status: str = Query(..., pattern="^(active|draft|completed|archived)$"),
+    db: AsyncSession = Depends(get_db),
+) -> EngineeringPlanResponse:
+    """
+    Phase 23: Update engineering plan status (active, draft, completed, archived).
+    """
+    repo = await db.get(Repository, repository_id)
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Repository with id '{repository_id}' not found.",
+        )
+    try:
+        plan = await engineering_planning_service.update_plan_status(db, repository_id, plan_id, status=new_status)
+        return EngineeringPlanResponse(
+            id=plan.id,
+            repository_id=plan.repository_id,
+            title=plan.title,
+            status=plan.status,
+            version=plan.version,
+            time_horizon=plan.time_horizon,
+            summary=plan.summary or "",
+            health_snapshot=plan.health_snapshot or {},
+            work_items=plan.work_items or [],
+            roadmaps=plan.roadmaps or {},
+            source_evidence={"evidence": plan.source_evidence or []},
+            created_at=plan.created_at.isoformat() if plan.created_at else None,
+            updated_at=plan.updated_at.isoformat() if plan.updated_at else None,
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        )
+    except Exception as e:
+        logger.error(f"Error updating status for plan '{plan_id}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update plan status: {str(e)}",
+        )
+
 
 
 

@@ -50,6 +50,14 @@ import {
   SimulationCreateRequest,
   SimulationDetailResponse,
   SimulationListResponse,
+  EngineeringHealthResponse,
+  EngineeringPrioritiesResponse,
+  EngineeringRoadmapResponse,
+  WhatShouldWeDoNextResponse,
+  StrategyComparisonResponse,
+  SimulateIgnoreResponse,
+  EngineeringPlanListResponse,
+  EngineeringPlanResponse,
 } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
@@ -630,6 +638,84 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify(payload),
     });
+  }
+
+  // =========================================================================
+  // Phase 23: AI CTO / Engineering Planning API Methods
+  // =========================================================================
+
+  async getEngineeringHealth(repositoryId: string): Promise<EngineeringHealthResponse> {
+    return this.request<EngineeringHealthResponse>(`/repositories/${repositoryId}/engineering/health`);
+  }
+
+  async getEngineeringPriorities(repositoryId: string): Promise<EngineeringPrioritiesResponse> {
+    return this.request<EngineeringPrioritiesResponse>(`/repositories/${repositoryId}/engineering/priorities`);
+  }
+
+  async getEngineeringRoadmap(repositoryId: string, timeFrame: string = '1_month'): Promise<EngineeringRoadmapResponse> {
+    return this.request<EngineeringRoadmapResponse>(`/repositories/${repositoryId}/engineering/roadmap?time_frame=${encodeURIComponent(timeFrame)}`);
+  }
+
+  async whatShouldWeDoNext(repositoryId: string): Promise<WhatShouldWeDoNextResponse> {
+    return this.request<WhatShouldWeDoNextResponse>(`/repositories/${repositoryId}/engineering/next`);
+  }
+
+  async compareEngineeringStrategies(
+    repositoryId: string,
+    workItemId?: string,
+    topic?: string
+  ): Promise<StrategyComparisonResponse> {
+    const params = new URLSearchParams();
+    if (workItemId) params.append('work_item_id', workItemId);
+    if (topic) params.append('topic', topic);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return this.request<StrategyComparisonResponse>(`/repositories/${repositoryId}/engineering/strategies${query}`);
+  }
+
+  async simulateIgnore(repositoryId: string, workItemId: string): Promise<SimulateIgnoreResponse> {
+    return this.request<SimulateIgnoreResponse>(
+      `/repositories/${repositoryId}/engineering/simulate-ignore?work_item_id=${encodeURIComponent(workItemId)}`,
+      { method: 'POST' }
+    );
+  }
+
+  async listEngineeringPlans(repositoryId: string): Promise<EngineeringPlanListResponse> {
+    return this.request<EngineeringPlanListResponse>(`/repositories/${repositoryId}/engineering/plans`);
+  }
+
+  async generateEngineeringPlan(
+    repositoryId: string,
+    payload: { title?: string; time_horizon?: string; focus_areas?: string[] }
+  ): Promise<EngineeringPlanResponse> {
+    return this.request<EngineeringPlanResponse>(`/repositories/${repositoryId}/engineering/plans/generate`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async createCustomEngineeringPlan(
+    repositoryId: string,
+    payload: { title: string; time_horizon?: string; summary?: string; work_items?: any[]; roadmaps?: any }
+  ): Promise<EngineeringPlanResponse> {
+    return this.request<EngineeringPlanResponse>(`/repositories/${repositoryId}/engineering/plans`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async getEngineeringPlan(repositoryId: string, planId: string): Promise<EngineeringPlanResponse> {
+    return this.request<EngineeringPlanResponse>(`/repositories/${repositoryId}/engineering/plans/${encodeURIComponent(planId)}`);
+  }
+
+  async updateEngineeringPlanStatus(
+    repositoryId: string,
+    planId: string,
+    newStatus: string
+  ): Promise<EngineeringPlanResponse> {
+    return this.request<EngineeringPlanResponse>(
+      `/repositories/${repositoryId}/engineering/plans/${encodeURIComponent(planId)}?new_status=${encodeURIComponent(newStatus)}`,
+      { method: 'PATCH' }
+    );
   }
 }
 

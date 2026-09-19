@@ -1,6 +1,6 @@
 export type AcquisitionStatus = 'NOT_CLONED' | 'CLONING' | 'READY' | 'SYNCING' | 'ERROR';
 export type AnalysisStatus = 'pending' | 'running' | 'completed' | 'partial' | 'failed';
-export type WorkspaceTab = 'overview' | 'chat' | 'architecture' | 'simulation' | 'quality' | 'security' | 'history' | 'files' | 'symbols' | 'dependencies' | 'settings';
+export type WorkspaceTab = 'overview' | 'chat' | 'architecture' | 'simulation' | 'engineering' | 'quality' | 'security' | 'history' | 'files' | 'symbols' | 'dependencies' | 'settings';
 
 export interface LanguageStat {
   language: string;
@@ -1780,6 +1780,168 @@ export interface SimulationListResponse {
   total_simulations: number;
   simulations: SimulationListItem[];
 }
+
+
+// =========================================================================
+// Phase 23: AI CTO / Engineering Planning Types
+// =========================================================================
+
+export interface EngineeringHealthDimension {
+  name: string;
+  key: string;
+  score: number;
+  grade: string;
+  status: 'HEALTHY' | 'MODERATE' | 'DEGRADED' | 'CRITICAL';
+  summary: string;
+  strengths: string[];
+  concerns: string[];
+  metrics: Record<string, any>;
+}
+
+export interface EngineeringHealthResponse {
+  repository_id: string;
+  overall_score: number;
+  overall_grade: string;
+  overall_status: 'HEALTHY' | 'MODERATE' | 'DEGRADED' | 'CRITICAL';
+  summary: string;
+  dimensions: EngineeringHealthDimension[];
+  generated_at: string;
+}
+
+export interface EngineeringEvidenceCitation {
+  evidence_type: string;
+  source_path?: string | null;
+  symbol_name?: string | null;
+  metric_name?: string | null;
+  metric_value?: any;
+  explanation: string;
+}
+
+export interface EngineeringWorkItem {
+  id: string;
+  title: string;
+  problem_statement: string;
+  primary_category: string;
+  priority_tier: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+  priority_score: number;
+  target_files: string[];
+  target_symbols: string[];
+  prerequisite_item_ids: string[];
+  dependent_item_ids: string[];
+  recommended_action: string;
+  validation_plan: string[];
+  effort_estimate: string;
+  evidence: EngineeringEvidenceCitation[];
+  impact_summary: string;
+  risk_if_ignored: string;
+}
+
+export interface EngineeringPrioritiesResponse {
+  repository_id: string;
+  total_priorities: number;
+  priorities: EngineeringWorkItem[];
+  rationale: string;
+  evaluated_at: string;
+}
+
+export interface EngineeringRoadmapItem {
+  work_item_id: string;
+  title: string;
+  category: string;
+  priority: string;
+  time_horizon: 'NOW' | 'NEXT' | 'LATER';
+  target_files: string[];
+  prerequisites: string[];
+  summary: string;
+}
+
+export interface EngineeringRoadmapResponse {
+  repository_id: string;
+  time_frame: string;
+  now: EngineeringRoadmapItem[];
+  next: EngineeringRoadmapItem[];
+  later: EngineeringRoadmapItem[];
+  executive_summary: string;
+  total_items: number;
+}
+
+export interface WhatShouldWeDoNextResponse {
+  repository_id: string;
+  headline: string;
+  top_action?: EngineeringWorkItem | null;
+  next_actions: EngineeringWorkItem[];
+  justification: string;
+  blockers_or_prerequisites: string[];
+  confidence: string;
+}
+
+export interface EngineeringStrategyOption {
+  strategy_type: 'MINIMAL_CHANGE' | 'STRUCTURAL_REFACTOR' | 'INCREMENTAL_MIGRATION' | 'CONTAINMENT';
+  title: string;
+  description: string;
+  pros: string[];
+  cons: string[];
+  blast_radius: 'LOW' | 'MEDIUM' | 'HIGH';
+  estimated_complexity: string;
+  recommended_steps: string[];
+  verification_strategy: string[];
+  is_recommended: boolean;
+}
+
+export interface StrategyComparisonResponse {
+  repository_id: string;
+  work_item_id?: string | null;
+  topic: string;
+  recommended_strategy: string;
+  options: EngineeringStrategyOption[];
+  synthesis: string;
+}
+
+export interface SimulateIgnoreResponse {
+  repository_id: string;
+  work_item_id: string;
+  title: string;
+  consequence_summary: string;
+  accumulated_risk_score: number;
+  affected_components: string[];
+  historical_precedents: string[];
+  simulation_details: Record<string, any>;
+}
+
+export interface EngineeringPlanListItem {
+  id: string;
+  repository_id: string;
+  title: string;
+  status: string;
+  version: number;
+  time_horizon: string;
+  work_item_count: number;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface EngineeringPlanListResponse {
+  repository_id: string;
+  total_plans: number;
+  plans: EngineeringPlanListItem[];
+}
+
+export interface EngineeringPlanResponse {
+  id: string;
+  repository_id: string;
+  title: string;
+  status: string;
+  version: number;
+  time_horizon: string;
+  summary: string;
+  health_snapshot: Record<string, any>;
+  work_items: Record<string, any>[];
+  roadmaps: Record<string, any>;
+  source_evidence: Record<string, any>;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
 
 
 

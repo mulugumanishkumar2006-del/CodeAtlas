@@ -13,6 +13,7 @@ from backend.app.models.finding import Finding
 from backend.app.models.investigation import Investigation
 from backend.app.models.simulation import Simulation
 from backend.app.models.conversation import Conversation
+from backend.app.models.engineering_plan import EngineeringPlan
 
 __all__ = [
     "Base",
@@ -35,4 +36,5 @@ __all__ = [
     "Investigation",
     "Simulation",
     "Conversation",
+    "EngineeringPlan",
 ]

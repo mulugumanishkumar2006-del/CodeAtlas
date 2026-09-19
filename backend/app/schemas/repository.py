@@ -1701,6 +1701,181 @@ class SimulationListResponse(BaseModel):
     simulations: list[SimulationListItem] = []
 
 
+# =========================================================================
+# Phase 23: AI CTO / Engineering Planning Schemas
+# =========================================================================
+
+class EngineeringHealthDimension(BaseModel):
+    name: str
+    key: str
+    score: float
+    grade: str
+    status: str
+    summary: str
+    strengths: list[str] = []
+    concerns: list[str] = []
+    metrics: dict[str, Any] = {}
+
+
+class EngineeringHealthResponse(BaseModel):
+    repository_id: str
+    overall_score: float
+    overall_grade: str
+    overall_status: str
+    summary: str
+    dimensions: list[EngineeringHealthDimension] = []
+    generated_at: str
+
+
+class EngineeringEvidenceCitation(BaseModel):
+    evidence_type: str
+    source_path: Optional[str] = None
+    symbol_name: Optional[str] = None
+    metric_name: Optional[str] = None
+    metric_value: Optional[Any] = None
+    explanation: str
+
+
+class EngineeringWorkItem(BaseModel):
+    id: str
+    title: str
+    problem_statement: str
+    primary_category: str
+    priority_tier: str
+    priority_score: float
+    target_files: list[str] = []
+    target_symbols: list[str] = []
+    prerequisite_item_ids: list[str] = []
+    dependent_item_ids: list[str] = []
+    recommended_action: str
+    validation_plan: list[str] = []
+    effort_estimate: str = "Effort estimate unavailable from repository evidence."
+    evidence: list[EngineeringEvidenceCitation] = []
+    impact_summary: str
+    risk_if_ignored: str
+
+
+class EngineeringPrioritiesResponse(BaseModel):
+    repository_id: str
+    total_priorities: int = 0
+    priorities: list[EngineeringWorkItem] = []
+    rationale: str
+    evaluated_at: str
+
+
+class EngineeringStrategyOption(BaseModel):
+    strategy_type: str
+    title: str
+    description: str
+    pros: list[str] = []
+    cons: list[str] = []
+    blast_radius: str
+    estimated_complexity: str
+    recommended_steps: list[str] = []
+    verification_strategy: list[str] = []
+    is_recommended: bool = False
+
+
+class StrategyComparisonResponse(BaseModel):
+    repository_id: str
+    work_item_id: Optional[str] = None
+    topic: str
+    recommended_strategy: str
+    options: list[EngineeringStrategyOption] = []
+    synthesis: str
+
+
+class EngineeringRoadmapItem(BaseModel):
+    work_item_id: str
+    title: str
+    category: str
+    priority: str
+    time_horizon: str
+    target_files: list[str] = []
+    prerequisites: list[str] = []
+    summary: str
+
+
+class EngineeringRoadmapResponse(BaseModel):
+    repository_id: str
+    time_frame: str
+    now: list[EngineeringRoadmapItem] = []
+    next: list[EngineeringRoadmapItem] = []
+    later: list[EngineeringRoadmapItem] = []
+    executive_summary: str
+    total_items: int = 0
+
+
+class WhatShouldWeDoNextResponse(BaseModel):
+    repository_id: str
+    headline: str
+    top_action: Optional[EngineeringWorkItem] = None
+    next_actions: list[EngineeringWorkItem] = []
+    justification: str
+    blockers_or_prerequisites: list[str] = []
+    confidence: str = "HIGH"
+
+
+class SimulateIgnoreResponse(BaseModel):
+    repository_id: str
+    work_item_id: str
+    title: str
+    consequence_summary: str
+    accumulated_risk_score: float
+    affected_components: list[str] = []
+    historical_precedents: list[str] = []
+    simulation_details: dict[str, Any] = {}
+
+
+class EngineeringPlanCreateRequest(BaseModel):
+    title: str = Field(..., min_length=2)
+    time_horizon: str = "1_month"
+    summary: Optional[str] = None
+    work_items: Optional[list[dict[str, Any]]] = None
+    roadmaps: Optional[dict[str, Any]] = None
+
+
+class EngineeringPlanGenerateRequest(BaseModel):
+    title: Optional[str] = None
+    time_horizon: str = "1_month"
+    focus_areas: Optional[list[str]] = None
+
+
+class EngineeringPlanResponse(BaseModel):
+    id: str
+    repository_id: str
+    title: str
+    status: str
+    version: int
+    time_horizon: str
+    summary: str
+    health_snapshot: dict[str, Any] = {}
+    work_items: list[dict[str, Any]] = []
+    roadmaps: dict[str, Any] = {}
+    source_evidence: dict[str, Any] = {}
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class EngineeringPlanListItem(BaseModel):
+    id: str
+    repository_id: str
+    title: str
+    status: str
+    version: int
+    time_horizon: str
+    work_item_count: int = 0
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class EngineeringPlanListResponse(BaseModel):
+    repository_id: str
+    total_plans: int = 0
+    plans: list[EngineeringPlanListItem] = []
+
+
+
 
 
 

@@ -24,6 +24,7 @@ from backend.app.services.architecture_intelligence_service import architecture_
 from backend.app.services.technical_debt_service import technical_debt_service
 from backend.app.services.risk_intelligence_service import risk_intelligence_service
 from backend.app.services.future_impact_simulator_service import future_impact_simulator_service
+from backend.app.services.engineering_planning_service import engineering_planning_service
 from backend.app.services.llm_provider import get_llm_provider, SYSTEM_PROMPT, LLMProvider
 
 logger = logging.getLogger("codeatlas.rag")
@@ -100,6 +101,10 @@ class RAGService:
             w.strip(".") for w in raw_words 
             if w.lower() not in stop_words and len(w) > 1 and not w.isdigit()
         ]
+
+        # -1. PLANNING / AI CTO (Engineering Priorities, Roadmaps, Health, What should we work on next, What to refactor first)
+        if re.search(r"\b(what should (?:the engineering team|we) work on (?:next)?|what (?:should we|to) do next|what (?:should|to) refactor first|engineering priorities|priorities|engineering plan|roadmap|technical roadmap|engineering health|health score|ai cto|largest technical risks|what happens if we ignore|compare strategies|strategy comparison)\b", lower_q):
+            return "PLANNING", keywords
 
         # 0. SIMULATION (Future Impact Simulator: what happens if I change/remove/rename/replace, simulate change)
         if re.search(r"\b(what happens if|what would happen if|simulate|what if i (?:remove|delete|rename|change|move|replace)|consequences of (?:removing|changing|renaming))\b", lower_q):
@@ -456,6 +461,57 @@ class RAGService:
                             relevance=0.95,
                             match_reason=f"Caller of '{target_sym.name}' in {caller_file.path}",
                         )
+
+        # --- E-1. PHASE 23: AI CTO & ENGINEERING PLANNING ---
+        if intent == "PLANNING" or any(kw.lower() in ["priorities", "roadmap", "health", "cto", "refactor", "plan"] for kw in keywords):
+            try:
+                plan_health = await engineering_planning_service.get_engineering_health(db, repository_id)
+                plan_priorities = await engineering_planning_service.get_engineering_priorities(db, repository_id)
+                plan_next = await engineering_planning_service.what_should_we_do_next(db, repository_id)
+
+                health_dims = plan_health.get("dimensions", [])
+                dims_summary = "\n".join(
+                    f"  - {d['name']}: {d['score']}/100 ({d['grade']} - {d['status']}) | Concerns: {', '.join(d.get('concerns', [])[:2]) or 'None'}"
+                    for d in health_dims
+                )
+
+                priorities_list = plan_priorities.get("priorities", [])
+                p_summary = "\n".join(
+                    f"  {idx+1}. [{p['priority_tier']}] {p['title']} (Score: {p['priority_score']}/100, Cat: {p['primary_category']})\n"
+                    f"     Problem: {p['problem_statement'][:140]}\n"
+                    f"     Action: {p['recommended_action'][:140]}\n"
+                    f"     Validation: {'; '.join(p.get('validation_plan', [])[:2])}"
+                    for idx, p in enumerate(priorities_list[:5])
+                )
+
+                top_act = plan_next.get("top_action") or {}
+
+                planning_content = (
+                    f"PHASE 23 AI CTO & ENGINEERING PLANNING INTELLIGENCE:\n"
+                    f"Overall Engineering Health: {plan_health.get('overall_score')}/100 ({plan_health.get('overall_grade')} - {plan_health.get('overall_status')})\n"
+                    f"Summary: {plan_health.get('summary')}\n\n"
+                    f"HEALTH DIMENSIONS:\n{dims_summary}\n\n"
+                    f"TOP RECOMMENDED NEXT ACTION:\n"
+                    f"- Action: {top_act.get('title', 'Baseline Maintenance')}\n"
+                    f"- Category: {top_act.get('primary_category', 'TESTING')}\n"
+                    f"- Justification: {plan_next.get('justification', '')}\n\n"
+                    f"RANKED ENGINEERING PRIORITIES:\n{p_summary}\n"
+                )
+
+                add_candidate(
+                    file_id=list(file_map.keys())[0] if file_map else "plan",
+                    path="engineering_planning_summary.md",
+                    start_line=1,
+                    end_line=60,
+                    symbol="AI_CTO_Planning",
+                    symbol_type="PLANNING_INTELLIGENCE",
+                    docstring=None,
+                    content=planning_content,
+                    relevance=0.99,
+                    match_reason="Phase 23 AI CTO Engineering Planning Intelligence",
+                )
+            except Exception as e:
+                logger.warning(f"RAG engineering planning retrieval error: {e}")
 
         # --- E0. PHASE 22: FUTURE IMPACT SIMULATOR ---
         if intent == "SIMULATION" or any(kw.lower() in ["simulate", "what happens if"] for kw in keywords):
