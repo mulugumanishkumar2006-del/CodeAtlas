@@ -1,0 +1,49 @@
+# CodeAtlas Repository Intelligence & PR Review Configuration
+# Place this file in the root of your repository to configure automated CI/CD review gates.
+
+version: 1
+
+gates:
+  breaking_changes:
+    enabled: true
+    fail_on: DETECTED  # DETECTED (fail on verified breaking changes), POTENTIAL, NONE
+    severity: BLOCKING
+
+  architecture:
+    enabled: true
+    max_new_violations: 0
+    fail_on_boundary_crossing: true
+    severity: BLOCKING
+
+  security:
+    enabled: true
+    fail_on_severity:
+      - CRITICAL
+      - HIGH
+    severity: BLOCKING
+
+  risk_delta:
+    enabled: true
+    max_risk_delta: 25.0
+    severity: HIGH
+
+  test_coverage_gap:
+    enabled: true
+    warn_on_untested_high_impact: true
+    severity: MEDIUM
+
+ignore_paths:
+  - "node_modules/**"
+  - "vendor/**"
+  - "dist/**"
+  - "build/**"
+  - "*.min.js"
+  - "*.min.css"
+  - "package-lock.json"
+  - "yarn.lock"
+  - "pnpm-lock.yaml"
+
+limits:
+  max_files: 200
+  max_diff_lines: 15000
+  max_comments: 50

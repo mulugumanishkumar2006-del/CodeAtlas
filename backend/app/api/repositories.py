@@ -14,6 +14,7 @@ from backend.app.models.symbol import Symbol
 from backend.app.models.dependency import Dependency
 from backend.app.models.graph import GraphNode, GraphRelationship
 from backend.app.models.conversation import Conversation
+from backend.app.models.pull_request_review import PullRequestReview
 from backend.app.schemas.repository import (
     RepositoryCreate,
     RepositoryResponse,
@@ -107,7 +108,16 @@ from backend.app.schemas.repository import (
     EngineeringPlanResponse,
     EngineeringPlanListItem,
     EngineeringPlanListResponse,
+    PullRequestReviewCreateRequest,
+    PullRequestReviewSummaryResponse,
+    PullRequestReviewDetailResponse,
+    PullRequestReviewListResponse,
+    PullRequestReviewDiffResponse,
+    PullRequestReviewFindingsResponse,
+    PullRequestReviewStatusResponse,
 )
+from backend.app.services.pull_request_reviewer_service import pr_reviewer_service
+from backend.app.services.ci_provider_service import get_ci_provider
 from backend.app.services.engineering_planning_service import engineering_planning_service
 from backend.app.services.future_impact_simulator_service import future_impact_simulator_service
 from backend.app.services.time_machine_service import time_machine_service
@@ -3535,6 +3545,464 @@ async def update_engineering_plan_status(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to update plan status: {str(e)}",
         )
+
+
+# =========================================================================
+# Phase 24: CI/CD & Automated Pull Request Reviewer Endpoints
+# =========================================================================
+
+@router.post("/{repository_id}/reviews", response_model=PullRequestReviewDetailResponse, status_code=status.HTTP_201_CREATED)
+async def create_pull_request_review(
+    repository_id: str,
+    request: PullRequestReviewCreateRequest,
+    db: AsyncSession = Depends(get_db),
+) -> PullRequestReviewDetailResponse:
+    """
+    Phase 24: Trigger an evidence-backed Pull Request / Diff Review.
+    Compares BASE commit vs HEAD commit (or custom diff) and computes:
+    - Changed files & AST symbols
+    - Breaking changes
+    - Architecture drift & boundary violations
+    - Risk & technical debt deltas
+    - Security & reliability review
+    - Test impact & coverage gaps
+    - Review gates & inline comments
+    """
+    repo = await db.get(Repository, repository_id)
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Repository with id '{repository_id}' not found.",
+        )
+
+    try:
+        review = await pr_reviewer_service.analyze_pull_request(
+            db=db,
+            repository_id=repository_id,
+            base_commit_sha=request.base_commit_sha,
+            head_commit_sha=request.head_commit_sha,
+            title=request.title or f"PR Review: {request.base_commit_sha[:7]}..{request.head_commit_sha[:7]}",
+            pr_number=request.pr_number,
+            provider=request.provider or "local",
+            source_branch=request.source_branch,
+            target_branch=request.target_branch,
+            author=request.author or "Engineer",
+            custom_diff=request.custom_diff,
+            config_override=request.config_override,
+        )
+
+        return PullRequestReviewDetailResponse(
+            id=review.id,
+            repository_id=review.repository_id,
+            provider=review.provider,
+            pr_number=review.pr_number,
+            title=review.title,
+            source_branch=review.source_branch,
+            target_branch=review.target_branch,
+            base_commit_sha=review.base_commit_sha,
+            head_commit_sha=review.head_commit_sha,
+            author=review.author,
+            status=review.status,
+            review_gate_status=review.review_gate_status,
+            summary=review.summary,
+            changed_files_count=review.changed_files_count,
+            changed_symbols_count=review.changed_symbols_count,
+            insertions=review.insertions,
+            deletions=review.deletions,
+            risk_score_before=review.risk_score_before,
+            risk_score_after=review.risk_score_after,
+            risk_delta=review.risk_delta,
+            debt_hours_before=review.debt_hours_before,
+            debt_hours_after=review.debt_hours_after,
+            debt_hours_delta=review.debt_hours_delta,
+            debt_cost_before=review.debt_cost_before,
+            debt_cost_after=review.debt_cost_after,
+            debt_cost_delta=review.debt_cost_delta,
+            breaking_changes_count=review.breaking_changes_count,
+            architecture_violations_count=review.architecture_violations_count,
+            security_findings_count=review.security_findings_count,
+            reliability_findings_count=review.reliability_findings_count,
+            test_gaps_count=review.test_gaps_count,
+            diff_summary=review.diff_summary_json or {},
+            symbol_changes=review.symbol_changes_json or [],
+            breaking_changes=review.breaking_changes_json or {},
+            architecture_review=review.architecture_review_json or {},
+            impact_analysis=review.impact_analysis_json or {},
+            risk_breakdown=review.risk_breakdown_json or {},
+            technical_debt=review.technical_debt_json or {},
+            security_review=review.security_review_json or {},
+            reliability_review=review.reliability_review_json or {},
+            test_impact=review.test_impact_json or {},
+            historical_context=review.historical_context_json or {},
+            unknowns=review.unknowns_json or [],
+            validation_checklist=review.validation_checklist_json or [],
+            review_comments=review.review_comments_json or [],
+            review_gates=review.review_gates_json or {},
+            ai_review=review.ai_review_json or {},
+            config_snapshot=review.config_snapshot_json or {},
+            created_at=review.created_at.isoformat() if review.created_at else None,
+            updated_at=review.updated_at.isoformat() if review.updated_at else None,
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+    except Exception as e:
+        logger.error(f"Error analyzing PR review for repo '{repository_id}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to analyze PR review: {str(e)}",
+        )
+
+
+@router.get("/{repository_id}/reviews", response_model=PullRequestReviewListResponse)
+async def list_pull_request_reviews(
+    repository_id: str,
+    status_filter: Optional[str] = Query(None, alias="status"),
+    db: AsyncSession = Depends(get_db),
+) -> PullRequestReviewListResponse:
+    """
+    Phase 24: List historical Pull Request Reviews for a repository.
+    Strictly isolated by repository_id.
+    """
+    repo = await db.get(Repository, repository_id)
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Repository with id '{repository_id}' not found.",
+        )
+
+    stmt = select(PullRequestReview).where(PullRequestReview.repository_id == repository_id)
+    if status_filter:
+        stmt = stmt.where(PullRequestReview.status == status_filter)
+    stmt = stmt.order_by(PullRequestReview.created_at.desc())
+
+    result = await db.execute(stmt)
+    reviews = result.scalars().all()
+
+    items = [
+        PullRequestReviewSummaryResponse(
+            id=r.id,
+            repository_id=r.repository_id,
+            provider=r.provider,
+            pr_number=r.pr_number,
+            title=r.title,
+            source_branch=r.source_branch,
+            target_branch=r.target_branch,
+            base_commit_sha=r.base_commit_sha,
+            head_commit_sha=r.head_commit_sha,
+            author=r.author,
+            status=r.status,
+            review_gate_status=r.review_gate_status,
+            changed_files_count=r.changed_files_count,
+            changed_symbols_count=r.changed_symbols_count,
+            insertions=r.insertions,
+            deletions=r.deletions,
+            risk_score_before=r.risk_score_before,
+            risk_score_after=r.risk_score_after,
+            risk_delta=r.risk_delta,
+            debt_hours_delta=r.debt_hours_delta,
+            debt_cost_delta=r.debt_cost_delta,
+            breaking_changes_count=r.breaking_changes_count,
+            architecture_violations_count=r.architecture_violations_count,
+            security_findings_count=r.security_findings_count,
+            reliability_findings_count=r.reliability_findings_count,
+            test_gaps_count=r.test_gaps_count,
+            created_at=r.created_at.isoformat() if r.created_at else None,
+            updated_at=r.updated_at.isoformat() if r.updated_at else None,
+        )
+        for r in reviews
+    ]
+
+    return PullRequestReviewListResponse(
+        repository_id=repository_id,
+        total_reviews=len(items),
+        reviews=items,
+    )
+
+
+@router.get("/{repository_id}/reviews/config")
+async def get_repository_review_config(
+    repository_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Phase 24: Get review configuration and gate thresholds for repository.
+    """
+    repo = await db.get(Repository, repository_id)
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Repository with id '{repository_id}' not found.",
+        )
+
+    config = pr_reviewer_service.load_repository_config(repo.clone_path)
+    return {"repository_id": repository_id, "config": config}
+
+
+@router.get("/{repository_id}/reviews/{review_id}", response_model=PullRequestReviewDetailResponse)
+async def get_pull_request_review_detail(
+    repository_id: str,
+    review_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> PullRequestReviewDetailResponse:
+    """
+    Phase 24: Get comprehensive details for a specific PR Review.
+    Enforces strict repository isolation.
+    """
+    stmt = select(PullRequestReview).where(
+        PullRequestReview.id == review_id,
+        PullRequestReview.repository_id == repository_id,
+    )
+    result = await db.execute(stmt)
+    review = result.scalar_one_or_none()
+
+    if not review:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"PR review with id '{review_id}' not found for repository '{repository_id}'.",
+        )
+
+    return PullRequestReviewDetailResponse(
+        id=review.id,
+        repository_id=review.repository_id,
+        provider=review.provider,
+        pr_number=review.pr_number,
+        title=review.title,
+        source_branch=review.source_branch,
+        target_branch=review.target_branch,
+        base_commit_sha=review.base_commit_sha,
+        head_commit_sha=review.head_commit_sha,
+        author=review.author,
+        status=review.status,
+        review_gate_status=review.review_gate_status,
+        summary=review.summary,
+        changed_files_count=review.changed_files_count,
+        changed_symbols_count=review.changed_symbols_count,
+        insertions=review.insertions,
+        deletions=review.deletions,
+        risk_score_before=review.risk_score_before,
+        risk_score_after=review.risk_score_after,
+        risk_delta=review.risk_delta,
+        debt_hours_before=review.debt_hours_before,
+        debt_hours_after=review.debt_hours_after,
+        debt_hours_delta=review.debt_hours_delta,
+        debt_cost_before=review.debt_cost_before,
+        debt_cost_after=review.debt_cost_after,
+        debt_cost_delta=review.debt_cost_delta,
+        breaking_changes_count=review.breaking_changes_count,
+        architecture_violations_count=review.architecture_violations_count,
+        security_findings_count=review.security_findings_count,
+        reliability_findings_count=review.reliability_findings_count,
+        test_gaps_count=review.test_gaps_count,
+        diff_summary=review.diff_summary_json or {},
+        symbol_changes=review.symbol_changes_json or [],
+        breaking_changes=review.breaking_changes_json or {},
+        architecture_review=review.architecture_review_json or {},
+        impact_analysis=review.impact_analysis_json or {},
+        risk_breakdown=review.risk_breakdown_json or {},
+        technical_debt=review.technical_debt_json or {},
+        security_review=review.security_review_json or {},
+        reliability_review=review.reliability_review_json or {},
+        test_impact=review.test_impact_json or {},
+        historical_context=review.historical_context_json or {},
+        unknowns=review.unknowns_json or [],
+        validation_checklist=review.validation_checklist_json or [],
+        review_comments=review.review_comments_json or [],
+        review_gates=review.review_gates_json or {},
+        ai_review=review.ai_review_json or {},
+        config_snapshot=review.config_snapshot_json or {},
+        created_at=review.created_at.isoformat() if review.created_at else None,
+        updated_at=review.updated_at.isoformat() if review.updated_at else None,
+    )
+
+
+@router.get("/{repository_id}/reviews/{review_id}/diff", response_model=PullRequestReviewDiffResponse)
+async def get_pull_request_review_diff(
+    repository_id: str,
+    review_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> PullRequestReviewDiffResponse:
+    """
+    Phase 24: Get structured file diffs and hunks for a specific PR Review.
+    """
+    stmt = select(PullRequestReview).where(
+        PullRequestReview.id == review_id,
+        PullRequestReview.repository_id == repository_id,
+    )
+    result = await db.execute(stmt)
+    review = result.scalar_one_or_none()
+
+    if not review:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"PR review with id '{review_id}' not found for repository '{repository_id}'.",
+        )
+
+    diff_summary = review.diff_summary_json or {}
+    return PullRequestReviewDiffResponse(
+        review_id=review.id,
+        repository_id=review.repository_id,
+        base_commit_sha=review.base_commit_sha,
+        head_commit_sha=review.head_commit_sha,
+        changed_files_count=review.changed_files_count,
+        insertions=review.insertions,
+        deletions=review.deletions,
+        files=diff_summary.get("files", []),
+    )
+
+
+@router.get("/{repository_id}/reviews/{review_id}/findings", response_model=PullRequestReviewFindingsResponse)
+async def get_pull_request_review_findings(
+    repository_id: str,
+    review_id: str,
+    severity: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+) -> PullRequestReviewFindingsResponse:
+    """
+    Phase 24: Get review findings and inline comments with gate status.
+    """
+    stmt = select(PullRequestReview).where(
+        PullRequestReview.id == review_id,
+        PullRequestReview.repository_id == repository_id,
+    )
+    result = await db.execute(stmt)
+    review = result.scalar_one_or_none()
+
+    if not review:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"PR review with id '{review_id}' not found for repository '{repository_id}'.",
+        )
+
+    all_comments = review.review_comments_json or []
+    if severity:
+        all_comments = [c for c in all_comments if c.get("severity") == severity.upper()]
+
+    blocking = sum(1 for c in all_comments if c.get("severity") == "BLOCKING")
+    high = sum(1 for c in all_comments if c.get("severity") == "HIGH")
+    medium = sum(1 for c in all_comments if c.get("severity") == "MEDIUM")
+    low = sum(1 for c in all_comments if c.get("severity") == "LOW")
+    info = sum(1 for c in all_comments if c.get("severity") in ("INFO", "INFORMATIONAL"))
+
+    return PullRequestReviewFindingsResponse(
+        review_id=review.id,
+        repository_id=review.repository_id,
+        review_gate_status=review.review_gate_status,
+        total_findings=len(all_comments),
+        blocking_count=blocking,
+        high_count=high,
+        medium_count=medium,
+        low_count=low,
+        info_count=info,
+        findings=all_comments,
+        gates=review.review_gates_json or {},
+    )
+
+
+@router.get("/{repository_id}/reviews/{review_id}/status", response_model=PullRequestReviewStatusResponse)
+async def get_pull_request_review_status(
+    repository_id: str,
+    review_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> PullRequestReviewStatusResponse:
+    """
+    Phase 24: Poll processing status and gate status for a PR review.
+    """
+    stmt = select(PullRequestReview).where(
+        PullRequestReview.id == review_id,
+        PullRequestReview.repository_id == repository_id,
+    )
+    result = await db.execute(stmt)
+    review = result.scalar_one_or_none()
+
+    if not review:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"PR review with id '{review_id}' not found for repository '{repository_id}'.",
+        )
+
+    return PullRequestReviewStatusResponse(
+        review_id=review.id,
+        repository_id=review.repository_id,
+        status=review.status,
+        review_gate_status=review.review_gate_status,
+        progress_percent=100 if review.status == "completed" else 50,
+        stage="COMPLETED" if review.status == "completed" else "ANALYZING",
+    )
+
+
+@router.post("/{repository_id}/reviews/webhook/{provider}")
+async def receive_ci_webhook(
+    repository_id: str,
+    provider: str,
+    payload: Dict[str, Any],
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Phase 24: CI/CD Webhook Receiver for GitHub Actions / GitLab CI events.
+    Parses incoming event payload, runs review, and formats provider comment.
+    """
+    repo = await db.get(Repository, repository_id)
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Repository with id '{repository_id}' not found.",
+        )
+
+    ci_prov = get_ci_provider(provider)
+    meta = ci_prov.parse_webhook_payload(payload)
+
+    base_sha = meta.get("base_commit_sha") or "HEAD~1"
+    head_sha = meta.get("head_commit_sha") or "HEAD"
+
+    review = await pr_reviewer_service.analyze_pull_request(
+        db=db,
+        repository_id=repository_id,
+        base_commit_sha=base_sha,
+        head_commit_sha=head_sha,
+        title=meta.get("title", "Webhook Review"),
+        pr_number=meta.get("pr_number"),
+        provider=provider,
+        source_branch=meta.get("source_branch"),
+        target_branch=meta.get("target_branch"),
+        author=meta.get("author"),
+    )
+
+    review_dict = {
+        "review_gate_status": review.review_gate_status,
+        "base_commit_sha": review.base_commit_sha,
+        "head_commit_sha": review.head_commit_sha,
+        "summary": review.summary,
+        "changed_files_count": review.changed_files_count,
+        "changed_symbols_count": review.changed_symbols_count,
+        "insertions": review.insertions,
+        "deletions": review.deletions,
+        "risk_score_before": review.risk_score_before,
+        "risk_score_after": review.risk_score_after,
+        "risk_delta": review.risk_delta,
+        "debt_hours_delta": review.debt_hours_delta,
+        "debt_cost_delta": review.debt_cost_delta,
+        "breaking_changes_count": review.breaking_changes_count,
+        "architecture_violations_count": review.architecture_violations_count,
+        "security_findings_count": review.security_findings_count,
+        "reliability_findings_count": review.reliability_findings_count,
+        "test_gaps_count": review.test_gaps_count,
+        "review_gates": review.review_gates_json or {},
+        "breaking_changes": review.breaking_changes_json or {},
+        "review_comments": review.review_comments_json or [],
+        "validation_checklist": review.validation_checklist_json or [],
+    }
+
+    formatted_comment = ci_prov.format_review_comment(review_dict)
+
+    return {
+        "status": "success",
+        "review_id": review.id,
+        "gate_status": review.review_gate_status,
+        "formatted_comment": formatted_comment,
+    }
 
 
 

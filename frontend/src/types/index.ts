@@ -1,6 +1,6 @@
 export type AcquisitionStatus = 'NOT_CLONED' | 'CLONING' | 'READY' | 'SYNCING' | 'ERROR';
 export type AnalysisStatus = 'pending' | 'running' | 'completed' | 'partial' | 'failed';
-export type WorkspaceTab = 'overview' | 'chat' | 'architecture' | 'simulation' | 'engineering' | 'quality' | 'security' | 'history' | 'files' | 'symbols' | 'dependencies' | 'settings';
+export type WorkspaceTab = 'overview' | 'chat' | 'architecture' | 'simulation' | 'engineering' | 'quality' | 'security' | 'history' | 'files' | 'symbols' | 'dependencies' | 'reviews' | 'settings';
 
 export interface LanguageStat {
   language: string;
@@ -1940,6 +1940,194 @@ export interface EngineeringPlanResponse {
   source_evidence: Record<string, any>;
   created_at?: string | null;
   updated_at?: string | null;
+}
+
+// =========================================================================
+// Phase 24: CI/CD & Automated Pull Request Reviewer Types
+// =========================================================================
+
+export type ReviewGateStatus = 'PASSED' | 'WARNING' | 'FAILED' | 'BLOCKED';
+export type ReviewSeverity = 'BLOCKING' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFORMATIONAL';
+
+export interface ReviewFindingComment {
+  id: string;
+  file_path: string;
+  line?: number | null;
+  end_line?: number | null;
+  finding: string;
+  severity: ReviewSeverity;
+  category: string;
+  evidence: string;
+  potential_impact: string;
+  suggested_action: string;
+  symbol_name?: string | null;
+}
+
+export interface ReviewGateItem {
+  status: ReviewGateStatus;
+  message: string;
+  threshold?: any;
+  actual_value?: any;
+  details?: Record<string, any>;
+}
+
+export interface PullRequestReviewSummary {
+  id: string;
+  repository_id: string;
+  provider: string;
+  pr_number?: string | null;
+  title: string;
+  source_branch?: string | null;
+  target_branch?: string | null;
+  base_commit_sha: string;
+  head_commit_sha: string;
+  author?: string | null;
+  status: string;
+  review_gate_status: ReviewGateStatus;
+  changed_files_count: number;
+  changed_symbols_count: number;
+  insertions: number;
+  deletions: number;
+  risk_score_before: number;
+  risk_score_after: number;
+  risk_delta: number;
+  debt_hours_delta: number;
+  debt_cost_delta: number;
+  breaking_changes_count: number;
+  architecture_violations_count: number;
+  security_findings_count: number;
+  reliability_findings_count: number;
+  test_gaps_count: number;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface PullRequestReviewDetail {
+  id: string;
+  repository_id: string;
+  provider: string;
+  pr_number?: string | null;
+  title: string;
+  source_branch?: string | null;
+  target_branch?: string | null;
+  base_commit_sha: string;
+  head_commit_sha: string;
+  author?: string | null;
+  status: string;
+  review_gate_status: ReviewGateStatus;
+  summary?: string | null;
+  changed_files_count: number;
+  changed_symbols_count: number;
+  insertions: number;
+  deletions: number;
+  risk_score_before: number;
+  risk_score_after: number;
+  risk_delta: number;
+  debt_hours_before: number;
+  debt_hours_after: number;
+  debt_hours_delta: number;
+  debt_cost_before: number;
+  debt_cost_after: number;
+  debt_cost_delta: number;
+  breaking_changes_count: number;
+  architecture_violations_count: number;
+  security_findings_count: number;
+  reliability_findings_count: number;
+  test_gaps_count: number;
+  diff_summary: {
+    files?: any[];
+    monorepo_packages?: any[];
+    total_files?: number;
+    insertions?: number;
+    deletions?: number;
+  };
+  symbol_changes: any[];
+  breaking_changes: {
+    detected?: any[];
+    potential?: any[];
+    unknowns?: any[];
+    total_breaking_count?: number;
+  };
+  architecture_review: {
+    layer_shifts?: any[];
+    new_dependencies?: any[];
+    boundary_violations?: any[];
+    violations_count?: number;
+  };
+  impact_analysis: Record<string, any>;
+  risk_breakdown: Record<string, any>;
+  technical_debt: Record<string, any>;
+  security_review: {
+    findings?: any[];
+  };
+  reliability_review: Record<string, any>;
+  test_impact: {
+    changed_test_files_count?: number;
+    changed_tests?: any[];
+    test_gaps_count?: number;
+    test_gaps?: any[];
+  };
+  historical_context: {
+    hotspots?: any[];
+    recent_churn?: any[];
+  };
+  unknowns: Array<{ item?: string; reason?: string }>;
+  validation_checklist: Array<{ task: string }>;
+  review_comments: ReviewFindingComment[];
+  review_gates: Record<string, ReviewGateItem>;
+  ai_review: {
+    title?: string;
+    summary?: string;
+    key_takeaways?: string[];
+    model_used?: string;
+  };
+  config_snapshot: Record<string, any>;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface PullRequestReviewCreateInput {
+  base_commit_sha: string;
+  head_commit_sha: string;
+  title?: string;
+  pr_number?: string;
+  provider?: string;
+  source_branch?: string;
+  target_branch?: string;
+  author?: string;
+  custom_diff?: string;
+  config_override?: Record<string, any>;
+}
+
+export interface PullRequestReviewListResponse {
+  repository_id: string;
+  total_reviews: number;
+  reviews: PullRequestReviewSummary[];
+}
+
+export interface PullRequestReviewDiffResponse {
+  review_id: string;
+  repository_id: string;
+  base_commit_sha: string;
+  head_commit_sha: string;
+  changed_files_count: number;
+  insertions: number;
+  deletions: number;
+  files: any[];
+}
+
+export interface PullRequestReviewFindingsResponse {
+  review_id: string;
+  repository_id: string;
+  review_gate_status: ReviewGateStatus;
+  total_findings: number;
+  blocking_count: number;
+  high_count: number;
+  medium_count: number;
+  low_count: number;
+  info_count: number;
+  findings: ReviewFindingComment[];
+  gates: Record<string, ReviewGateItem>;
 }
 
 

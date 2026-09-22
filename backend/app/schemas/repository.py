@@ -1875,6 +1875,171 @@ class EngineeringPlanListResponse(BaseModel):
     plans: list[EngineeringPlanListItem] = []
 
 
+# =========================================================================
+# Phase 24: CI/CD & Automated Pull Request Reviewer Schemas
+# =========================================================================
+
+class ReviewFindingComment(BaseModel):
+    id: str
+    file_path: str
+    line: Optional[int] = None
+    end_line: Optional[int] = None
+    finding: str
+    severity: str = "MEDIUM"  # BLOCKING, HIGH, MEDIUM, LOW, INFORMATIONAL
+    category: str = "GENERAL"  # BREAKING_CHANGE, ARCHITECTURE, SECURITY, RELIABILITY, RISK, TEST_GAP, TECH_DEBT
+    evidence: str
+    potential_impact: str
+    suggested_action: str
+    symbol_name: Optional[str] = None
+
+
+class ReviewGateItem(BaseModel):
+    name: str
+    status: str = "PASSED"  # PASSED, WARNING, FAILED, BLOCKED
+    threshold: Optional[Any] = None
+    actual_value: Optional[Any] = None
+    message: str
+    details: Optional[dict[str, Any]] = None
+
+
+class PullRequestReviewCreateRequest(BaseModel):
+    base_commit_sha: str
+    head_commit_sha: str
+    title: Optional[str] = "Automated Pull Request Review"
+    pr_number: Optional[str] = None
+    provider: Optional[str] = "local"  # github, gitlab, local, cli
+    source_branch: Optional[str] = None
+    target_branch: Optional[str] = None
+    author: Optional[str] = "Engineer"
+    custom_diff: Optional[str] = None
+    config_override: Optional[dict[str, Any]] = None
+
+
+class PullRequestReviewSummaryResponse(BaseModel):
+    id: str
+    repository_id: str
+    provider: str
+    pr_number: Optional[str] = None
+    title: str
+    source_branch: Optional[str] = None
+    target_branch: Optional[str] = None
+    base_commit_sha: str
+    head_commit_sha: str
+    author: Optional[str] = None
+    status: str
+    review_gate_status: str
+    changed_files_count: int = 0
+    changed_symbols_count: int = 0
+    insertions: int = 0
+    deletions: int = 0
+    risk_score_before: float = 0.0
+    risk_score_after: float = 0.0
+    risk_delta: float = 0.0
+    debt_hours_delta: float = 0.0
+    debt_cost_delta: float = 0.0
+    breaking_changes_count: int = 0
+    architecture_violations_count: int = 0
+    security_findings_count: int = 0
+    reliability_findings_count: int = 0
+    test_gaps_count: int = 0
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class PullRequestReviewDetailResponse(BaseModel):
+    id: str
+    repository_id: str
+    provider: str
+    pr_number: Optional[str] = None
+    title: str
+    source_branch: Optional[str] = None
+    target_branch: Optional[str] = None
+    base_commit_sha: str
+    head_commit_sha: str
+    author: Optional[str] = None
+    status: str
+    review_gate_status: str
+    summary: Optional[str] = None
+    changed_files_count: int = 0
+    changed_symbols_count: int = 0
+    insertions: int = 0
+    deletions: int = 0
+    risk_score_before: float = 0.0
+    risk_score_after: float = 0.0
+    risk_delta: float = 0.0
+    debt_hours_before: float = 0.0
+    debt_hours_after: float = 0.0
+    debt_hours_delta: float = 0.0
+    debt_cost_before: float = 0.0
+    debt_cost_after: float = 0.0
+    debt_cost_delta: float = 0.0
+    breaking_changes_count: int = 0
+    architecture_violations_count: int = 0
+    security_findings_count: int = 0
+    reliability_findings_count: int = 0
+    test_gaps_count: int = 0
+    diff_summary: dict[str, Any] = {}
+    symbol_changes: list[dict[str, Any]] = []
+    breaking_changes: dict[str, Any] = {}
+    architecture_review: dict[str, Any] = {}
+    impact_analysis: dict[str, Any] = {}
+    risk_breakdown: dict[str, Any] = {}
+    technical_debt: dict[str, Any] = {}
+    security_review: dict[str, Any] = {}
+    reliability_review: dict[str, Any] = {}
+    test_impact: dict[str, Any] = {}
+    historical_context: dict[str, Any] = {}
+    unknowns: list[dict[str, Any]] = []
+    validation_checklist: list[dict[str, Any]] = []
+    review_comments: list[ReviewFindingComment] = []
+    review_gates: dict[str, Any] = {}
+    ai_review: dict[str, Any] = {}
+    config_snapshot: dict[str, Any] = {}
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class PullRequestReviewListResponse(BaseModel):
+    repository_id: str
+    total_reviews: int = 0
+    reviews: list[PullRequestReviewSummaryResponse] = []
+
+
+class PullRequestReviewDiffResponse(BaseModel):
+    review_id: str
+    repository_id: str
+    base_commit_sha: str
+    head_commit_sha: str
+    changed_files_count: int = 0
+    insertions: int = 0
+    deletions: int = 0
+    files: list[dict[str, Any]] = []
+
+
+class PullRequestReviewFindingsResponse(BaseModel):
+    review_id: str
+    repository_id: str
+    review_gate_status: str
+    total_findings: int = 0
+    blocking_count: int = 0
+    high_count: int = 0
+    medium_count: int = 0
+    low_count: int = 0
+    info_count: int = 0
+    findings: list[ReviewFindingComment] = []
+    gates: dict[str, Any] = {}
+
+
+class PullRequestReviewStatusResponse(BaseModel):
+    review_id: str
+    repository_id: str
+    status: str
+    review_gate_status: str
+    progress_percent: int = 100
+    stage: str = "COMPLETED"
+    error: Optional[str] = None
+
+
 
 
 

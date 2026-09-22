@@ -14,6 +14,7 @@ from backend.app.models.investigation import Investigation
 from backend.app.models.simulation import Simulation
 from backend.app.models.conversation import Conversation
 from backend.app.models.engineering_plan import EngineeringPlan
+from backend.app.models.pull_request_review import PullRequestReview
 
 __all__ = [
     "Base",
@@ -37,4 +38,5 @@ __all__ = [
     "Simulation",
     "Conversation",
     "EngineeringPlan",
+    "PullRequestReview",
 ]

@@ -58,6 +58,11 @@ import {
   SimulateIgnoreResponse,
   EngineeringPlanListResponse,
   EngineeringPlanResponse,
+  PullRequestReviewCreateInput,
+  PullRequestReviewDetail,
+  PullRequestReviewListResponse,
+  PullRequestReviewDiffResponse,
+  PullRequestReviewFindingsResponse,
 } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
@@ -716,6 +721,70 @@ class ApiClient {
       `/repositories/${repositoryId}/engineering/plans/${encodeURIComponent(planId)}?new_status=${encodeURIComponent(newStatus)}`,
       { method: 'PATCH' }
     );
+  }
+
+  // =========================================================================
+  // Phase 24: CI/CD & Automated Pull Request Reviewer API Methods
+  // =========================================================================
+
+  async createPullRequestReview(
+    repositoryId: string,
+    input: PullRequestReviewCreateInput
+  ): Promise<PullRequestReviewDetail> {
+    return this.request<PullRequestReviewDetail>(`/repositories/${repositoryId}/reviews`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  }
+
+  async getPullRequestReviews(
+    repositoryId: string,
+    statusFilter?: string
+  ): Promise<PullRequestReviewListResponse> {
+    const qs = statusFilter ? `?status=${encodeURIComponent(statusFilter)}` : '';
+    return this.request<PullRequestReviewListResponse>(`/repositories/${repositoryId}/reviews${qs}`);
+  }
+
+  async getPullRequestReview(
+    repositoryId: string,
+    reviewId: string
+  ): Promise<PullRequestReviewDetail> {
+    return this.request<PullRequestReviewDetail>(
+      `/repositories/${repositoryId}/reviews/${encodeURIComponent(reviewId)}`
+    );
+  }
+
+  async getPullRequestReviewDiff(
+    repositoryId: string,
+    reviewId: string
+  ): Promise<PullRequestReviewDiffResponse> {
+    return this.request<PullRequestReviewDiffResponse>(
+      `/repositories/${repositoryId}/reviews/${encodeURIComponent(reviewId)}/diff`
+    );
+  }
+
+  async getPullRequestReviewFindings(
+    repositoryId: string,
+    reviewId: string,
+    severity?: string
+  ): Promise<PullRequestReviewFindingsResponse> {
+    const qs = severity ? `?severity=${encodeURIComponent(severity)}` : '';
+    return this.request<PullRequestReviewFindingsResponse>(
+      `/repositories/${repositoryId}/reviews/${encodeURIComponent(reviewId)}/findings${qs}`
+    );
+  }
+
+  async getPullRequestReviewStatus(
+    repositoryId: string,
+    reviewId: string
+  ): Promise<{ review_id: string; repository_id: string; status: string; review_gate_status: string; progress_percent: number; stage: string }> {
+    return this.request(`/repositories/${repositoryId}/reviews/${encodeURIComponent(reviewId)}/status`);
+  }
+
+  async getPullRequestReviewConfig(
+    repositoryId: string
+  ): Promise<{ repository_id: string; config: Record<string, any> }> {
+    return this.request(`/repositories/${repositoryId}/reviews/config`);
   }
 }
 

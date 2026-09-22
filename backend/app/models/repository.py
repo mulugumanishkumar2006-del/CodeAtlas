@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from backend.app.models.simulation import Simulation
     from backend.app.models.conversation import Conversation
     from backend.app.models.engineering_plan import EngineeringPlan
+    from backend.app.models.pull_request_review import PullRequestReview
 
 
 class Repository(Base, UUIDPrimaryKeyMixin, TimestampMixin):
@@ -114,6 +115,11 @@ class Repository(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     engineering_plans: Mapped[List["EngineeringPlan"]] = relationship(
         "EngineeringPlan",
+        back_populates="repository",
+        cascade="all, delete-orphan",
+    )
+    pull_request_reviews: Mapped[List["PullRequestReview"]] = relationship(
+        "PullRequestReview",
         back_populates="repository",
         cascade="all, delete-orphan",
     )

@@ -13,6 +13,7 @@ import { ImpactIntelligenceModal } from './ImpactIntelligenceModal';
 import { UniversalRepositoryOverview } from './UniversalRepositoryOverview';
 import { SimulationView } from './SimulationView';
 import { EngineeringDashboardView } from './EngineeringDashboardView';
+import { PullRequestReviewView } from './PullRequestReviewView';
 import { 
   ExternalLink, 
   GitBranch, 
@@ -744,6 +745,24 @@ export const RepositoryDetail: React.FC<RepositoryDetailProps> = ({
                     onNavigateToFile={navigateToSource}
                   />
                 </div>
+              </div>
+            )}
+
+            {/* Phase 24: CI/CD & Automated Pull Request Reviewer Tab */}
+            {activeTab === 'reviews' && (
+              <div className="tab-panel-body" style={{ padding: 0 }}>
+                <PullRequestReviewView
+                  repositoryId={repository.id}
+                  onOpenFile={(filePath, line) => {
+                    const targetFile = files.find(f => f.path === filePath);
+                    if (targetFile) {
+                      navigateToSource(targetFile.id, line);
+                    }
+                  }}
+                  onOpenImpact={(targetId) => {
+                    setImpactTargetId(targetId);
+                  }}
+                />
               </div>
             )}
 

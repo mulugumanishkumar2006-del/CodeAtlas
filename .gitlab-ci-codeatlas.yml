@@ -1,0 +1,30 @@
+# CodeAtlas GitLab CI Merge Request Reviewer Template
+# Include this file in your .gitlab-ci.yml:
+# include:
+#   - local: '.gitlab-ci-codeatlas.yml'
+
+stages:
+  - review
+
+codeatlas_mr_review:
+  stage: review
+  image: python:3.10-slim
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  before_script:
+    - apt-get update && apt-get install -y git
+    - pip install --upgrade pip
+    - pip install -r backend/requirements.txt
+  script:
+    - export PYTHONPATH="."
+    - >
+      python -m backend.app.cli review
+      --repository "$CI_PROJECT_PATH"
+      --base "$CI_MERGE_REQUEST_DIFF_BASE_SHA"
+      --head "$CI_COMMIT_SHA"
+      --provider gitlab
+      --format text
+  artifacts:
+    when: always
+    reports:
+      junit: report.xml
