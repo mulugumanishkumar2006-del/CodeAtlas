@@ -58,3 +58,7 @@ Thumbs.db
 
 # CodeAtlas runtime data (cloned repos, databases, vector stores)
 data/
+
+# Generated phase reports
+PHASE_*_REPORT*.md
+*REPORT*.md
