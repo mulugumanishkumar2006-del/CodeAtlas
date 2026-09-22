@@ -37,6 +37,8 @@ TestingSessionLocal = async_sessionmaker(
 )
 
 TABLES_IN_ORDER = [
+    "comments",
+    "annotations",
     "pull_request_reviews",
     "engineering_plans",
     "conversations",

@@ -31,7 +31,12 @@ import {
   ShieldCheck,
   Workflow,
   ArrowRight,
+  MessageSquare,
+  Trash2,
+  PlusCircle,
 } from 'lucide-react';
+import { AnnotationItem } from '../types';
+import { collaborationWs } from '../services/collaborationWs';
 
 interface ArchitectureViewProps {
   repositoryId: string;
@@ -47,8 +52,15 @@ export const ArchitectureView: React.FC<ArchitectureViewProps> = ({
   const [archData, setArchData] = useState<ArchitectureData | null>(null);
   const [graphData, setGraphData] = useState<GraphData | null>(null);
   const [advIntel, setAdvIntel] = useState<AdvancedArchitectureIntelligence | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'modules' | 'graph' | 'dataflows' | 'coupling' | 'patterns' | 'issues'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'modules' | 'graph' | 'dataflows' | 'coupling' | 'patterns' | 'issues' | 'annotations'>('overview');
   
+  // Real-time Collaborative Annotations
+  const [annotations, setAnnotations] = useState<AnnotationItem[]>([]);
+  const [newAnnotationContent, setNewAnnotationContent] = useState('');
+  const [newAnnotationCategory, setNewAnnotationCategory] = useState<'note' | 'question' | 'concern' | 'decision' | 'review_comment'>('note');
+  const [newAnnotationTarget, setNewAnnotationTarget] = useState('architecture');
+  const [isSubmittingAnnotation, setIsSubmittingAnnotation] = useState(false);
+
   const [level, setLevel] = useState<GraphLevel>('directory');
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -114,6 +126,35 @@ export const ArchitectureView: React.FC<ArchitectureViewProps> = ({
     loadData();
     return () => {
       isMounted = false;
+    };
+  }, [repositoryId]);
+
+  // Load and sync real-time collaborative annotations
+  useEffect(() => {
+    let isMounted = true;
+    api.getAnnotations(repositoryId).then((items) => {
+      if (isMounted) setAnnotations(items);
+    }).catch(() => {});
+
+    const unsubCreated = collaborationWs.on('annotation.created', (ev) => {
+      if (ev.payload) {
+        setAnnotations((prev) => {
+          if (prev.some((a) => a.id === ev.payload.id)) return prev;
+          return [ev.payload as AnnotationItem, ...prev];
+        });
+      }
+    });
+
+    const unsubDeleted = collaborationWs.on('annotation.deleted', (ev) => {
+      if (ev.payload?.annotation_id) {
+        setAnnotations((prev) => prev.filter((a) => a.id !== ev.payload.annotation_id));
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      unsubCreated();
+      unsubDeleted();
     };
   }, [repositoryId]);
 
@@ -377,6 +418,14 @@ export const ArchitectureView: React.FC<ArchitectureViewProps> = ({
           >
             <AlertTriangle size={14} style={{ color: (violations.length + drift.length + (advIntel?.violations?.length || 0)) > 0 ? '#f43f5e' : undefined }} />
             <span>Issues & Drift ({violations.length + drift.length + (advIntel?.violations?.length || 0) + (archData?.cycles?.length || 0)})</span>
+          </button>
+          <button 
+            id="tab-arch-annotations"
+            className={`arch-nav-tab ${activeTab === 'annotations' ? 'active' : ''}`}
+            onClick={() => setActiveTab('annotations')}
+          >
+            <MessageSquare size={14} style={{ color: annotations.length > 0 ? '#10b981' : undefined }} />
+            <span>Annotations ({annotations.length})</span>
           </button>
         </div>
 
@@ -1242,6 +1291,173 @@ export const ArchitectureView: React.FC<ArchitectureViewProps> = ({
                       )}
                     </div>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* Collaborative Annotations Tab */}
+            {activeTab === 'annotations' && (
+              <div className="arch-tab-pane" style={{ padding: '20px', maxWidth: '900px', margin: '0 auto' }}>
+                <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '16px', marginBottom: '24px' }}>
+                  <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <PlusCircle size={16} color="#6366f1" />
+                    Add Collaborative Architecture Annotation
+                  </h4>
+                  <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', flexWrap: 'wrap' }}>
+                    <select
+                      value={newAnnotationCategory}
+                      onChange={(e) => setNewAnnotationCategory(e.target.value as any)}
+                      style={{ padding: '6px 10px', borderRadius: '6px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '12px' }}
+                    >
+                      <option value="note">📝 Note</option>
+                      <option value="question">❓ Question</option>
+                      <option value="concern">⚠️ Concern</option>
+                      <option value="decision">✅ Decision</option>
+                      <option value="review_comment">💬 Review Comment</option>
+                    </select>
+
+                    <input
+                      type="text"
+                      placeholder="Target entity (e.g. backend/app/main.py, Architecture, or Symbol)"
+                      value={newAnnotationTarget}
+                      onChange={(e) => setNewAnnotationTarget(e.target.value)}
+                      style={{ flex: 1, minWidth: '220px', padding: '6px 10px', borderRadius: '6px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '12px' }}
+                    />
+                  </div>
+
+                  <textarea
+                    rows={3}
+                    placeholder="Enter collaborative note, decision, or architecture concern..."
+                    value={newAnnotationContent}
+                    onChange={(e) => setNewAnnotationContent(e.target.value)}
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '13px', resize: 'vertical' }}
+                  />
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
+                    <button
+                      disabled={!newAnnotationContent.trim() || isSubmittingAnnotation}
+                      onClick={async () => {
+                        if (!newAnnotationContent.trim()) return;
+                        setIsSubmittingAnnotation(true);
+                        try {
+                          const user = collaborationWs.getCurrentUser();
+                          await api.createAnnotation(
+                            repositoryId,
+                            {
+                              target_type: 'architecture_component',
+                              target_id: newAnnotationTarget.trim() || 'architecture',
+                              category: newAnnotationCategory,
+                              content: newAnnotationContent.trim(),
+                            },
+                            user.username
+                          );
+                          setNewAnnotationContent('');
+                        } catch (err) {
+                          console.error('Failed to create annotation:', err);
+                        } finally {
+                          setIsSubmittingAnnotation(false);
+                        }
+                      }}
+                      style={{
+                        padding: '6px 16px',
+                        background: '#6366f1',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        opacity: !newAnnotationContent.trim() || isSubmittingAnnotation ? 0.6 : 1,
+                      }}
+                    >
+                      {isSubmittingAnnotation ? 'Posting...' : 'Post Annotation'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Annotations List */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {annotations.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '13px' }}>
+                      No architecture annotations yet. Collaborators can add notes, decisions, and concerns above.
+                    </div>
+                  ) : (
+                    annotations.map((ann) => (
+                      <div
+                        key={ann.id}
+                        style={{
+                          background: 'var(--bg-secondary)',
+                          border: '1px solid var(--border-color)',
+                          borderRadius: '8px',
+                          padding: '14px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '8px',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span
+                              style={{
+                                fontSize: '11px',
+                                textTransform: 'uppercase',
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                fontWeight: 700,
+                                background:
+                                  ann.category === 'decision'
+                                    ? 'rgba(16, 185, 129, 0.15)'
+                                    : ann.category === 'concern'
+                                    ? 'rgba(244, 63, 94, 0.15)'
+                                    : ann.category === 'question'
+                                    ? 'rgba(245, 158, 11, 0.15)'
+                                    : 'rgba(99, 102, 241, 0.15)',
+                                color:
+                                  ann.category === 'decision'
+                                    ? '#10b981'
+                                    : ann.category === 'concern'
+                                    ? '#f43f5e'
+                                    : ann.category === 'question'
+                                    ? '#f59e0b'
+                                    : '#818cf8',
+                              }}
+                            >
+                              {ann.category}
+                            </span>
+                            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                              Target: <code>{ann.target_id}</code>
+                            </span>
+                            {ann.user_name && (
+                              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                by {ann.user_name}
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                              {new Date(ann.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                            <button
+                              onClick={async () => {
+                                try {
+                                  await api.deleteAnnotation(repositoryId, ann.id);
+                                } catch (err) {
+                                  console.error('Failed to delete annotation:', err);
+                                }
+                              }}
+                              style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '2px' }}
+                              title="Delete annotation"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </div>
+                        <div style={{ fontSize: '13px', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>
+                          {ann.content}
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             )}

@@ -2,7 +2,7 @@ import re
 import json
 import logging
 from abc import ABC, abstractmethod
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, AsyncIterator
 import httpx
 
 from backend.app.config import settings
@@ -57,6 +57,16 @@ class LLMProvider(ABC):
                 "raw_response": Optional[str]
             }
         """
+        pass
+
+    @abstractmethod
+    async def generate_stream(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        temperature: float = 0.1,
+    ) -> AsyncIterator[str]:
+        """Yield token chunks as they arrive from the LLM."""
         pass
 
 
@@ -116,6 +126,17 @@ class GeminiProvider(LLMProvider):
                 "raw_response": text_content,
             }
 
+    async def generate_stream(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        temperature: float = 0.1,
+    ) -> AsyncIterator[str]:
+        gen = await self.generate(system_prompt, user_prompt, temperature)
+        tokens = re.findall(r"\S+|\n+", gen["answer"])
+        for tok in tokens:
+            yield tok if tok.startswith("\n") else tok + " "
+
 
 class OpenAICompatibleProvider(LLMProvider):
     """OpenAI, Groq, Ollama, and vLLM compatible provider."""
@@ -171,6 +192,17 @@ class OpenAICompatibleProvider(LLMProvider):
                 "cited_source_ids": list(dict.fromkeys(cited_ids)),
                 "raw_response": text_content,
             }
+
+    async def generate_stream(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        temperature: float = 0.1,
+    ) -> AsyncIterator[str]:
+        gen = await self.generate(system_prompt, user_prompt, temperature)
+        tokens = re.findall(r"\S+|\n+", gen["answer"])
+        for tok in tokens:
+            yield tok if tok.startswith("\n") else tok + " "
 
 
 class GroundedDeterministicProvider(LLMProvider):
@@ -270,6 +302,17 @@ class GroundedDeterministicProvider(LLMProvider):
             "cited_source_ids": cited_ids,
             "raw_response": full_answer,
         }
+
+    async def generate_stream(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        temperature: float = 0.1,
+    ) -> AsyncIterator[str]:
+        gen = await self.generate(system_prompt, user_prompt, temperature)
+        tokens = re.findall(r"\S+|\n+", gen["answer"])
+        for tok in tokens:
+            yield tok if tok.startswith("\n") else tok + " "
 
 
 def get_llm_provider() -> LLMProvider:

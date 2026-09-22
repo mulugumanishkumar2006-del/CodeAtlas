@@ -2130,6 +2130,70 @@ export interface PullRequestReviewFindingsResponse {
   gates: Record<string, ReviewGateItem>;
 }
 
+// --- Phase 25: Real-Time Multi-User Collaboration ---
+
+export interface PresenceUser {
+  user_id: string;
+  username: string;
+  color: string;
+  current_tab?: string | null;
+  last_seen: string;
+}
+
+export interface AnnotationItem {
+  id: string;
+  repository_id: string;
+  user_id?: string | null;
+  user_name?: string | null;
+  target_type: 'file' | 'symbol' | 'graph_node' | 'architecture_component' | 'general';
+  target_id: string;
+  category: 'note' | 'question' | 'concern' | 'decision' | 'review_comment';
+  content: string;
+  metadata_json?: Record<string, any> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CommentItem {
+  id: string;
+  repository_id: string;
+  user_id?: string | null;
+  user_name?: string | null;
+  parent_id?: string | null;
+  target_type: string;
+  target_id: string;
+  content: string;
+  metadata_json?: Record<string, any> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InvestigationItem {
+  id: string;
+  repository_id: string;
+  user_id?: string | null;
+  title: string;
+  status: string;
+  query: string;
+  summary?: string | null;
+  findings_summary?: Record<string, any> | null;
+  metadata_json?: Record<string, any> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CollaborationEvent {
+  event_id: string;
+  event_type: string;
+  version: number;
+  repository_id: string;
+  workspace_id?: string | null;
+  user_id?: string | null;
+  user_name?: string | null;
+  timestamp: string;
+  payload: Record<string, any>;
+}
+
 
 
 

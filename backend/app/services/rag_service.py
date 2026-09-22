@@ -1,7 +1,7 @@
 import re
 import json
 import logging
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional, Tuple, AsyncIterator
 from datetime import datetime, timezone
 from sqlalchemy import select, or_, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -1512,6 +1512,157 @@ class RAGService:
         )
 
         return response_payload
+
+    async def query_stream(
+        self,
+        repository_id: str,
+        question: str,
+        db: AsyncSession,
+        conversation_id: Optional[str] = None,
+        llm_provider: Optional[LLMProvider] = None,
+    ) -> AsyncIterator[Dict[str, Any]]:
+        """
+        Stream grounded AI Q&A tokens with citation validation and persistence.
+        Yields:
+            {"event_type": "ai.response.started", "intent": str, "question": str}
+            {"event_type": "ai.token", "token": str}
+            {"event_type": "ai.response.completed", "payload": Dict[str, Any]}
+            {"event_type": "ai.response.error", "error": str}
+        """
+        start_time = datetime.now(timezone.utc)
+        question = question.strip()
+        if not question:
+            yield {"event_type": "ai.response.error", "error": "Question cannot be empty"}
+            return
+
+        # 1. Verify Repository
+        repo_res = await db.execute(select(Repository).where(Repository.id == repository_id))
+        repository = repo_res.scalars().first()
+        if not repository:
+            yield {"event_type": "ai.response.error", "error": f"Repository '{repository_id}' not found."}
+            return
+
+        # 2. Check conversation
+        conversation = None
+        if conversation_id:
+            c_res = await db.execute(
+                select(Conversation).where(
+                    and_(
+                        Conversation.id == conversation_id,
+                        Conversation.repository_id == repository_id,
+                    )
+                )
+            )
+            conversation = c_res.scalars().first()
+
+        # 3. Intent Classification & Keywords
+        intent, keywords = self.classify_query(question)
+
+        yield {
+            "event_type": "ai.response.started",
+            "repository_id": repository_id,
+            "conversation_id": conversation.id if conversation else None,
+            "intent": intent,
+            "question": question,
+        }
+
+        # 4. Evidence Retrieval
+        retrieved_sources = await self.retrieve_evidence(
+            repository_id=repository_id,
+            query=question,
+            intent=intent,
+            keywords=keywords,
+            db=db,
+        )
+
+        relationships_summary = ""
+        if intent in ["ARCHITECTURE", "FLOW", "DEPENDENCY", "CALL_GRAPH"]:
+            deps_q = select(Dependency).where(Dependency.repository_id == repository_id).limit(10)
+            deps_sample = (await db.execute(deps_q)).scalars().all()
+            if deps_sample:
+                rel_lines = []
+                for d in deps_sample:
+                    meta = d.metadata_json or {}
+                    src_p = meta.get("source_path") or "Module"
+                    tgt_p = meta.get("target_path") or d.name
+                    rel_lines.append(f"- `{src_p}` → `{tgt_p}` ({d.dependency_type})")
+                relationships_summary = "\n".join(rel_lines)
+
+        user_prompt, source_id_map = self.build_context_package(
+            repository=repository,
+            query=question,
+            intent=intent,
+            sources=retrieved_sources,
+            relationships_summary=relationships_summary,
+        )
+
+        # 5. Token streaming from LLM provider
+        provider = llm_provider or get_llm_provider()
+        raw_answer_chunks = []
+        try:
+            async for token in provider.generate_stream(
+                system_prompt=SYSTEM_PROMPT,
+                user_prompt=user_prompt,
+                temperature=0.1,
+            ):
+                raw_answer_chunks.append(token)
+                yield {"event_type": "ai.token", "token": token}
+        except Exception as e:
+            logger.error(f"Streaming LLM generation failed: {e}", exc_info=True)
+            yield {"event_type": "ai.response.error", "error": f"LLM error: {str(e)}"}
+            return
+
+        raw_answer = "".join(raw_answer_chunks)
+        cited_ids = list(dict.fromkeys(re.findall(r"\[(source_\d+)\]", raw_answer)))
+
+        # 6. Citation Validation Layer
+        formatted_answer, final_sources = self.validate_and_format_citations(
+            raw_answer=raw_answer,
+            cited_ids=cited_ids,
+            source_id_map=source_id_map,
+            repository_id=repository_id,
+        )
+
+        related_files = sorted(list(set(s["path"] for s in final_sources if s.get("path"))))
+        related_symbols = sorted(list(set(s["symbol"] for s in final_sources if s.get("symbol"))))
+        duration_ms = (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
+
+        # 7. Persist to Conversation
+        if conversation:
+            current_messages = list(conversation.messages or [])
+            current_messages.append({
+                "role": "user",
+                "content": question,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            })
+            current_messages.append({
+                "role": "assistant",
+                "content": formatted_answer,
+                "sources": final_sources,
+                "intent": intent,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            })
+            conversation.messages = current_messages
+            await db.commit()
+
+        response_payload = {
+            "repository_id": repository_id,
+            "conversation_id": conversation.id if conversation else None,
+            "question": question,
+            "answer": formatted_answer,
+            "intent": intent,
+            "evidence": final_sources,
+            "sources": final_sources,
+            "related_symbols": related_symbols,
+            "related_files": related_files,
+            "related_dependencies": [],
+            "duration_ms": round(duration_ms, 2),
+        }
+
+        yield {
+            "event_type": "ai.response.completed",
+            "payload": response_payload,
+        }
 
     def invalidate_cache(self, repository_id: Optional[str] = None):
         """Invalidate Q&A cache when repository is re-indexed."""

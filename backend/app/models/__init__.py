@@ -15,6 +15,7 @@ from backend.app.models.simulation import Simulation
 from backend.app.models.conversation import Conversation
 from backend.app.models.engineering_plan import EngineeringPlan
 from backend.app.models.pull_request_review import PullRequestReview
+from backend.app.models.collaboration import Annotation, Comment
 
 __all__ = [
     "Base",
@@ -39,4 +40,6 @@ __all__ = [
     "Conversation",
     "EngineeringPlan",
     "PullRequestReview",
+    "Annotation",
+    "Comment",
 ]

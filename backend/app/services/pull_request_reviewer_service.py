@@ -24,6 +24,8 @@ from backend.app.services.technical_debt_service import TechnicalDebtService
 from backend.app.services.security_reliability_service import SecurityReliabilityService
 from backend.app.services.git_history_service import GitHistoryService
 from backend.app.services.llm_provider import GroundedDeterministicProvider, get_llm_provider
+from backend.app.schemas.collaboration import CollaborationEventType
+from backend.app.services.collaboration_manager import collaboration_manager
 
 logger = logging.getLogger("codeatlas.pr_reviewer")
 
@@ -805,6 +807,23 @@ class PullRequestReviewerService:
         if not repo:
             raise ValueError(f"Repository '{repository_id}' not found.")
 
+        # Broadcast PR review started event
+        try:
+            await collaboration_manager.broadcast_to_repository(
+                repository_id=repository_id,
+                event_type=CollaborationEventType.PR_REVIEW_STARTED.value,
+                payload={
+                    "title": title,
+                    "pr_number": pr_number,
+                    "base_commit_sha": base_commit_sha,
+                    "head_commit_sha": head_commit_sha,
+                    "author": author,
+                    "status": "started",
+                },
+            )
+        except Exception:
+            pass
+
         # 1. Load config
         config = self.load_repository_config(repo.clone_path, config_override)
 
@@ -819,6 +838,20 @@ class PullRequestReviewerService:
         # Apply file limit
         max_files = config.get("limits", {}).get("max_files", 200)
         file_diffs = file_diffs[:max_files]
+
+        # Broadcast PR review progress
+        try:
+            await collaboration_manager.broadcast_to_repository(
+                repository_id=repository_id,
+                event_type=CollaborationEventType.PR_REVIEW_PROGRESS.value,
+                payload={
+                    "stage": "diff_parsed",
+                    "files_count": len(file_diffs),
+                    "progress_percent": 25,
+                },
+            )
+        except Exception:
+            pass
 
         insertions = sum(f.get("additions", 0) for f in file_diffs)
         deletions = sum(f.get("deletions", 0) for f in file_diffs)
@@ -1005,6 +1038,24 @@ class PullRequestReviewerService:
         db.add(review)
         await db.commit()
         await db.refresh(review)
+
+        # Broadcast PR review completed
+        try:
+            await collaboration_manager.broadcast_to_repository(
+                repository_id=repository_id,
+                event_type=CollaborationEventType.PR_REVIEW_COMPLETED.value,
+                payload={
+                    "review_id": review.id,
+                    "title": review.title,
+                    "gate_status": review.review_gate_status,
+                    "breaking_changes_count": review.breaking_changes_count,
+                    "architecture_violations_count": review.architecture_violations_count,
+                    "security_findings_count": review.security_findings_count,
+                    "risk_delta": review.risk_delta,
+                },
+            )
+        except Exception:
+            pass
 
         return review
 

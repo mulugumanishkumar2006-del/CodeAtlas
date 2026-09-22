@@ -63,6 +63,10 @@ import {
   PullRequestReviewListResponse,
   PullRequestReviewDiffResponse,
   PullRequestReviewFindingsResponse,
+  PresenceUser,
+  AnnotationItem,
+  CommentItem,
+  InvestigationItem,
 } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
@@ -785,6 +789,87 @@ class ApiClient {
     repositoryId: string
   ): Promise<{ repository_id: string; config: Record<string, any> }> {
     return this.request(`/repositories/${repositoryId}/reviews/config`);
+  }
+
+  // --- Phase 25: Real-Time Multi-User Collaboration ---
+
+  async getPresence(repositoryId: string): Promise<PresenceUser[]> {
+    return this.request<PresenceUser[]>(`/repositories/${repositoryId}/presence`);
+  }
+
+  async getAnnotations(
+    repositoryId: string,
+    targetType?: string,
+    targetId?: string
+  ): Promise<AnnotationItem[]> {
+    const params = new URLSearchParams();
+    if (targetType) params.append('target_type', targetType);
+    if (targetId) params.append('target_id', targetId);
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    return this.request<AnnotationItem[]>(`/repositories/${repositoryId}/annotations${qs}`);
+  }
+
+  async createAnnotation(
+    repositoryId: string,
+    payload: { target_type: string; target_id: string; category: string; content: string; metadata_json?: any },
+    username?: string
+  ): Promise<AnnotationItem> {
+    const qs = username ? `?username=${encodeURIComponent(username)}` : '';
+    return this.request<AnnotationItem>(`/repositories/${repositoryId}/annotations${qs}`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async deleteAnnotation(repositoryId: string, annotationId: string): Promise<void> {
+    return this.request<void>(`/repositories/${repositoryId}/annotations/${encodeURIComponent(annotationId)}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getComments(
+    repositoryId: string,
+    targetType?: string,
+    targetId?: string
+  ): Promise<CommentItem[]> {
+    const params = new URLSearchParams();
+    if (targetType) params.append('target_type', targetType);
+    if (targetId) params.append('target_id', targetId);
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    return this.request<CommentItem[]>(`/repositories/${repositoryId}/comments${qs}`);
+  }
+
+  async createComment(
+    repositoryId: string,
+    payload: { target_type: string; target_id: string; content: string; parent_id?: string; metadata_json?: any },
+    username?: string
+  ): Promise<CommentItem> {
+    const qs = username ? `?username=${encodeURIComponent(username)}` : '';
+    return this.request<CommentItem>(`/repositories/${repositoryId}/comments${qs}`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async deleteComment(repositoryId: string, commentId: string): Promise<void> {
+    return this.request<void>(`/repositories/${repositoryId}/comments/${encodeURIComponent(commentId)}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getInvestigations(repositoryId: string, status?: string): Promise<InvestigationItem[]> {
+    const qs = status ? `?status=${encodeURIComponent(status)}` : '';
+    return this.request<InvestigationItem[]>(`/repositories/${repositoryId}/investigations${qs}`);
+  }
+
+  async createInvestigation(
+    repositoryId: string,
+    payload: { title: string; query: string; summary?: string; status?: string }
+  ): Promise<InvestigationItem> {
+    return this.request<InvestigationItem>(`/repositories/${repositoryId}/investigations`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
   }
 }
 

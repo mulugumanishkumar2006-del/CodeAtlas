@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Repository, HealthStatus, WorkspaceTab, RepositoryCreateInput } from './types';
+import { Repository, HealthStatus, WorkspaceTab, RepositoryCreateInput, PresenceUser } from './types';
 import { api } from './services/api';
+import { collaborationWs } from './services/collaborationWs';
 import { Sidebar } from './components/Sidebar';
 import { WorkspaceNav } from './components/WorkspaceNav';
 import { EmptyState } from './components/EmptyState';
@@ -16,6 +17,8 @@ export const App: React.FC = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [initialChatQuestion, setInitialChatQuestion] = useState<string | null>(null);
+  const [activeUsers, setActiveUsers] = useState<PresenceUser[]>([]);
+  const [liveAnalysis, setLiveAnalysis] = useState<{ stage: string; progress_percent: number } | null>(null);
 
   // Fetch health and repository list from backend
   const loadInitialData = useCallback(async () => {
@@ -78,6 +81,60 @@ export const App: React.FC = () => {
 
     return () => clearInterval(interval);
   }, [loadInitialData]);
+
+  // Real-Time Collaboration: WebSocket lifecycle & live events
+  useEffect(() => {
+    if (!selectedRepo) {
+      collaborationWs.disconnect();
+      setActiveUsers([]);
+      return;
+    }
+
+    collaborationWs.connect(selectedRepo.id, activeTab);
+
+    // Initial presence fetch
+    api.getPresence(selectedRepo.id).then((users) => {
+      if (users && users.length > 0) setActiveUsers(users);
+    }).catch(() => {});
+
+    const unsubPresence = collaborationWs.on('presence.update', (ev) => {
+      if (ev.payload?.users) {
+        setActiveUsers(ev.payload.users);
+      }
+    });
+
+    const unsubAnalysisProg = collaborationWs.on('analysis.progress', (ev) => {
+      setLiveAnalysis({
+        stage: ev.payload.stage || ev.payload.current_stage || 'analyzing',
+        progress_percent: ev.payload.progress_percent || ev.payload.progress || 0,
+      });
+      setSelectedRepo((prev) => (prev ? { ...prev, analysis_status: 'running' } : null));
+    });
+
+    const unsubAnalysisDone = collaborationWs.on('analysis.completed', () => {
+      setLiveAnalysis(null);
+      refreshRepository(selectedRepo.id);
+    });
+
+    const unsubAnalysisFail = collaborationWs.on('analysis.failed', () => {
+      setLiveAnalysis(null);
+      refreshRepository(selectedRepo.id);
+    });
+
+    return () => {
+      unsubPresence();
+      unsubAnalysisProg();
+      unsubAnalysisDone();
+      unsubAnalysisFail();
+    };
+  }, [selectedRepo?.id, refreshRepository]);
+
+  // Tab change heartbeat
+  useEffect(() => {
+    if (selectedRepo) {
+      collaborationWs.sendHeartbeat(activeTab);
+    }
+  }, [activeTab, selectedRepo]);
 
   // Handle adding repository
   const handleAddRepository = async (input: RepositoryCreateInput) => {
@@ -181,13 +238,75 @@ export const App: React.FC = () => {
               {selectedRepo ? selectedRepo.name : 'Workspace'}
             </h2>
             {selectedRepo && (
-              <span className="repo-badge-status">
-                {selectedRepo.analysis_status === 'completed'
-                  ? 'ANALYZED'
-                  : selectedRepo.analysis_status === 'running'
-                  ? 'ANALYZING'
-                  : selectedRepo.acquisition_status || selectedRepo.status}
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span className="repo-badge-status">
+                  {selectedRepo.analysis_status === 'completed'
+                    ? 'ANALYZED'
+                    : selectedRepo.analysis_status === 'running'
+                    ? 'ANALYZING'
+                    : selectedRepo.acquisition_status || selectedRepo.status}
+                </span>
+
+                {/* Live Analysis Progress */}
+                {liveAnalysis && (
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      padding: '2px 8px',
+                      borderRadius: '12px',
+                      background: 'rgba(99, 102, 241, 0.15)',
+                      color: '#818cf8',
+                      border: '1px solid rgba(99, 102, 241, 0.3)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}
+                  >
+                    <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: '#6366f1', animation: 'pulse 1.5s infinite' }}></span>
+                    {liveAnalysis.stage} ({liveAnalysis.progress_percent}%)
+                  </span>
+                )}
+
+                {/* Real-Time Collaborators Presence Avatars */}
+                {activeUsers.length > 0 && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      marginLeft: '12px',
+                      paddingLeft: '12px',
+                      borderLeft: '1px solid rgba(255, 255, 255, 0.1)',
+                      gap: '4px',
+                    }}
+                    title={`${activeUsers.length} collaborator(s) online`}
+                  >
+                    <span style={{ fontSize: '11px', color: '#94a3b8', marginRight: '4px' }}>Online:</span>
+                    {activeUsers.map((u) => (
+                      <div
+                        key={u.user_id}
+                        style={{
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '50%',
+                          backgroundColor: u.color || '#6366f1',
+                          color: '#fff',
+                          fontSize: '10px',
+                          fontWeight: 600,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          border: '2px solid #0f172a',
+                          boxShadow: '0 0 6px rgba(0,0,0,0.3)',
+                          cursor: 'pointer',
+                        }}
+                        title={`${u.username} (${u.current_tab || 'overview'})`}
+                      >
+                        {u.username.substring(0, 2).toUpperCase()}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
           </div>
 

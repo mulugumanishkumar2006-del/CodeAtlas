@@ -25,6 +25,7 @@ import {
   PullRequestReviewDetail,
   PullRequestReviewCreateInput,
 } from '../types';
+import { collaborationWs } from '../services/collaborationWs';
 
 interface PullRequestReviewViewProps {
   repositoryId: string;
@@ -46,6 +47,7 @@ export const PullRequestReviewView: React.FC<PullRequestReviewViewProps> = ({
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<DetailTab>('summary');
   const [severityFilter, setSeverityFilter] = useState<string>('ALL');
+  const [liveReviewProgress, setLiveReviewProgress] = useState<{ stage: string; progress_percent: number } | null>(null);
 
   // Trigger modal state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -88,6 +90,34 @@ export const PullRequestReviewView: React.FC<PullRequestReviewViewProps> = ({
       setIsDetailLoading(false);
     }
   }, [repositoryId]);
+
+  // Real-time PR Review progress updates
+  useEffect(() => {
+    const unsubStarted = collaborationWs.on('pr_review.started', () => {
+      setLiveReviewProgress({ stage: 'Starting PR analysis...', progress_percent: 15 });
+    });
+
+    const unsubProgress = collaborationWs.on('pr_review.progress', (ev) => {
+      setLiveReviewProgress({
+        stage: ev.payload?.stage || 'Analyzing changes...',
+        progress_percent: ev.payload?.progress_percent || 50,
+      });
+    });
+
+    const unsubCompleted = collaborationWs.on('pr_review.completed', (ev) => {
+      setLiveReviewProgress(null);
+      loadReviews();
+      if (ev.payload?.review_id) {
+        setSelectedReviewId(ev.payload.review_id);
+      }
+    });
+
+    return () => {
+      unsubStarted();
+      unsubProgress();
+      unsubCompleted();
+    };
+  }, [loadReviews]);
 
   useEffect(() => {
     loadReviews();
@@ -200,6 +230,35 @@ export const PullRequestReviewView: React.FC<PullRequestReviewViewProps> = ({
             <PlusCircle size={14} /> Review PR
           </button>
         </div>
+
+        {/* Live PR Review Progress Banner */}
+        {liveReviewProgress && (
+          <div
+            style={{
+              margin: '8px',
+              padding: '10px 12px',
+              borderRadius: 6,
+              background: 'rgba(99, 102, 241, 0.12)',
+              border: '1px solid rgba(99, 102, 241, 0.3)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 6,
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#818cf8', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#6366f1', display: 'inline-block' }}></span>
+                PR Review in Progress
+              </span>
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                {liveReviewProgress.progress_percent}%
+              </span>
+            </div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+              {liveReviewProgress.stage}
+            </div>
+          </div>
+        )}
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
           {isLoading ? (

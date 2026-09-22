@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { Repository, ChatMessage } from '../types';
 import { api } from '../services/api';
+import { collaborationWs } from '../services/collaborationWs';
 
 interface ChatAssistantViewProps {
   repository: Repository;
@@ -120,49 +121,150 @@ export const ChatAssistantView: React.FC<ChatAssistantViewProps> = ({
     setIsLoading(true);
     setLoadingStage('Analyzing query intent & keywords...');
 
-    const timer1 = setTimeout(() => setLoadingStage('Retrieving repository AST symbols & source code...'), 600);
-    const timer2 = setTimeout(() => setLoadingStage('Synthesizing grounded evidence & citations...'), 1200);
+    // Try real-time streaming via WebSocket
+    let streamedAnyToken = false;
+    let unsubToken: (() => void) | null = null;
+    let unsubComplete: (() => void) | null = null;
+    let unsubError: (() => void) | null = null;
+
+    const cleanupWsListeners = () => {
+      if (unsubToken) unsubToken();
+      if (unsubComplete) unsubComplete();
+      if (unsubError) unsubError();
+    };
+
+    const runRestFallback = async () => {
+      cleanupWsListeners();
+      try {
+        const response = await api.queryRepository(
+          repository.id,
+          q,
+          activeConversationId,
+        );
+
+        const assistantMsg: ChatMessage = {
+          role: 'assistant',
+          content: response.answer,
+          intent: response.intent,
+          evidence: response.evidence || response.sources || [],
+          sources: response.sources || response.evidence || [],
+          related_symbols: response.related_symbols,
+          related_files: response.related_files,
+          related_dependencies: response.related_dependencies,
+          created_at: new Date().toISOString(),
+        };
+
+        setMessages((prev) => {
+          // Replace empty streaming placeholder if present, else append
+          const last = prev[prev.length - 1];
+          if (last && last.role === 'assistant' && !last.content) {
+            return [...prev.slice(0, -1), assistantMsg];
+          }
+          return [...prev, assistantMsg];
+        });
+
+        if (response.conversation_id && !activeConversationId) {
+          setActiveConversationId(response.conversation_id);
+        }
+      } catch (err: any) {
+        setError(err.message || 'Failed to query repository intelligence.');
+        const errorMsg: ChatMessage = {
+          role: 'assistant',
+          content: `Error: ${err.message || 'Unable to complete repository analysis. Please verify the repository has been indexed.'}`,
+          sources: [],
+          created_at: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, errorMsg]);
+      } finally {
+        setIsLoading(false);
+        setTimeout(() => inputRef.current?.focus(), 100);
+      }
+    };
 
     try {
-      const response = await api.queryRepository(
-        repository.id,
-        q,
-        activeConversationId,
-      );
-
-      clearTimeout(timer1);
-      clearTimeout(timer2);
-
-      const assistantMsg: ChatMessage = {
+      // Add empty assistant message placeholder ready to receive tokens
+      const placeholderMsg: ChatMessage = {
         role: 'assistant',
-        content: response.answer,
-        intent: response.intent,
-        evidence: response.evidence || response.sources || [],
-        sources: response.sources || response.evidence || [],
-        related_symbols: response.related_symbols,
-        related_files: response.related_files,
-        related_dependencies: response.related_dependencies,
-        created_at: new Date().toISOString(),
-      };
-
-      setMessages((prev) => [...prev, assistantMsg]);
-      if (response.conversation_id && !activeConversationId) {
-        setActiveConversationId(response.conversation_id);
-      }
-    } catch (err: any) {
-      clearTimeout(timer1);
-      clearTimeout(timer2);
-      setError(err.message || 'Failed to query repository intelligence.');
-      const errorMsg: ChatMessage = {
-        role: 'assistant',
-        content: `Error: ${err.message || 'Unable to complete repository analysis. Please verify the repository has been indexed.'}`,
+        content: '',
         sources: [],
         created_at: new Date().toISOString(),
       };
-      setMessages((prev) => [...prev, errorMsg]);
-    } finally {
-      setIsLoading(false);
-      setTimeout(() => inputRef.current?.focus(), 100);
+      setMessages((prev) => [...prev, placeholderMsg]);
+
+      // Set up streaming token listeners
+      unsubToken = collaborationWs.on('ai.token', (ev) => {
+        const tok = ev.payload?.token;
+        if (tok) {
+          streamedAnyToken = true;
+          setMessages((prev) => {
+            const updated = [...prev];
+            const last = updated[updated.length - 1];
+            if (last && last.role === 'assistant') {
+              updated[updated.length - 1] = {
+                ...last,
+                content: last.content + tok,
+              };
+            }
+            return updated;
+          });
+        }
+      });
+
+      unsubComplete = collaborationWs.on('ai.response.completed', (ev) => {
+        cleanupWsListeners();
+        const payload = ev.payload?.payload || ev.payload;
+        if (payload) {
+          setMessages((prev) => {
+            const updated = [...prev];
+            const last = updated[updated.length - 1];
+            if (last && last.role === 'assistant') {
+              updated[updated.length - 1] = {
+                role: 'assistant',
+                content: payload.answer || last.content,
+                intent: payload.intent,
+                evidence: payload.evidence || payload.sources || [],
+                sources: payload.sources || payload.evidence || [],
+                related_symbols: payload.related_symbols,
+                related_files: payload.related_files,
+                related_dependencies: payload.related_dependencies,
+                created_at: new Date().toISOString(),
+              };
+            }
+            return updated;
+          });
+          if (payload.conversation_id && !activeConversationId) {
+            setActiveConversationId(payload.conversation_id);
+          }
+        }
+        setIsLoading(false);
+      });
+
+      unsubError = collaborationWs.on('ai.response.error', () => {
+        cleanupWsListeners();
+        if (!streamedAnyToken) {
+          runRestFallback();
+        } else {
+          setIsLoading(false);
+        }
+      });
+
+      // Send streaming query through WebSocket
+      collaborationWs.send({
+        type: 'ai.query',
+        question: q,
+        conversation_id: activeConversationId,
+      });
+
+      // Safety timeout: if no token arrives in 4 seconds, fallback to REST
+      setTimeout(() => {
+        if (!streamedAnyToken && isLoading) {
+          runRestFallback();
+        }
+      }, 4000);
+
+    } catch (wsErr) {
+      console.warn('[ChatAssistantView] WS query failed, using REST fallback:', wsErr);
+      runRestFallback();
     }
   };
 

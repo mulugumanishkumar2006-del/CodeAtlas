@@ -6,6 +6,7 @@ from backend.app.config import settings
 from backend.app.db.session import init_db, check_db_health
 from backend.app.db.redis import check_redis_health, close_redis
 from backend.app.api import api_router
+from backend.app.services.collaboration_manager import collaboration_manager
 
 logging.basicConfig(
     level=settings.LOG_LEVEL.upper(),
@@ -27,9 +28,13 @@ async def lifespan(app: FastAPI):
     redis_healthy = await check_redis_health()
     logger.info(f"Initial Health Check - Database: {db_healthy}, Redis: {redis_healthy}")
 
+    # Start Real-time Collaboration Manager & Redis PubSub
+    await collaboration_manager.start()
+
     yield
 
     logger.info("Shutting down CodeAtlas services...")
+    await collaboration_manager.stop()
     await close_redis()
     logger.info("Shutdown complete.")
 

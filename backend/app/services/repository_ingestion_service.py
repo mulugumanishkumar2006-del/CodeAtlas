@@ -23,6 +23,8 @@ from backend.app.services.dependency_resolution_service import dependency_resolv
 from backend.app.services.graph_builder_service import graph_builder
 from backend.app.services.universal_analyzer_service import universal_analyzer
 from backend.app.db.session import get_session_factory
+from backend.app.schemas.collaboration import CollaborationEventType
+from backend.app.services.collaboration_manager import collaboration_manager
 
 logger = logging.getLogger("codeatlas.ingestion")
 
@@ -77,6 +79,27 @@ class RepositoryIngestionService:
             "unsupported_languages": unsupported_languages or [],
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
+
+        # Real-time event broadcasting to repository room
+        ev_type = CollaborationEventType.ANALYSIS_PROGRESS.value
+        if status == "running" and stage in ["cloning", "scanning"] and progress_percent <= 10:
+            ev_type = CollaborationEventType.ANALYSIS_STARTED.value
+        elif status == "completed":
+            ev_type = CollaborationEventType.ANALYSIS_COMPLETED.value
+        elif status == "failed":
+            ev_type = CollaborationEventType.ANALYSIS_FAILED.value
+
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(
+                collaboration_manager.broadcast_to_repository(
+                    repository_id=repo_id,
+                    event_type=ev_type,
+                    payload=self._active_progress[repo_id],
+                )
+            )
+        except RuntimeError:
+            pass
 
     async def ingest_repository(
         self,
