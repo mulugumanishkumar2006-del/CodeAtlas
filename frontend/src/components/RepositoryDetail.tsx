@@ -140,6 +140,20 @@ export const RepositoryDetail: React.FC<RepositoryDetailProps> = ({
     };
   }, [repository.id, isAnalyzing, repository.analysis_status]);
 
+  // Reset repository-scoped state whenever selected repository changes
+  useEffect(() => {
+    setFiles([]);
+    setSymbols([]);
+    setDependencies([]);
+    setGraphData(null);
+    setSelectedNode(null);
+    setProfile(null);
+    setAnalysisProgress(null);
+    setExplorerTargetFileId(null);
+    setExplorerTargetLine(null);
+    setImpactTargetId(null);
+  }, [repository.id]);
+
   // Load files, symbols, dependencies, graph and universal profile when analysis is completed or partial
   useEffect(() => {
     const isFinished = 

@@ -83,10 +83,26 @@ export const QualityView: React.FC<QualityViewProps> = ({
   const [fileSortBy, setFileSortBy] = useState<string>('risk');
   const [fileRiskFilter, setFileRiskFilter] = useState<string>('ALL');
 
+  // Reset quality & risk state when repositoryId changes
+  useEffect(() => {
+    setSummary(null);
+    setFiles([]);
+    setDuplications([]);
+    setDebtSummary(null);
+    setRiskSummary(null);
+    setHotspots([]);
+    setDebtFindings([]);
+    setTrendsData(null);
+    setSelectedFindingDetail(null);
+    setEntityRiskData(null);
+    setEntityRiskError(null);
+  }, [repositoryId]);
+
   const loadData = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
+
 
       const [
         summaryRes,

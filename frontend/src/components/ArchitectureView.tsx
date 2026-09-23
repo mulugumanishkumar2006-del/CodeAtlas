@@ -85,6 +85,10 @@ export const ArchitectureView: React.FC<ArchitectureViewProps> = ({
     let isMounted = true;
     setIsLoading(true);
     setError(null);
+    setArchData(null);
+    setGraphData(null);
+    setAdvIntel(null);
+    setAnnotations([]);
     setSelectedGroup(null);
     setSelectedModule(null);
     setSelectedNode(null);

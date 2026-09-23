@@ -1814,8 +1814,8 @@ async def _get_repository_history_data(repository_id: str, db: AsyncSession) -> 
     try:
         q_data = await _get_repository_quality_data(repository_id, db)
         quality_metrics = q_data.get("files", [])
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"Failed to fetch quality metrics for history analysis: {e}")
 
     clone_path = repo.clone_path or str(git_service.get_repository_path(repository_id))
 
@@ -2034,8 +2034,8 @@ async def _get_repository_dependency_data(repository_id: str, db: AsyncSession) 
     try:
         a_data = await _get_repository_architecture_data(repository_id, db)
         arch_nodes = a_data.get("nodes", [])
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"Failed to fetch architecture nodes for dependency analysis: {e}")
 
     dep_data = dependency_intelligence_service.analyze_repository_dependencies(
         repository_id=repository_id,
@@ -2869,8 +2869,8 @@ async def get_repository_finding_detail(
                     "direct_dependents": len(imp.direct_dependents),
                     "affected_files_count": len(imp.affected_files),
                 }
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Failed to fetch impact context for finding: {e}")
 
         # Build time machine context if file_path available
         time_machine_context = None
@@ -2885,8 +2885,8 @@ async def get_repository_finding_detail(
                     "last_modified": evol.get("last_modified_at"),
                     "authors": evol.get("authors", []),
                 }
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Failed to fetch time machine context for finding: {e}")
 
         return FindingDetailResponse(
             finding=TechnicalDebtFindingItem(**target),

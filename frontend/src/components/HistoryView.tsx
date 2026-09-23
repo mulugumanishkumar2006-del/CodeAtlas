@@ -82,6 +82,22 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
   const [isLoadingCommitDetail, setIsLoadingCommitDetail] = useState<boolean>(false);
   const [activeTimeMachineSubSection, setActiveTimeMachineSubSection] = useState<'compare' | 'file-history' | 'snapshots'>('compare');
 
+  // Reset git history & time machine state when repositoryId changes
+  useEffect(() => {
+    setSummary(null);
+    setCommits([]);
+    setFilesMetrics([]);
+    setSnapshots([]);
+    setSelectedFromCommit('');
+    setSelectedToCommit('');
+    setCompareResult(null);
+    setCompareError(null);
+    setFileEvolution(null);
+    setFileHistoryError(null);
+    setSelectedCommitHash(null);
+    setCommitDetail(null);
+  }, [repositoryId]);
+
   const loadSnapshots = useCallback(async () => {
     try {
       const res = await api.getHistoricalSnapshots(repositoryId);

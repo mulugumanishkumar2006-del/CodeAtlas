@@ -55,6 +55,15 @@ export const SecurityReliabilityView: React.FC<SecurityReliabilityViewProps> = (
   const [selectedConfidence, setSelectedConfidence] = useState<string>('ALL');
   const [expandedFindingId, setExpandedFindingId] = useState<string | null>(null);
 
+  // Reset security & reliability state when repositoryId changes
+  useEffect(() => {
+    setSummary(null);
+    setFindings([]);
+    setDependencies([]);
+    setHotspots([]);
+    setExpandedFindingId(null);
+  }, [repositoryId]);
+
   const loadData = useCallback(async () => {
     try {
       setIsLoading(true);

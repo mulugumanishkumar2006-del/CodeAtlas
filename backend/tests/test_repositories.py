@@ -3,7 +3,7 @@ from httpx import AsyncClient
 
 
 @pytest.mark.asyncio
-async def test_repository_empty_state_and_crud_lifecycle(client: AsyncClient):
+async def test_repository_empty_state_and_crud_lifecycle(client: AsyncClient, repo_a_python_origin):
     # 1. Verify initial empty list - no fake data
     response = await client.get("/api/v1/repositories")
     assert response.status_code == 200
@@ -11,10 +11,10 @@ async def test_repository_empty_state_and_crud_lifecycle(client: AsyncClient):
 
     # 2. Add real repository
     payload = {
-        "name": "fastapi/fastapi",
-        "url": "https://github.com/fastapi/fastapi",
-        "default_branch": "master",
-        "description": "FastAPI framework, high performance, easy to learn, fast to code, ready for production",
+        "name": "codeatlas/test-repo",
+        "url": str(repo_a_python_origin.as_uri()),
+        "default_branch": "main",
+        "description": "Hermetic local repository for CRUD lifecycle testing",
     }
     create_res = await client.post("/api/v1/repositories", json=payload)
     assert create_res.status_code == 201

@@ -28,3 +28,19 @@ async def get_health() -> HealthStatus:
         redis="connected" if redis_ok else "disconnected",
         timestamp=datetime.now(timezone.utc),
     )
+
+
+@router.get("/ready")
+async def get_readiness():
+    db_ok = await check_db_health()
+    redis_ok = await check_redis_health()
+    
+    return {
+        "status": "ready" if db_ok else "unready",
+        "database": "connected" if db_ok else "disconnected",
+        "redis": "connected" if redis_ok else "disconnected",
+        "version": settings.VERSION,
+        "environment": settings.ENVIRONMENT,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+

@@ -18,6 +18,10 @@ class FailingMockLLMProvider(LLMProvider):
     async def generate(self, system_prompt: str, user_prompt: str, temperature: float = 0.1):
         raise RuntimeError("Simulated upstream LLM API connection timeout")
 
+    async def generate_stream(self, system_prompt: str, user_prompt: str, temperature: float = 0.1):
+        raise RuntimeError("Simulated upstream LLM API connection timeout")
+        yield ""  # pragma: no cover
+
 
 class MalformedMockLLMProvider(LLMProvider):
     async def generate(self, system_prompt: str, user_prompt: str, temperature: float = 0.1):
@@ -26,6 +30,9 @@ class MalformedMockLLMProvider(LLMProvider):
             "cited_source_ids": ["source_99"],
             "raw_response": "Malformed output",
         }
+
+    async def generate_stream(self, system_prompt: str, user_prompt: str, temperature: float = 0.1):
+        yield "Fabricated text mentioning [fake_source_99] and [fake_path.py:10-20]"
 
 
 @pytest.mark.asyncio

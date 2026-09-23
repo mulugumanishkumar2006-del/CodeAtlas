@@ -54,9 +54,12 @@ export const ChatAssistantView: React.FC<ChatAssistantViewProps> = ({
   // Load conversations on repo change
   useEffect(() => {
     let isMounted = true;
+    setError(null);
+    setMessages([]);
+    setActiveConversationId(null);
+
     const loadConversations = async () => {
       try {
-        setError(null);
         const res = await api.getConversations(repository.id);
         if (!isMounted) return;
         if (res.conversations && res.conversations.length > 0) {
